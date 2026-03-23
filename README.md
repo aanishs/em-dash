@@ -22,17 +22,15 @@ So we built em-dash.
 
 Originally for CoralEHR. Now open source.
 
-![em-dash compliance dashboard](docs/screenshots/overview.png)
-
 Because "pay $10k a year" and "guess" should not be the two main options.
 
 em-dash is Claude Code plus HIPAA compliance.
 
-Ten slash commands. A visual dashboard. Assess. Scan. Remediate. Report. Track vendors. Score risks. Export everything.
+Our core philosophy is simple: compliance should be human-in-the-loop.
 
-It checks your code, your cloud, your policies, and the gaps between them. It fixes what it can. Writes what's missing. Generates reports an auditor can actually use. And now it gives you a real-time compliance dashboard — evidence management, risk register, vendor/BAA tracking, findings, exportable reports — the things Vanta charges $10k/year for.
+AI is good at finding gaps, drafting fixes, and doing tedious work fast. It is not good at being the final authority on how your company handles sensitive healthcare data.
 
-Everything runs locally. Everything is readable. No mystery score. No compliance cosplay.
+So em-dash is built to assist, not impersonate judgment. You stay in control. You can inspect everything. You can override everything. Nothing important disappears into a black box and comes back wearing a confidence score.
 
 (Why "em-dash"? The em dash and "delve" are both classic AI tells. LLMs can't stop using them. The Delve scandal pushed us to ship this publicly, so the name just... worked.)
 
@@ -149,6 +147,8 @@ Open Claude Code in any project that handles PHI.
 ```
 
 All skills auto-update `.em-dash/dashboard.json` as they run. The visual dashboard (`bun run dashboard` or `/em-dashboard`) shows checklists, findings, risks, vendors, evidence, and activity in real time.
+
+![em-dash compliance dashboard](docs/screenshots/overview.png)
 
 ## What it checks
 
