@@ -26,8 +26,12 @@ interface ConftestResult {
 let conftestAvailable = false;
 
 beforeAll(() => {
-  const check = Bun.spawnSync(['conftest', '--version']);
-  conftestAvailable = check.exitCode === 0;
+  try {
+    const check = Bun.spawnSync(['conftest', '--version']);
+    conftestAvailable = check.exitCode === 0;
+  } catch {
+    conftestAvailable = false;
+  }
 });
 
 function runConftest(fixturePath: string): ConftestResult[] {
