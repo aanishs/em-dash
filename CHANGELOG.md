@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.0 — Design system polish + documentation
+
+**Pipeline fix.** The audit pipeline now correctly reads skill status from `dashboard.json`. Previously all 6 steps showed `–` because the code looked up `assess` but the data used `hipaa-assess`. Fixed key resolution, status normalization (`completed`→`complete`, `not-run`→`pending`), and the next-step recommendation logic.
+
+**Pipeline redesign.** 6 equal-width columns (`repeat(6, 1fr)`), larger icons (36px), `font-weight: 600` step names, 2-line summary clamp instead of single-line truncation. Pending steps use dashed borders to signal "not yet run." Collapses to 3-col on mobile.
+
+**Chart grid fix.** The third overview chart (Evidence Coverage) was overflowing offscreen because chart containers lacked `min-width: 0`. All three charts now render correctly at any viewport width.
+
+**Risk matrix scaling.** Changed from fixed 48px cell widths to fluid `1fr` columns with `max-width: 480px`. Matrix fills its container instead of sitting tiny and centered.
+
+**Vendor row alignment.** BAA badges, expiry dates, and risk tier pills now have minimum widths and consistent text alignment, so they form proper columns across rows.
+
+**Design system document.** New `docs/design.md` covering colors, typography, spacing, every component spec, Chart.js v4 configuration, responsive breakpoints, and interaction patterns.
+
+**Usage guide.** New `docs/guide.md` with Playwright-captured screenshots of all 7 pages: Overview, Findings, Checklist, Evidence, Risks, Vendors, Activity. Each section explains what the page shows and how to use it.
+
+**README screenshot.** Hero image of the dashboard added to the README intro.
+
+**328 tests. 0 failures.**
+
 ## v1.1.0 — Compliance dashboard + vendor/risk management
 
 **Visual compliance dashboard.** Run `bun run dashboard` or `/em-dashboard` to open a real-time dashboard at localhost:3000. Sidebar navigation, dark mode, live reload. Checklist tracking, evidence management, risk register, vendor/BAA tracking, findings, activity timeline, charts — running locally for free.

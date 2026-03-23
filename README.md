@@ -22,6 +22,8 @@ So we built em-dash.
 
 Originally for CoralEHR. Now open source.
 
+![em-dash compliance dashboard](docs/screenshots/overview.png)
+
 Because "pay $10k a year" and "guess" should not be the two main options.
 
 em-dash is Claude Code plus HIPAA compliance.
@@ -270,6 +272,8 @@ Contributors welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) — "Adding a new c
 
 | Document | Description |
 |----------|-------------|
+| [docs/guide.md](docs/guide.md) | Visual usage guide with screenshots of every page |
+| [docs/design.md](docs/design.md) | Design system reference (colors, typography, components, Chart.js) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Project architecture, contribution paths, testing guide |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
