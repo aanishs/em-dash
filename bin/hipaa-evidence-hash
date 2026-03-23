@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# hipaa-evidence-hash — SHA-256 hash evidence files for tamper detection
+# Usage: hipaa-evidence-hash <file>           → print hash
+#        hipaa-evidence-hash <directory>      → hash all files, write manifest
+#        hipaa-evidence-hash verify <manifest> → verify integrity
+set -euo pipefail
+
+hash_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1"
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1"
+  else
+    openssl dgst -sha256 "$1" | sed 's/.*= //'
+  fi
+}
+
+case "${1:-}" in
+  verify)
+    MANIFEST="${2:?Usage: hipaa-evidence-hash verify <manifest>}"
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum -c "$MANIFEST"
+    elif command -v shasum >/dev/null 2>&1; then
+      shasum -a 256 -c "$MANIFEST"
+    else
+      echo "Error: sha256sum or shasum required for verification" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    TARGET="${1:?Usage: hipaa-evidence-hash <file|directory>}"
+    if [ -f "$TARGET" ]; then
+      hash_file "$TARGET"
+    elif [ -d "$TARGET" ]; then
+      MANIFEST="$TARGET/evidence-manifest.sha256"
+      find "$TARGET" -type f ! -name 'evidence-manifest.sha256' -print0 | \
+        sort -z | \
+        xargs -0 -I {} sh -c 'sha256sum "{}" 2>/dev/null || shasum -a 256 "{}"' \
+        > "$MANIFEST"
+      echo "Manifest written: $MANIFEST"
+      echo "$(wc -l < "$MANIFEST" | tr -d ' ') files hashed"
+    else
+      echo "Error: $TARGET not found" >&2
+      exit 1
+    fi
+    ;;
+esac

@@ -1,0 +1,5 @@
+kind: Namespace
+metadata:
+  name: patient-data
+  labels:
+    contains-phi: "true"

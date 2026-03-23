@@ -1,0 +1,21 @@
+kind: Deployment
+metadata:
+  name: secure-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: gcr.io/my-project/app:v1.2.3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            privileged: false
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: db-password
+            - name: APP_NAME
+              value: "my-app"

@@ -1,0 +1,516 @@
+---
+name: hipaa-scan
+version: 0.1.0
+description: |
+  Automated HIPAA technical scanning. Wraps Prowler (AWS), Lynis (system),
+  and Trivy (containers/code) with graceful degradation. Scans codebase for
+  PHI exposure. Maps all findings to specific HIPAA requirements.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - AskUserQuestion
+hipaa_sections:
+  - "164.312(a)(1)"
+  - "164.312(a)(2)(iv)"
+  - "164.312(b)"
+  - "164.312(e)(1)"
+  - "164.308(a)(1)"
+  - "164.308(a)(8)"
+risk_level: high
+requires_prior: [hipaa-assess]
+---
+
+{{PREAMBLE}}
+
+{{TOOL_DETECTION}}
+
+# /hipaa-scan: Automated HIPAA Technical Scanning
+
+You are running the `/hipaa-scan` skill. Systematically scan the project's infrastructure, system configuration, containers, and codebase for HIPAA compliance gaps. Map every finding to a specific HIPAA requirement. Gracefully degrade when scanning tools are unavailable.
+
+---
+
+## Phase 1: Scan Planning
+
+1. **Check for prior assessment.** Read the most recent assessment report if one exists:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+ls -t ~/.em-dash/projects/${SLUG:-unknown}/*-assessment-*.md 2>/dev/null | head -1
+```
+
+If an assessment report exists, read it to understand the project's PHI scope, architecture, and compliance posture. This context helps prioritize scans.
+
+2. **Determine scan tier.** Based on the tool detection results from the Preamble:
+
+| Tier | Criteria | Coverage |
+|------|----------|----------|
+| Tier 1 (fully automated) | Prowler + at least one of Lynis/Trivy | Cloud + system + code scanning |
+| Tier 2 (partial automation) | Any scanning tool available | Automated where possible, manual otherwise |
+| Tier 3 (guided manual) | No scanning tools | CLI commands for the user to run + code-level scanning |
+
+3. **If critical tools are missing,** use AskUserQuestion:
+
+```
+This project would benefit from automated scanning tools that are not currently installed.
+
+Missing tools: [list missing tools and what they cover]
+
+RECOMMENDATION: Choose A to get the most comprehensive scan results.
+
+A) Install missing tools now (estimated: 2-5 minutes)
+B) Skip missing tools — scan with what's available
+C) Install later — show me what each tool does first
+```
+
+If the user chooses A, provide installation commands:
+- Prowler: `pip install prowler` or `brew install prowler`
+- Lynis: `brew install lynis` or `apt install lynis`
+- Trivy: `brew install trivy` or `curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh`
+
+4. **Display the scan plan** before proceeding:
+
+```
+SCAN PLAN
+================================
+Tier: [1/2/3]
+Tools: [list tools that will run]
+Estimated time: [estimate]
+
+Phases:
+  [x] Cloud Infrastructure Scan — [tool or "manual checks"]
+  [x] System-Level Scan — [tool or "skip"]
+  [x] Container & Code Scan — [tool or "skip"]
+  [x] Code-Level PHI Scan — Grep-based (always runs)
+  [x] Network & Config Checks — [tool or "manual"]
+================================
+```
+
+---
+
+## Phase 2: Cloud Infrastructure Scan
+
+Before running cloud checks, confirm with the user via AskUserQuestion:
+
+"Your project has cloud CLIs available ([list detected]). Running infrastructure checks will query your cloud APIs (read-only). This requires active credentials.
+
+RECOMMENDATION: Choose A for the most comprehensive scan.
+
+A) Run live cloud checks (read-only API queries)
+B) Skip cloud checks — scan IaC files and code only
+C) Run cloud checks for specific services only"
+
+### 2A: AWS
+
+If `CLOUD_AWS=true` and user approved live checks:
+
+If `TOOL_PROWLER=true`, run the full Prowler HIPAA scan first:
+
+```bash
+prowler aws --compliance hipaa_aws --output-formats json-ocsf \
+  --output-directory /tmp/hipaa-prowler-$(date +%Y%m%d) 2>&1 | tail -20
+```
+
+Prowler maps 83 checks to HIPAA requirements automatically. Read the JSON output and extract:
+- Total checks run, passed, failed, skipped
+- Each failed check with its HIPAA requirement mapping
+
+Then run supplemental checks. If `TOOL_PROWLER=false`, run ALL checks below as primary scan.
+
+{{AWS_CHECKS}}
+
+### 2B: GCP
+
+If `CLOUD_GCP=true` and user approved live checks:
+
+{{GCP_CHECKS}}
+
+### 2C: Azure
+
+If `CLOUD_AZURE=true` and user approved live checks:
+
+{{AZURE_CHECKS}}
+
+If no cloud CLIs are available, note: "No cloud CLIs detected. Cloud infrastructure scanning skipped. If this project uses cloud services, install the appropriate CLI (aws, gcloud, az) and re-run."
+
+---
+
+## Phase 3: System-Level Scan
+
+If `TOOL_LYNIS=true`, run the Lynis system audit:
+
+```bash
+sudo lynis audit system --no-colors --quick 2>&1 | tee /tmp/hipaa-lynis-$(date +%Y%m%d).txt
+```
+
+If sudo is not available, run without it (reduced coverage):
+
+```bash
+lynis audit system --no-colors --quick --pentest 2>&1 | tee /tmp/hipaa-lynis-$(date +%Y%m%d).txt
+```
+
+Map Lynis finding categories to HIPAA requirements:
+
+| Lynis Category | HIPAA Requirement | Section |
+|----------------|-------------------|---------|
+| AUTH-* | Access Control | 164.312(a) |
+| FILE-* | Integrity Controls | 164.312(c) |
+| NETW-* | Transmission Security | 164.312(e) |
+| LOGG-* | Audit Controls | 164.312(b) |
+| CRYP-* | Encryption | 164.312(a)(2)(iv) |
+| MALW-* | Protection from Malicious Software | 164.308(a)(5)(ii)(B) |
+| FIRE-* | Transmission Security | 164.312(e) |
+| KRNL-* | Integrity Controls | 164.312(c) |
+
+If `TOOL_LYNIS=false`, provide manual check commands that the user can run:
+
+```bash
+# Check password policy
+grep -E "PASS_MAX_DAYS|PASS_MIN_LEN|PASS_WARN_AGE" /etc/login.defs 2>/dev/null || echo "Not a Linux system or login.defs not found"
+
+# Check SSH configuration
+grep -E "PermitRootLogin|PasswordAuthentication|Protocol" /etc/ssh/sshd_config 2>/dev/null || echo "SSH config not found"
+
+# Check firewall status
+ufw status 2>/dev/null || iptables -L -n 2>/dev/null || pfctl -sr 2>/dev/null || echo "No firewall detected"
+
+# Check disk encryption
+fdesetup status 2>/dev/null || lsblk -o NAME,FSTYPE,MOUNTPOINT 2>/dev/null || echo "Could not check disk encryption"
+```
+
+---
+
+## Phase 4: Container & Code Scan
+
+**Smart-skip:** Before running container scans, check if the project actually uses containers:
+
+```bash
+ls Dockerfile docker-compose.yml docker-compose.yaml 2>/dev/null
+ls -d k8s/ kubernetes/ helm/ 2>/dev/null
+```
+
+If no container-related files exist, skip the container image scan and note: "No container artifacts detected — skipping container image scan."
+
+### 4A: Container Image Scan
+
+If `TOOL_TRIVY=true` and Docker images or Dockerfiles are found:
+
+```bash
+# Scan Dockerfile for misconfigurations
+trivy config . --severity HIGH,CRITICAL --format json 2>&1
+
+# If Docker is running, scan built images
+docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | head -5
+```
+
+For each image found:
+
+```bash
+trivy image <image-name> --severity HIGH,CRITICAL --format json 2>&1
+```
+
+### 4B: Infrastructure as Code & Policy Engine
+
+{{IAC_POLICY_ENGINE}}
+
+### 4C: Secret Scan (always runs if Trivy available)
+
+If `TOOL_TRIVY=true`, scan for exposed secrets regardless of project type:
+
+```bash
+trivy fs . --scanners secret --format json 2>&1
+```
+
+Map Trivy findings to HIPAA requirements:
+- Exposed secrets → 164.312(a)(1) Access Control (unique user identification)
+- Vulnerable dependencies → 164.308(a)(5)(ii)(B) Protection from Malicious Software
+- Container misconfigurations → 164.312(a)(1) Access Control
+- IaC misconfigurations → 164.312(a)(2)(iv) Encryption, 164.312(e) Transmission Security
+
+---
+
+## Phase 5: Code-Level Security & PHI Scan
+
+This phase always runs regardless of available tools — it uses built-in Grep/Glob capabilities. It checks for HIPAA-required controls in the actual codebase, not just PHI field names.
+
+{{PHI_PATTERNS}}
+
+**Run ALL 19 checks above against the project's source files.**
+
+For each check:
+1. Run the grep commands listed
+2. Read the surrounding context (5 lines before and after) to distinguish real issues from false positives
+3. Apply the classification guide at the bottom of the PHI patterns section
+4. Record: file path, line number, check number, matched pattern, severity, and the specific HIPAA requirement violated
+
+**Important interpretation rules:**
+- CHECK 5 (RBAC): If the project handles PHI but you find NO authorization/role-checking code, this is itself a CRITICAL finding — not just "no results found." The absence of RBAC is the finding.
+- CHECK 6 (Audit Logging): Same — if PHI endpoints exist but no audit logging captures who accessed them, the absence IS the CRITICAL finding.
+- CHECK 8 (Session Timeout): If the project has user sessions but no timeout/auto-logoff configured, the absence is a HIGH finding.
+- CHECK 9 (Password Hashing): If the project handles auth (not delegated to OAuth/SSO) and uses weak hashing, that's CRITICAL.
+- CHECK 12 (Least Privilege): Any `"Action": "*"` in IAM policies is a HIGH finding even if it's in a dev environment.
+
+**Summary table to include in the report:**
+
+| Check | HIPAA Requirement | Result | Severity |
+|-------|-------------------|--------|----------|
+| PHI Identifiers (1-2) | 164.502 (Minimum Necessary) | N findings | — |
+| PHI in Logs (3) | 164.312(b) Audit Controls | N findings | — |
+| PHI in Browser (4) | 164.312(a)(1) Access Control | N findings | — |
+| RBAC/Authorization (5) | 164.312(a)(1) Access Control | PRESENT/ABSENT | — |
+| Audit Logging (6) | 164.312(b) Audit Controls | PRESENT/ABSENT | — |
+| Encryption at Rest (7) | 164.312(a)(2)(iv) Encryption | PRESENT/ABSENT | — |
+| Session Timeout (8) | 164.312(a)(2)(iii) Auto-Logoff | CONFIGURED/MISSING | — |
+| Password Hashing (9) | 164.312(d) Authentication | SECURE/WEAK/N/A | — |
+| PHI in Test Data (10) | 164.502 (Minimum Necessary) | N findings | — |
+| PHI in Errors (11) | 164.312(a)(1) Access Control | N findings | — |
+| Least Privilege (12) | 164.308(a)(4) Access Mgmt | N findings | — |
+| DB Sensitive Columns (13) | 164.502 Minimum Necessary | N findings | — |
+| DB Audit Logging (14) | 164.312(b) Audit Controls | CONFIGURED/MISSING | — |
+| DB Encryption (15) | 164.312(a)(2)(iv) Encryption | ENABLED/MISSING | — |
+| DB Access Controls (16) | 164.312(a)(1) Access Control | N findings | — |
+| DB Connection Security (17) | 164.312(e)(1) Transmission | SECURE/INSECURE | — |
+| Push/Email PHI (18) | 164.312(a)(1) Access Control | N findings | — |
+| Secrets in Config (19) | 164.312(a)(1) Access Control | N findings | — |
+
+---
+
+## Phase 5.5: Database Compliance Scan
+
+If the project uses databases (detected by config/env files, ORM imports, or database CLIs from tool detection), perform a deeper database compliance check.
+
+### 5.5A: Detect Database Type
+
+```bash
+# Check for database configuration indicators
+grep -rli "postgres\|mysql\|mongodb\|sqlite\|dynamodb\|redis\|sequelize\|prisma\|typeorm\|mongoose\|knex\|drizzle" --include="*.yml" --include="*.yaml" --include="*.env*" --include="*.json" --include="*.ts" --include="*.js" --include="*.py" . 2>/dev/null | grep -v node_modules | head -10
+```
+
+Based on the results, identify the primary database type(s): PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, SQLite, DynamoDB, or other.
+
+### 5.5B: Live Database Access (optional)
+
+Use AskUserQuestion to ask:
+
+```
+Your project appears to use [detected database type]. For the most comprehensive compliance scan, I can run read-only queries against your database to check audit logging, encryption settings, and access controls directly.
+
+RECOMMENDATION: Choose A if you have a staging/dev database available. Never run compliance queries against production.
+
+A) Yes — provide connection details (I'll run read-only checks only)
+B) Skip — scan config files only (CHECKs 13-17 from the code scan)
+```
+
+If the user chooses A and provides connection access:
+
+**For PostgreSQL:**
+```bash
+# Check audit logging configuration
+psql "$DATABASE_URL" -c "SHOW log_statement;" 2>&1
+psql "$DATABASE_URL" -c "SELECT * FROM pg_available_extensions WHERE name = 'pgaudit';" 2>&1
+
+# Check SSL enforcement
+psql "$DATABASE_URL" -c "SHOW ssl;" 2>&1
+
+# Check for overly permissive roles
+psql "$DATABASE_URL" -c "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolsuper = true;" 2>&1
+
+# Check encryption extensions
+psql "$DATABASE_URL" -c "SELECT * FROM pg_available_extensions WHERE name IN ('pgcrypto', 'pgsodium');" 2>&1
+
+# Check active connections (activity monitoring)
+psql "$DATABASE_URL" -c "SELECT count(*) as active_connections FROM pg_stat_activity;" 2>&1
+```
+
+**For MySQL:**
+```bash
+# Check audit logging
+mysql -e "SHOW VARIABLES LIKE 'audit_log%';" 2>&1
+mysql -e "SHOW VARIABLES LIKE 'general_log%';" 2>&1
+
+# Check SSL
+mysql -e "SHOW VARIABLES LIKE 'have_ssl';" 2>&1
+
+# Check overly permissive grants
+mysql -e "SELECT user, host FROM mysql.user WHERE Grant_priv = 'Y';" 2>&1
+```
+
+If the user chooses B, note: "Database live scanning skipped — relying on config-file checks (CHECKs 13-17) from the code scan phase."
+
+### 5.5C: Database Findings Summary
+
+Consolidate database findings from both live queries (if run) and config-file checks (CHECKs 13-17) into a sub-table:
+
+```
+DATABASE COMPLIANCE SUMMARY
+============================
+Database Type: [type]
+Scan Method: [live queries / config-file only]
+
+| Area               | Status          | Detail |
+|--------------------|-----------------|--------|
+| Audit Logging      | CONFIGURED/MISSING | [specifics] |
+| SSL/TLS            | ENFORCED/DISABLED/UNKNOWN | [specifics] |
+| Access Controls    | RESTRICTED/PERMISSIVE | [specifics] |
+| Encryption at Rest | ENABLED/MISSING/UNKNOWN | [specifics] |
+| PHI Columns        | N found         | [list] |
+============================
+```
+
+---
+
+## Phase 6: Network & Configuration Checks
+
+### 6A: TLS Configuration
+
+If `UTIL_OPENSSL=true` and the project has configured endpoints (check CLAUDE.md, README.md, or environment files for domain names):
+
+```bash
+# Check TLS version and cipher strength
+openssl s_client -connect <domain>:443 -tls1_2 </dev/null 2>&1 | grep -E "Protocol|Cipher|Verify"
+```
+
+```bash
+# Check certificate expiration
+openssl s_client -connect <domain>:443 </dev/null 2>&1 | openssl x509 -noout -dates 2>&1
+```
+
+Map to: 164.312(e)(1) Transmission Security — encryption of PHI in transit.
+
+If no domain is known, use AskUserQuestion to ask for the production domain, or skip with a note.
+
+### 6B: Database Encryption Verification
+
+Check for database configuration files and verify encryption settings:
+
+```bash
+# PostgreSQL
+grep -r "sslmode" config/ .env* 2>/dev/null | grep -v node_modules
+
+# MySQL
+grep -r "ssl" config/ .env* 2>/dev/null | grep -v node_modules | grep -i mysql
+
+# MongoDB
+grep -r "tls\|ssl" config/ .env* 2>/dev/null | grep -v node_modules | grep -i mongo
+```
+
+Map to: 164.312(a)(2)(iv) Encryption and Decryption, 164.312(e)(2)(ii) Encryption.
+
+### 6C: Open Port Scan
+
+If `UTIL_NMAP=true` and the project has a known host:
+
+```bash
+nmap -sT -p 1-1024 <host> 2>&1
+```
+
+If nmap is unavailable, skip with a note: "Install nmap for port scanning, or verify manually that only required ports are exposed."
+
+---
+
+## Phase 7: Generate Scan Report
+
+{{EVIDENCE_COLLECTION}}
+
+**Compile all findings into a structured scan report.**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+_USER=$(whoami 2>/dev/null || echo "unknown")
+_DATETIME=$(date +%Y%m%d-%H%M%S)
+_REPORT_PATH="$HOME/.em-dash/projects/${SLUG:-unknown}/${_USER}-scan-${_DATETIME}.md"
+echo "REPORT_PATH: $_REPORT_PATH"
+```
+
+Write the report to the path above. Use this structure:
+
+```markdown
+# HIPAA Technical Scan Report
+**Project:** [project name]
+**Date:** [date]
+**Scan Tier:** [1/2/3]
+**Auditor:** [username] (automated scan)
+
+## Scan Summary
+
+| Tool | Checks Run | Passed | Failed | Skipped |
+|------|-----------|--------|--------|---------|
+| Prowler (AWS) | N | N | N | N |
+| Lynis (System) | N | N | N | N |
+| Trivy (Container/Code) | N | N | N | N |
+| PHI Scan (Code) | N | N | N | N |
+| Network Checks | N | N | N | N |
+
+## HIPAA Requirement Mapping
+
+| Req ID | Requirement | Status | Evidence |
+|--------|-------------|--------|----------|
+| 164.312(a)(1) | Access Control | PASS/FAIL/PARTIAL | [evidence reference] |
+| 164.312(a)(2)(iv) | Encryption and Decryption | PASS/FAIL/PARTIAL | [evidence reference] |
+| 164.312(b) | Audit Controls | PASS/FAIL/PARTIAL | [evidence reference] |
+| 164.312(c)(1) | Integrity Controls | PASS/FAIL/PARTIAL | [evidence reference] |
+| 164.312(d) | Authentication | PASS/FAIL/PARTIAL | [evidence reference] |
+| 164.312(e)(1) | Transmission Security | PASS/FAIL/PARTIAL | [evidence reference] |
+| 164.308(a)(5)(ii)(B) | Security Awareness | PASS/FAIL/PARTIAL | [evidence reference] |
+
+## Critical Findings (fix immediately)
+
+[List each CRITICAL finding with:
+- Finding ID (e.g., SCAN-001)
+- HIPAA requirement it violates
+- What was found
+- Where (file:line or resource identifier)
+- Recommended fix
+- Auto-remediation available: YES/NO]
+
+## PHI Exposure Findings
+
+[List each PHI finding with:
+- Severity (CRITICAL/HIGH/MEDIUM/LOW)
+- File:line reference
+- Pattern matched
+- Context (what the code does with this data)
+- Recommended action]
+
+## Evidence Archive
+
+Evidence collected in: ~/.em-dash/projects/$SLUG/evidence/[phase-datetime]/
+Evidence manifest hash: [SHA-256 from hipaa-evidence-hash]
+
+## Remediation Availability
+
+| Finding | Auto-Fix Available | Estimated Effort |
+|---------|--------------------|------------------|
+| [finding] | YES — IaC fix / NO — manual | [human: X / CC: Y] |
+
+## Next Step
+
+Run `/hipaa-remediate` to fix findings by priority, generate missing policies,
+and collect evidence for each remediation.
+```
+
+**Log the review:**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+"$_EMDASH_BIN"/hipaa-review-log write "${SLUG:-unknown}" "hipaa-scan" "<STATUS>" <FINDINGS_COUNT>
+```
+
+Substitute STATUS with "clean" (0 critical findings), "issues_found" (any findings), or "critical" (CRITICAL findings present). Substitute FINDINGS_COUNT with the total number of findings.
+
+---
+
+## Important Rules
+
+- **Each bash block is self-contained.** Do not rely on shell variables from previous blocks. Use natural language between blocks to carry context.
+- **Smart-skip scans that do not apply.** Skip Docker scanning if no containers are detected. Skip cloud scans if no cloud CLIs are available. Skip nmap if no production host is known. Always note what was skipped and why.
+- **Never store actual PHI.** Evidence files contain configuration states, scan results, and metadata only. If a code scan finds actual PHI (e.g., a hardcoded SSN), note the file and line but do not copy the PHI value into the report.
+- **Map every finding to a HIPAA requirement.** Unmapped findings are useless for compliance reporting. If a finding does not map cleanly, note the closest requirement and flag it for manual review.
+- **Graceful degradation over failure.** If a tool crashes or returns an error, log the error, note the gap, and continue with the next phase. Never abort the entire scan because one tool failed.
+- **Recommend /hipaa-remediate as the next step** at the end of every scan report.

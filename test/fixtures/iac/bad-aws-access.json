@@ -1,0 +1,25 @@
+{
+  "resource": {
+    "aws_iam_policy": {
+      "admin_string": {
+        "name": "admin-policy",
+        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+      },
+      "admin_array": {
+        "name": "admin-policy-array",
+        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"*\"],\"Resource\":[\"*\"]}]}"
+      }
+    },
+    "aws_iam_role_policy": {
+      "role_wildcard": {
+        "name": "role-admin",
+        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"arn:aws:s3:::*\"}]}"
+      }
+    },
+    "aws_iam_user_login_profile": {
+      "dev_user": {
+        "user": "developer"
+      }
+    }
+  }
+}

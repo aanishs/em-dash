@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# em-dash setup — register skills with Claude Code
+set -e
+
+EMDASH_DIR="$(cd "$(dirname "$0")" && pwd)"
+SKILLS_DIR="$(dirname "$EMDASH_DIR")"
+
+echo "em-dash setup"
+echo "============="
+
+# 1. Migrate data directory if upgrading from hipaa-audit
+if [ -d "$HOME/.hipaa-audit" ] && [ ! -d "$HOME/.em-dash" ]; then
+  echo "  migrating ~/.hipaa-audit/ → ~/.em-dash/ ..."
+  cp -R "$HOME/.hipaa-audit" "$HOME/.em-dash"
+  echo "  migration complete (old directory preserved at ~/.hipaa-audit/)"
+fi
+
+# 2. Check for bun (needed for gen-skill-docs)
+if command -v bun >/dev/null 2>&1; then
+  echo "  bun: $(bun --version)"
+else
+  echo "  bun: not installed (optional — needed for template regeneration)"
+  echo "  Install: curl -fsSL https://bun.sh/install | bash"
+fi
+
+# 3. Make bin scripts executable
+chmod +x "$EMDASH_DIR"/bin/* 2>/dev/null || true
+echo "  bin scripts: executable"
+
+# 4. Create global state directory
+mkdir -p "$HOME/.em-dash/projects"
+echo "  state dir: ~/.em-dash/"
+
+# 5. Link skill directories into Claude Code skills
+SKILLS_BASENAME="$(basename "$SKILLS_DIR")"
+if [ "$SKILLS_BASENAME" = "skills" ]; then
+  LINKED=()
+  for skill_dir in "$EMDASH_DIR"/skills/*/; do
+    if [ -f "$skill_dir/SKILL.md" ] || [ -f "$skill_dir/SKILL.md.tmpl" ]; then
+      skill_name="$(basename "$skill_dir")"
+      target="$SKILLS_DIR/$skill_name"
+      if [ -L "$target" ] || [ ! -e "$target" ]; then
+        ln -snf "em-dash/skills/$skill_name" "$target"
+        LINKED+=("$skill_name")
+      fi
+    fi
+  done
+
+  # Also link the root (em-dash itself) so /hipaa works
+  target="$SKILLS_DIR/em-dash"
+  if [ -L "$target" ] || [ ! -e "$target" ]; then
+    ln -snf "em-dash" "$SKILLS_DIR/em-dash" 2>/dev/null || true
+  fi
+
+  if [ ${#LINKED[@]} -gt 0 ]; then
+    echo "  linked skills: ${LINKED[*]}"
+  fi
+  echo ""
+  echo "em-dash ready."
+else
+  echo ""
+  echo "em-dash ready."
+  echo "  (skipped skill symlinks — not inside .claude/skills/)"
+  echo "  To install: clone this repo into ~/.claude/skills/ and re-run setup"
+fi
+
+# 6. Generate SKILL.md files if bun is available
+if command -v bun >/dev/null 2>&1; then
+  echo ""
+  echo "Generating SKILL.md files..."
+  (cd "$EMDASH_DIR" && bun run gen:skill-docs)
+fi
+
+echo ""
+echo "Available skills:"
+echo "  /hipaa           — compliance dashboard + router"
+echo "  /hipaa-assess    — organizational assessment interview"
+echo "  /hipaa-scan      — automated technical scanning"
+echo "  /hipaa-remediate — fix findings + generate policies"
+echo "  /hipaa-report    — compliance report generation"
+echo "  /hipaa-monitor   — compliance drift detection"
+echo "  /hipaa-breach    — breach notification workflow"

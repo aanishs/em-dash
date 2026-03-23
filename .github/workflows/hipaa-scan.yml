@@ -1,0 +1,41 @@
+name: HIPAA Compliance Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: 'Which em-dash skill to run'
+        required: false
+        default: 'hipaa-scan'
+        type: choice
+        options:
+          - hipaa-scan
+          - hipaa-assess
+          - hipaa-remediate
+          - hipaa-report
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  hipaa-scan:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'hipaa-scan')
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run HIPAA compliance scan
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: |
+            You have the em-dash HIPAA compliance skills installed.
+            Run /${{ github.event.inputs.skill || 'hipaa-scan' }} on this repository.
+            Focus on code-level PHI checks and IaC policy scanning.
+            Output a compliance summary as a PR comment.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_tools: "Bash,Read,Write,Glob,Grep"
+          max_turns: 20

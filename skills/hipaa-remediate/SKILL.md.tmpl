@@ -1,0 +1,506 @@
+---
+name: hipaa-remediate
+version: 0.1.0
+description: |
+  Fix HIPAA compliance findings from assessment and scan reports. Generates
+  infrastructure fixes (Terraform/CloudFormation), code fixes (PHI removal),
+  policy documents, and evidence for each remediation.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - AskUserQuestion
+hipaa_sections:
+  - "164.312(a)(1)"
+  - "164.312(a)(2)(iv)"
+  - "164.312(b)"
+  - "164.312(e)(1)"
+risk_level: high
+requires_prior: [hipaa-scan]
+---
+
+{{PREAMBLE}}
+
+# /hipaa-remediate: HIPAA Compliance Remediation
+
+You are running the `/hipaa-remediate` skill. Fix HIPAA compliance findings from prior assessment and scan reports. For each finding: apply the fix, collect evidence, and track progress. Ask one question at a time. Never apply destructive changes without user confirmation.
+
+---
+
+## Phase 1: Load Prior Findings
+
+Read the most recent assessment and scan reports for this project:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+PROJ_DIR="$HOME/.em-dash/projects/${SLUG:-unknown}"
+echo "PROJECT_DIR: $PROJ_DIR"
+
+# Most recent assessment
+ls -t "$PROJ_DIR"/*-assessment-*.md 2>/dev/null | head -1
+
+# Most recent scan
+ls -t "$PROJ_DIR"/*-scan-*.md 2>/dev/null | head -1
+
+# Most recent remediation (if resuming)
+ls -t "$PROJ_DIR"/*-remediation-*.md 2>/dev/null | head -1
+```
+
+Read both the assessment and scan reports. Extract all findings into a unified list.
+
+**Build a prioritized findings list** sorted by:
+1. CRITICAL findings first (immediate risk of PHI exposure or breach)
+2. HIGH findings (significant compliance gaps)
+3. MEDIUM findings (partial controls, improvement needed)
+4. LOW findings (minor gaps, best practices)
+
+If a prior remediation report exists, cross-reference it to identify which findings have already been addressed. Skip those and note: "N findings previously remediated — focusing on M remaining."
+
+**If no prior reports are found,** use AskUserQuestion:
+
+```
+No prior assessment or scan reports found for this project.
+
+RECOMMENDATION: Choose A — the assessment provides the compliance context needed for effective remediation.
+
+A) Run /hipaa-assess first — structured interview to understand your compliance posture
+B) Enter findings manually — describe what you need to fix
+C) Scan first — run /hipaa-scan for automated technical findings
+```
+
+---
+
+## Phase 2: Triage and Prioritize
+
+Present the unified findings list to the user as a numbered, prioritized summary:
+
+```
+FINDINGS TRIAGE
+====================================
+CRITICAL (fix immediately):
+  1. [SCAN-001] PHI logged in plaintext — app/services/patient_service.ts:42
+  2. [SCAN-005] CloudTrail disabled — no audit trail for PHI access
+  3. [ASSESS-012] No encryption at rest for patient database
+
+HIGH (fix soon):
+  4. [SCAN-008] S3 bucket without encryption — patient-uploads
+  5. [ASSESS-019] No access control policy documented
+  6. [SCAN-011] Secrets in environment file committed to repo
+
+MEDIUM (address within 30 days):
+  7. [ASSESS-025] Incident response plan not documented
+  8. [SCAN-015] TLS 1.0 still accepted on API endpoint
+
+LOW (address within 90 days):
+  9. [ASSESS-030] Employee training records not tracked
+ 10. [ASSESS-033] BAA template not customized
+====================================
+Total: N findings (X critical, Y high, Z medium, W low)
+```
+
+Then use AskUserQuestion to determine the remediation approach:
+
+```
+How would you like to proceed with remediation?
+
+RECOMMENDATION: Choose A for the fastest path to compliance — auto-fixable items are applied with your review, manual items get checklists.
+
+A) Fix all auto-fixable items (review each before applying) + generate checklists for manual items
+B) Work sequentially from highest priority — one finding at a time
+C) Choose specific findings to fix now (enter numbers, e.g., "1,2,5,8")
+```
+
+**Group findings by remediation type** for efficient processing:
+
+| Type | Examples | How fixed |
+|------|----------|-----------|
+| Infrastructure fixes | Enable encryption, configure logging, enforce MFA | Terraform/CloudFormation/CLI commands |
+| Code fixes | PHI in logs, missing encryption, exposed secrets | Edit tool — code changes |
+| Policy generation | Access control policy, incident response plan | Templates customized for the org |
+| Manual items | BAA signing, employee training, physical security | Checklists with deadlines |
+
+---
+
+## Phase 3: Infrastructure Remediation
+
+For each infrastructure finding, follow this workflow:
+
+### Step 1: Detect IaC
+
+```bash
+ls *.tf terraform/ 2>/dev/null && echo "IAC_TERRAFORM=true" || echo "IAC_TERRAFORM=false"
+ls cloudformation/ cfn/ *.template *.yaml 2>/dev/null | grep -i cloud && echo "IAC_CFN=true" || echo "IAC_CFN=false"
+ls cdk/ 2>/dev/null && echo "IAC_CDK=true" || echo "IAC_CDK=false"
+```
+
+### Step 2: Generate the fix
+
+**If Terraform exists:** Generate a `.tf` fix or modify the existing Terraform resource. For example, to enable S3 bucket encryption:
+
+```hcl
+resource "aws_s3_bucket_server_side_encryption_configuration" "patient_uploads" {
+  bucket = aws_s3_bucket.patient_uploads.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+```
+
+**If CloudFormation exists:** Generate the equivalent CloudFormation resource update.
+
+**If no IaC:** Generate AWS CLI commands to apply the fix directly:
+
+```bash
+aws s3api put-bucket-encryption --bucket <bucket-name> --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms"}}]}'
+```
+
+### Step 3: Show the user what will change
+
+Before applying any infrastructure change, use AskUserQuestion:
+
+```
+Finding: [SCAN-004] S3 bucket 'patient-uploads' has no encryption at rest
+HIPAA Requirement: 164.312(a)(2)(iv) — Encryption and Decryption
+
+Proposed fix: Enable AWS KMS server-side encryption on the bucket.
+
+[Show the Terraform diff or CLI command]
+
+RECOMMENDATION: Choose A — this is a standard encryption fix with no data loss risk.
+
+A) Apply this fix
+B) Skip — I'll handle this manually
+C) Modify — I want a different approach
+```
+
+### Step 4: Apply and collect evidence
+
+If the user approves, apply the fix. Then collect before/after evidence:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+_EVIDENCE_DIR=~/.em-dash/projects/${SLUG:-unknown}/evidence/infra-$(date +%Y%m%d-%H%M%S)
+mkdir -p "$_EVIDENCE_DIR"
+```
+
+Save the before state, the fix applied, and the after state to the evidence directory. Hash the evidence for integrity.
+
+### Common Infrastructure Fixes
+
+Apply these patterns based on the finding type:
+
+- **Enable CloudTrail:** Create a multi-region trail with S3 logging and log file validation
+- **Enable encryption at rest:** KMS encryption for S3, RDS, EBS, DynamoDB
+- **Enforce MFA:** IAM policy requiring MFA for console access and sensitive API operations
+- **Configure VPC Flow Logs:** Enable flow logs to CloudWatch or S3 for network audit trail
+- **Enable access logging:** S3 access logging, ALB access logs, API Gateway logging
+- **Restrict security groups:** Remove overly permissive inbound rules (0.0.0.0/0)
+
+---
+
+## Phase 4: Code Remediation
+
+For each code finding (PHI exposure, missing encryption, access control gaps):
+
+### Step 1: Read the offending file
+
+Read the full file to understand the context — not just the flagged line. Understand the data flow: where does PHI enter, how is it processed, where does it go?
+
+### Step 2: Apply the fix
+
+Use the Edit tool to make targeted changes. Common code fixes:
+
+**Remove PHI from log output:**
+```
+# Before
+logger.info("Processing patient: #{patient.name}, SSN: #{patient.ssn}")
+
+# After
+logger.info("Processing patient: #{patient.id}")
+```
+
+**Add field-level encryption:**
+```
+# Before
+patient.diagnosis = params[:diagnosis]
+
+# After
+patient.diagnosis = EncryptionService.encrypt(params[:diagnosis])
+```
+
+**Redact PHI in error messages:**
+```
+# Before
+raise "Invalid patient data: #{patient.inspect}"
+
+# After
+raise "Invalid patient data for patient_id=#{patient.id}"
+```
+
+**Remove PHI from client-side storage:**
+```
+# Before
+localStorage.setItem('patientData', JSON.stringify(patient))
+
+# After
+localStorage.setItem('patientSession', JSON.stringify({ id: patient.id, expiresAt: session.expiresAt }))
+```
+
+### Step 3: Suggest a regression test
+
+After each code fix, suggest a test that would catch a future regression. For example:
+
+```
+Suggested test: Verify that log output for patient processing does not contain
+patient name, SSN, or other PHI identifiers. Grep test log output for PHI patterns
+after running the patient processing flow.
+```
+
+### Step 4: Collect evidence
+
+```bash
+git diff -- <fixed-file> 2>/dev/null
+```
+
+Save the diff output to the evidence directory. This proves the remediation was applied.
+
+---
+
+## Phase 5: Policy Generation
+
+For each missing policy identified in the assessment:
+
+### Step 1: Check for existing templates
+
+```bash
+ls ~/.claude/skills/em-dash/templates/policies/ 2>/dev/null
+```
+
+### Step 2: Customize the template
+
+Read the template and customize it with organization details gathered from the assessment report. Key details to fill in:
+- Organization name and type
+- Types of PHI handled
+- Systems and services used
+- Team size and structure
+- Existing security controls
+
+### Step 3: Present for review
+
+Use AskUserQuestion to present the draft policy:
+
+```
+Generated policy: [Policy Name]
+HIPAA Requirement: [requirement ID and description]
+
+I've drafted a [policy type] policy based on your assessment. Key sections:
+
+1. [Section overview]
+2. [Section overview]
+3. [Section overview]
+
+RECOMMENDATION: Choose A to review the full document, then we'll finalize it.
+
+A) Show me the full policy — I'll review and approve
+B) Write it directly — I trust the template
+C) Skip this policy for now
+```
+
+### Step 4: Write the policy
+
+Write the finalized policy to the project's policies directory:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+mkdir -p ~/.em-dash/projects/${SLUG:-unknown}/policies
+```
+
+### Available Policy Templates
+
+Generate policies for any of these areas when findings indicate they are missing:
+
+| Policy | HIPAA Section | Purpose |
+|--------|--------------|---------|
+| Access Control | 164.312(a) | Who can access PHI, how access is granted/revoked |
+| Audit Logging | 164.312(b) | What is logged, retention period, review process |
+| Encryption | 164.312(a)(2)(iv), 164.312(e) | Encryption standards for data at rest and in transit |
+| Incident Response | 164.308(a)(6) | How breaches are detected, assessed, reported |
+| Risk Assessment | 164.308(a)(1)(ii)(A) | Annual risk assessment methodology and findings |
+| Workforce Security | 164.308(a)(3) | Employee onboarding/offboarding, access provisioning |
+| Contingency Plan | 164.308(a)(7) | Backup, disaster recovery, emergency mode operations |
+| BAA Template | 164.308(b) | Business Associate Agreement for third-party vendors |
+
+---
+
+## Phase 6: Manual Remediation Checklist
+
+For items that require human action (cannot be automated):
+
+### Generate a checklist with deadlines
+
+```
+MANUAL REMEDIATION CHECKLIST
+============================================
+Due dates based on severity:
+  CRITICAL → within 7 days
+  HIGH → within 30 days
+  MEDIUM → within 60 days
+  LOW → within 90 days
+
+[ ] BAA signed with [vendor name] — due [date]
+    Template: ~/.em-dash/projects/$SLUG/policies/baa-template.md
+    Action: Legal review → countersign → file copy
+
+[ ] Security awareness training completed — due [date]
+    Action: All workforce members with PHI access must complete training
+    Evidence needed: Training completion records with dates
+
+[ ] Physical security controls verified — due [date]
+    Action: Verify workstation locks, screen timeouts, secure disposal
+    Evidence needed: Photo documentation or security walk checklist
+
+[ ] Risk assessment reviewed by management — due [date]
+    Action: Management review and sign-off on risk assessment report
+    Evidence needed: Signed risk assessment with date
+============================================
+```
+
+### Track completion
+
+For each manual item, use AskUserQuestion one at a time to track progress:
+
+```
+Manual item: [description]
+Due: [date]
+
+Has this been completed?
+
+A) Yes — completed on [date]
+B) In progress — expected completion [date]
+C) Not started — remind me later
+D) Not applicable — explain why
+```
+
+Record the response in the remediation report for evidence purposes.
+
+---
+
+## Phase 7: Evidence Collection & Report
+
+{{EVIDENCE_COLLECTION}}
+
+**Compile all evidence from the remediation session into a structured report.**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+_USER=$(whoami 2>/dev/null || echo "unknown")
+_DATETIME=$(date +%Y%m%d-%H%M%S)
+_REPORT_PATH="$HOME/.em-dash/projects/${SLUG:-unknown}/${_USER}-remediation-${_DATETIME}.md"
+echo "REPORT_PATH: $_REPORT_PATH"
+```
+
+Write the remediation report with this structure:
+
+```markdown
+# HIPAA Remediation Report
+**Project:** [project name]
+**Date:** [date]
+**Auditor:** [username]
+
+## Remediation Summary
+
+| Category | Total | Fixed | Skipped | Manual Pending |
+|----------|-------|-------|---------|----------------|
+| Infrastructure | N | N | N | N |
+| Code | N | N | N | N |
+| Policy | N | N | N | N |
+| Manual | N | N | N | N |
+| **Total** | **N** | **N** | **N** | **N** |
+
+## Remediation Details
+
+### Infrastructure Fixes Applied
+[For each fix:
+- Finding ID and description
+- HIPAA requirement addressed
+- What was changed (before → after)
+- Evidence reference]
+
+### Code Fixes Applied
+[For each fix:
+- Finding ID and description
+- File:line reference
+- Git diff summary
+- Regression test suggested/created
+- Evidence reference]
+
+### Policies Generated
+[For each policy:
+- Policy name
+- HIPAA requirement addressed
+- Location: ~/.em-dash/projects/$SLUG/policies/[name].md
+- Review status (approved/pending)]
+
+### Manual Items Pending
+[For each manual item:
+- Description
+- Assigned to / responsible party
+- Due date
+- Current status
+- Template/guidance provided]
+
+## Remaining Findings
+
+[List any findings that were not addressed in this session, with reason:
+- Skipped by user
+- Requires additional access/information
+- Deferred to next remediation cycle]
+
+## Evidence Archive
+
+Evidence directory: ~/.em-dash/projects/$SLUG/evidence/
+Evidence manifest: [path to manifest]
+Manifest hash: [SHA-256]
+
+## Compliance Posture Change
+
+Before remediation: N critical, N high, N medium, N low findings
+After remediation: N critical, N high, N medium, N low findings
+Reduction: N findings addressed (X%)
+
+## Next Step
+
+Run `/hipaa-report` to generate a formal HIPAA compliance report suitable
+for auditors, business partners, and internal stakeholders.
+```
+
+**Log the review:**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+"$_EMDASH_BIN"/hipaa-review-log write "${SLUG:-unknown}" "hipaa-remediate" "<STATUS>" <FINDINGS_COUNT>
+```
+
+Substitute STATUS with "clean" (all findings addressed), "issues_found" (some findings remain), or "critical" (critical findings still unaddressed). Substitute FINDINGS_COUNT with the number of remaining unaddressed findings.
+
+---
+
+## Important Rules
+
+- **Ask one question at a time.** Do not batch multiple unrelated questions. Each remediation decision deserves the user's full attention.
+- **Never apply destructive changes without user confirmation.** Infrastructure changes, data migrations, and security policy changes all require explicit approval via AskUserQuestion.
+- **Show before applying.** For every fix, show the user what will change before making the change. Use terraform plan output, git diff previews, or clear descriptions.
+- **Collect evidence for every remediation.** A fix without evidence is invisible to auditors. Every change should have a before state, the action taken, and an after state.
+- **Never store actual PHI in evidence.** Evidence files contain configuration states, scan results, diffs, and metadata. If a code fix involves PHI, the evidence shows the diff (which removes the PHI), not the PHI itself.
+- **Preserve existing controls.** When fixing one finding, verify that the fix does not break an existing security control. For example, enabling encryption should not disable access logging.
+- **Recommend /hipaa-report as the next step** at the end of every remediation session.

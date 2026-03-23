@@ -1,0 +1,349 @@
+---
+name: hipaa-report
+version: 0.1.0
+description: |
+  Generate HIPAA compliance reports from assessment and scan data.
+  Three formats: full compliance report (internal), executive summary
+  (C-suite), and trust report (shareable with prospects/partners).
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - AskUserQuestion
+hipaa_sections:
+  - "164.308(a)(1)(ii)(D)"
+  - "164.312"
+risk_level: low
+requires_prior: [hipaa-scan]
+---
+
+{{PREAMBLE}}
+
+# HIPAA Compliance Report Generator
+
+You are running the `/hipaa-report` skill. Your job is to aggregate all prior compliance artifacts and generate polished, auditor-ready reports in the user's chosen format.
+
+---
+
+## Phase 1: Aggregate Artifacts
+
+Read all prior compliance artifacts from the project directory.
+
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+PROJ_DIR="$HOME/.em-dash/projects/$SLUG"
+echo "PROJECT: $SLUG"
+echo "ARTIFACT_DIR: $PROJ_DIR"
+
+echo ""
+echo "=== Assessment Artifacts ==="
+ls -lt "$PROJ_DIR"/*-assessment-*.md 2>/dev/null || echo "NONE"
+
+echo ""
+echo "=== Scan Artifacts ==="
+ls -lt "$PROJ_DIR"/*-scan-*.md 2>/dev/null || echo "NONE"
+
+echo ""
+echo "=== Remediation Artifacts ==="
+ls -lt "$PROJ_DIR"/*-remediation-*.md 2>/dev/null || echo "NONE"
+
+echo ""
+echo "=== Evidence Directory ==="
+ls -lt "$PROJ_DIR"/evidence/ 2>/dev/null || echo "NONE"
+
+echo ""
+echo "=== Prior Reports ==="
+ls -lt "$PROJ_DIR"/*-compliance-report-*.md "$PROJ_DIR"/*-executive-summary-*.md "$PROJ_DIR"/*-trust-report-*.md 2>/dev/null || echo "NONE"
+```
+
+Read the most recent artifact of each type (assessment, scan, remediation). These are the inputs for report generation. If no assessment or scan artifacts exist, stop and recommend:
+
+- "No assessment artifacts found. Run `/hipaa-assess` first to complete a compliance interview."
+- "No scan artifacts found. Run `/hipaa-scan` to perform automated technical scanning."
+
+A report requires at minimum an assessment AND a scan. Remediation artifacts are optional but improve the report quality.
+
+---
+
+## Phase 2: Choose Report Format
+
+Use AskUserQuestion to determine which reports to generate:
+
+```
+We have compliance artifacts ready for report generation. Which format do you need?
+
+RECOMMENDATION: Choose D (all three) — the full report takes the most work, and
+the executive summary and trust report are derivatives of it. Generating all three
+costs almost nothing extra.
+
+A) Full Compliance Report — internal, detailed, auditor-ready
+B) Executive Summary — 1-page C-suite overview with compliance maturity rating
+C) Trust Report — shareable with prospects/partners, verified controls checklist
+D) All three
+```
+
+---
+
+## Phase 3: Generate Full Compliance Report
+
+Write the full compliance report to `~/.em-dash/projects/$SLUG/{user}-compliance-report-{datetime}.md` where `{user}` is derived from `whoami` and `{datetime}` is `YYYYMMDD-HHMMSS`.
+
+The full compliance report must include these sections:
+
+### 3a: Compliance Summary
+
+A 3-5 paragraph executive overview covering:
+- Organization name and scope of assessment
+- Date range of assessment activities
+- Overall compliance posture (percentage of controls satisfied)
+- Key strengths and critical gaps
+
+### 3b: Security Rule Compliance Table
+
+A table with three subsections:
+
+**Technical Safeguards (45 CFR 164.312):**
+
+| Control | Requirement | Status | Evidence | Notes |
+|---------|-------------|--------|----------|-------|
+| Access Control | Unique user IDs, emergency access, auto-logoff, encryption | PASS/PARTIAL/FAIL | [reference] | |
+| Audit Controls | Hardware/software/procedural mechanisms | PASS/PARTIAL/FAIL | [reference] | |
+| Integrity Controls | ePHI alteration/destruction protection | PASS/PARTIAL/FAIL | [reference] | |
+| Authentication | Person/entity identity verification | PASS/PARTIAL/FAIL | [reference] | |
+| Transmission Security | Encryption, integrity controls for ePHI in transit | PASS/PARTIAL/FAIL | [reference] | |
+
+**Administrative Safeguards (45 CFR 164.308):**
+
+| Control | Requirement | Status | Evidence | Notes |
+|---------|-------------|--------|----------|-------|
+| Security Management | Risk analysis, risk management, sanctions, information system activity review | PASS/PARTIAL/FAIL | [reference] | |
+| Assigned Security Responsibility | Designated security official | PASS/PARTIAL/FAIL | [reference] | |
+| Workforce Security | Authorization, clearance, termination procedures | PASS/PARTIAL/FAIL | [reference] | |
+| Security Awareness & Training | Reminders, malicious software, login monitoring, password management | PASS/PARTIAL/FAIL | [reference] | |
+| Security Incident Procedures | Response and reporting | PASS/PARTIAL/FAIL | [reference] | |
+| Contingency Plan | Data backup, disaster recovery, emergency mode operations | PASS/PARTIAL/FAIL | [reference] | |
+| Evaluation | Periodic technical and nontechnical evaluation | PASS/PARTIAL/FAIL | [reference] | |
+| BAA Management | Business associate contracts and arrangements | PASS/PARTIAL/FAIL | [reference] | |
+
+**Physical Safeguards (45 CFR 164.310):**
+
+| Control | Requirement | Status | Evidence | Notes |
+|---------|-------------|--------|----------|-------|
+| Facility Access Controls | Contingency operations, facility security plan, access control | PASS/PARTIAL/FAIL | [reference] | |
+| Workstation Use | Policies and procedures for workstation use | PASS/PARTIAL/FAIL | [reference] | |
+| Workstation Security | Physical safeguards for workstations | PASS/PARTIAL/FAIL | [reference] | |
+| Device & Media Controls | Disposal, re-use, accountability, data backup | PASS/PARTIAL/FAIL | [reference] | |
+
+Populate each row by cross-referencing the assessment and scan artifacts. Use scan evidence where available; note "self-reported" for assessment-only controls.
+
+### 3c: Privacy Rule Compliance
+
+Summarize Privacy Rule (45 CFR 164.500-534) compliance:
+- Minimum Necessary standard adherence
+- Notice of Privacy Practices
+- Individual rights (access, amendment, accounting of disclosures)
+- Uses and disclosures policies
+- De-identification methods in use
+
+### 3d: Breach Notification Compliance
+
+Summarize Breach Notification Rule (45 CFR 164.400-414) readiness:
+- Breach detection capabilities
+- Notification procedures in place
+- Documentation and logging practices
+- Prior breach history (if any from artifacts)
+
+### 3e: Evidence Index Table
+
+| Evidence ID | Phase | Description | File Path | SHA-256 Hash | Date Collected |
+|-------------|-------|-------------|-----------|--------------|----------------|
+
+Populate from the evidence index JSONL file if it exists:
+
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+cat "$HOME/.em-dash/projects/$SLUG/evidence/evidence-index.jsonl" 2>/dev/null || echo "NO_EVIDENCE_INDEX"
+```
+
+### 3f: Open Findings Table
+
+| Finding ID | Severity | Category | Description | Recommendation | Status |
+|------------|----------|----------|-------------|----------------|--------|
+
+List all findings from assessment and scan that remain open (not addressed in remediation artifacts). Sort by severity: CRITICAL > HIGH > MEDIUM > LOW.
+
+### 3g: Corrective Action Plan
+
+For each open finding, provide:
+- Description of the gap
+- Recommended corrective action
+- Responsible party (suggest role, e.g., "Security Officer", "Engineering Lead")
+- Target completion date (suggest reasonable timeframes: CRITICAL = 30 days, HIGH = 60 days, MEDIUM = 90 days, LOW = next review cycle)
+- Priority ranking
+
+### 3h: Append Disclaimer
+
+Include the DISCLAIMER from the preamble at the end of the report.
+
+---
+
+## Phase 4: Generate Executive Summary
+
+Write the executive summary to `~/.em-dash/projects/$SLUG/{user}-executive-summary-{datetime}.md`.
+
+This is a 1-page document for C-suite stakeholders. It must include:
+
+### 4a: Compliance Maturity Rating
+
+Assign one of four maturity levels based on the full report findings:
+
+- **INITIAL** — Ad-hoc compliance efforts. Multiple critical gaps. No formal policies. (Typically <40% controls satisfied)
+- **DEVELOPING** — Some policies in place. Technical controls partially implemented. Active remediation underway. (40-70% controls satisfied)
+- **ESTABLISHED** — Formal compliance program. Most controls implemented. Regular assessments. (70-90% controls satisfied)
+- **ADVANCED** — Mature compliance program. Continuous monitoring. Industry best practices. (>90% controls satisfied)
+
+### 4b: Key Metrics
+
+Display as a compact dashboard:
+
+```
+Compliance Score:     [X]% ([maturity level])
+Controls Assessed:   [N] total
+Controls Passing:    [N] ([X]%)
+Controls Partial:    [N] ([X]%)
+Controls Failing:    [N] ([X]%)
+Critical Findings:   [N] open
+High Findings:       [N] open
+Assessment Date:     [date]
+```
+
+### 4c: Risk Posture
+
+A 2-3 sentence summary of the organization's overall HIPAA risk posture — the single most important takeaway for leadership.
+
+### 4d: Next Audit Date Recommendation
+
+Based on maturity level:
+- INITIAL: Re-assess in 30 days after remediation
+- DEVELOPING: Re-assess in 60 days
+- ESTABLISHED: Re-assess in 90 days
+- ADVANCED: Re-assess in 180 days (or per regulatory schedule)
+
+### 4e: Append Disclaimer
+
+Include the DISCLAIMER from the preamble.
+
+---
+
+## Phase 5: Generate Trust Report
+
+Write the trust report to `~/.em-dash/projects/$SLUG/{user}-trust-report-{datetime}.md`.
+
+This document is designed to be shared externally with prospects, partners, and customers. It demonstrates compliance without exposing internal details.
+
+### 5a: Header
+
+```
+HIPAA COMPLIANCE TRUST REPORT
+Organization: [name from assessment]
+Report Date:  [date]
+Report ID:    [generated UUID or timestamp-based ID]
+```
+
+### 5b: Verified Controls Checklist
+
+| Control Category | Control | Verification Method | Status | Last Verified |
+|-----------------|---------|-------------------|--------|---------------|
+| Access Control | Unique user identification | Automated scan | VERIFIED | [date] |
+| Access Control | Automatic logoff | Automated scan | VERIFIED | [date] |
+| Encryption | Data at rest | Automated scan | VERIFIED | [date] |
+| Encryption | Data in transit | Automated scan | VERIFIED | [date] |
+| Audit Logging | System activity recording | Automated scan | VERIFIED | [date] |
+| ... | ... | ... | ... | ... |
+
+Only include controls with status VERIFIED (PASS from full report). Do NOT expose failing or partial controls in the trust report — those are internal.
+
+Verification methods: "Automated scan", "Configuration review", "Policy review", "Self-reported" (descending trustworthiness).
+
+### 5c: Scan Summary
+
+```
+Last Technical Scan:  [date]
+Tools Used:           [Prowler, Lynis, Trivy — whatever was detected]
+Scope:                [infrastructure, codebase, containers — whatever was scanned]
+```
+
+### 5d: Aggregate Evidence Hash
+
+Generate a single aggregate hash covering all evidence files to prove integrity:
+
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence"
+if [ -d "$EVIDENCE_DIR" ]; then
+  _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+  "$_EMDASH_BIN"/hipaa-evidence-hash "$EVIDENCE_DIR"
+  echo ""
+  echo "AGGREGATE_HASH:"
+  cat "$EVIDENCE_DIR/evidence-manifest.sha256" 2>/dev/null | sha256sum | cut -d' ' -f1
+else
+  echo "NO_EVIDENCE_DIRECTORY"
+fi
+```
+
+Include the aggregate hash in the trust report so recipients can request verification.
+
+### 5e: Append Disclaimer
+
+Include the DISCLAIMER from the preamble. Additionally, append:
+
+> This trust report represents a point-in-time assessment. HIPAA compliance requires
+> ongoing monitoring and periodic reassessment. The aggregate evidence hash can be
+> used to verify that underlying evidence has not been modified since this report
+> was generated.
+
+---
+
+## Phase 6: Log and Recommend
+
+### 6a: Log the review
+
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+REPORT_COUNT=$(ls "$HOME/.em-dash/projects/$SLUG"/*-compliance-report-*.md "$HOME/.em-dash/projects/$SLUG"/*-executive-summary-*.md "$HOME/.em-dash/projects/$SLUG"/*-trust-report-*.md 2>/dev/null | wc -l | tr -d ' ')
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-report" "complete" "$REPORT_COUNT"
+```
+
+### 6b: Display compliance dashboard
+
+```bash
+SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
+```
+
+### 6c: Recommend next steps
+
+Based on the report findings:
+
+1. If there are open CRITICAL or HIGH findings: "You have [N] critical/high findings still open. Run `/hipaa-remediate` to address them, then regenerate the report."
+2. If all controls are passing: "All controls verified. Run `/hipaa-monitor` to set up ongoing compliance drift detection."
+3. In all cases: "Run `/hipaa-monitor` periodically to detect compliance drift and maintain your compliance posture."
+
+---
+
+## Important Rules
+
+- **Never fabricate evidence.** If a control was not assessed or scanned, mark it "NOT ASSESSED" — never infer PASS.
+- **Trust reports must never expose failures.** Only verified/passing controls appear in the trust report. Internal gaps stay in the full report.
+- **Every report includes the DISCLAIMER.** This tool does not certify compliance.
+- **One question at a time** via AskUserQuestion. Never batch multiple questions.
+- **Each bash block is self-contained.** Re-derive SLUG and paths in every block.
+- **Completion status:**
+  - DONE — All requested reports generated successfully
+  - DONE_WITH_CONCERNS — Reports generated but critical findings remain unaddressed
+  - BLOCKED — Insufficient artifacts to generate a meaningful report
+  - NEEDS_CONTEXT — Missing assessment or scan data; recommend running prerequisite skills

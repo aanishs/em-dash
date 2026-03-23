@@ -1,0 +1,22 @@
+kind: Deployment
+metadata:
+  name: insecure-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: root-container
+          image: my-private-registry.example.com/app:latest
+          securityContext:
+            runAsUser: 0
+        - name: privileged-container
+          image: gcr.io/my-project/sidecar:latest
+          securityContext:
+            privileged: true
+        - name: no-security-context
+          image: gcr.io/my-project/worker:latest
+          env:
+            - name: DB_PASSWORD
+              value: "secretpass123"
+            - name: API_SECRET_KEY
+              value: "sk-abc123"

@@ -1,0 +1,117 @@
+package hipaa.transmission_security
+
+# HIPAA 164.312(e)(1) — Transmission Security
+# Ensures PHI is encrypted in transit and network access is restricted.
+
+# AWS — Security groups must not allow 0.0.0.0/0 on sensitive ports
+deny[msg] {
+    resource := input.resource.aws_security_group_rule[name]
+    resource.type == "ingress"
+    resource.cidr_blocks[_] == "0.0.0.0/0"
+    sensitive_ports := {22, 3306, 5432, 27017, 1433}
+    sensitive_ports[resource.from_port]
+    msg := {
+        "msg": sprintf("Security group rule '%s' allows 0.0.0.0/0 on sensitive port %d", [name, resource.from_port]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# AWS — Security groups must not allow 0.0.0.0/0 on sensitive port ranges
+deny[msg] {
+    resource := input.resource.aws_security_group[name]
+    ingress := resource.ingress[_]
+    ingress.cidr_blocks[_] == "0.0.0.0/0"
+    sensitive_ports := {22, 3306, 5432, 27017, 1433}
+    port := sensitive_ports[_]
+    port >= ingress.from_port
+    port <= ingress.to_port
+    msg := {
+        "msg": sprintf("Security group '%s' allows 0.0.0.0/0 ingress on port %d", [name, port]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# AWS — ALB/NLB listeners must use HTTPS
+deny[msg] {
+    resource := input.resource.aws_lb_listener[name]
+    resource.protocol != "HTTPS"
+    resource.protocol != "TLS"
+    msg := {
+        "msg": sprintf("Load balancer listener '%s' uses protocol '%s' instead of HTTPS/TLS", [name, resource.protocol]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# AWS — RDS instances must not be publicly accessible
+deny[msg] {
+    resource := input.resource.aws_db_instance[name]
+    resource.publicly_accessible == true
+    msg := {
+        "msg": sprintf("RDS instance '%s' is publicly accessible", [name]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "CRITICAL",
+        "resource": name,
+    }
+}
+
+# Database connections must enforce SSL (sslmode != disable)
+deny[msg] {
+    resource := input.resource.aws_db_instance[name]
+    not resource.parameter_group_name
+    msg := {
+        "msg": sprintf("RDS instance '%s' may not enforce SSL — verify parameter group requires ssl", [name]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "MEDIUM",
+        "resource": name,
+    }
+}
+
+# GCP — Cloud SQL must require SSL
+deny[msg] {
+    resource := input.resource.google_sql_database_instance[name]
+    settings := resource.settings[_]
+    ip_config := settings.ip_configuration
+    not ip_config.require_ssl
+    msg := {
+        "msg": sprintf("Cloud SQL instance '%s' does not require SSL for connections", [name]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# GCP — Cloud SQL should not have public IP enabled
+deny[msg] {
+    resource := input.resource.google_sql_database_instance[name]
+    settings := resource.settings[_]
+    ip_config := settings.ip_configuration
+    ip_config.ipv4_enabled == true
+    msg := {
+        "msg": sprintf("Cloud SQL instance '%s' has public IPv4 enabled — use private IP only", [name]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# GCP — Firewall rules must not allow 0.0.0.0/0 on sensitive ports
+deny[msg] {
+    resource := input.resource.google_compute_firewall[name]
+    resource.direction == "INGRESS"
+    resource.source_ranges[_] == "0.0.0.0/0"
+    allowed := resource.allow[_]
+    sensitive_ports := {"22", "3306", "5432", "27017", "1433"}
+    allowed.ports[_] == sensitive_ports[_]
+    msg := {
+        "msg": sprintf("GCP firewall rule '%s' allows 0.0.0.0/0 on sensitive port", [name]),
+        "hipaa_ref": "164.312(e)(1)",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}

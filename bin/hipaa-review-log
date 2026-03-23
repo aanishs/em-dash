@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# hipaa-review-log — persist compliance review outcomes
+# Usage: hipaa-review-log write <slug> <skill> <status> <findings-count>
+#        hipaa-review-log read <slug>
+#        hipaa-review-log dashboard <slug>
+set -euo pipefail
+
+PROJECTS_DIR="$HOME/.em-dash/projects"
+
+case "${1:-}" in
+  write)
+    SLUG="${2:?Usage: hipaa-review-log write <slug> <skill> <status> <findings>}"
+    SKILL="${3:?}"
+    STATUS="${4:?}"
+    FINDINGS="${5:-0}"
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    DATETIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    mkdir -p "$PROJECTS_DIR/$SLUG"
+    echo "{\"skill\":\"$SKILL\",\"status\":\"$STATUS\",\"findings\":$FINDINGS,\"commit\":\"$COMMIT\",\"timestamp\":\"$DATETIME\"}" \
+      >> "$PROJECTS_DIR/$SLUG/compliance-reviews.jsonl"
+    echo "Logged: $SKILL → $STATUS ($FINDINGS findings)"
+    ;;
+  read)
+    SLUG="${2:?Usage: hipaa-review-log read <slug>}"
+    LOG="$PROJECTS_DIR/$SLUG/compliance-reviews.jsonl"
+    if [ -f "$LOG" ]; then
+      cat "$LOG"
+    else
+      echo "No compliance reviews found for $SLUG"
+    fi
+    ;;
+  dashboard)
+    SLUG="${2:?Usage: hipaa-review-log dashboard <slug>}"
+    LOG="$PROJECTS_DIR/$SLUG/compliance-reviews.jsonl"
+    if [ ! -f "$LOG" ]; then
+      echo "No compliance reviews found for $SLUG"
+      exit 0
+    fi
+
+    echo "+====================================================================+"
+    echo "|                  HIPAA COMPLIANCE DASHBOARD                         |"
+    echo "+====================================================================+"
+    echo "| Domain              | Last Run    | Status      | Findings         |"
+    echo "|---------------------|-------------|-------------|------------------|"
+
+    for SKILL in hipaa-assess hipaa-scan hipaa-remediate hipaa-report hipaa-monitor hipaa-breach; do
+      LAST=$(grep "\"$SKILL\"" "$LOG" 2>/dev/null | tail -1 || true)
+      if [ -n "$LAST" ]; then
+        TS=$(echo "$LAST" | sed 's/.*"timestamp":"\([^"]*\)".*/\1/' | cut -c1-10)
+        ST=$(echo "$LAST" | sed 's/.*"status":"\([^"]*\)".*/\1/')
+        FN=$(echo "$LAST" | sed 's/.*"findings":\([0-9]*\).*/\1/')
+        printf "| %-19s | %-11s | %-11s | %-16s |\n" "$SKILL" "$TS" "$ST" "$FN findings"
+      else
+        printf "| %-19s | %-11s | %-11s | %-16s |\n" "$SKILL" "—" "NOT RUN" "—"
+      fi
+    done
+
+    echo "+--------------------------------------------------------------------+"
+    echo "+====================================================================+"
+    ;;
+  *)
+    echo "Usage: hipaa-review-log write|read|dashboard <slug> [...]" >&2
+    exit 1
+    ;;
+esac

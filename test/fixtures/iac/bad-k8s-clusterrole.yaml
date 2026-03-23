@@ -1,0 +1,7 @@
+kind: ClusterRole
+metadata:
+  name: god-mode
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]

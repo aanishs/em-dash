@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# hipaa-tool-detect — detect available scanning tools and cloud CLIs
+# Outputs key=value pairs for each detected tool
+set -euo pipefail
+
+# Cloud CLIs
+command -v aws >/dev/null 2>&1 && echo "CLOUD_AWS=true" || echo "CLOUD_AWS=false"
+command -v gcloud >/dev/null 2>&1 && echo "CLOUD_GCP=true" || echo "CLOUD_GCP=false"
+command -v az >/dev/null 2>&1 && echo "CLOUD_AZURE=true" || echo "CLOUD_AZURE=false"
+
+# Scanning tools
+command -v prowler >/dev/null 2>&1 && echo "TOOL_PROWLER=true" || echo "TOOL_PROWLER=false"
+command -v lynis >/dev/null 2>&1 && echo "TOOL_LYNIS=true" || echo "TOOL_LYNIS=false"
+command -v trivy >/dev/null 2>&1 && echo "TOOL_TRIVY=true" || echo "TOOL_TRIVY=false"
+command -v scout >/dev/null 2>&1 && echo "TOOL_SCOUTSUITE=true" || echo "TOOL_SCOUTSUITE=false"
+
+# Container tools
+command -v docker >/dev/null 2>&1 && echo "CONTAINER_DOCKER=true" || echo "CONTAINER_DOCKER=false"
+command -v kubectl >/dev/null 2>&1 && echo "CONTAINER_K8S=true" || echo "CONTAINER_K8S=false"
+
+# Policy-as-code tools
+command -v checkov >/dev/null 2>&1 && echo "TOOL_CHECKOV=true" || echo "TOOL_CHECKOV=false"
+command -v conftest >/dev/null 2>&1 && echo "TOOL_CONFTEST=true" || echo "TOOL_CONFTEST=false"
+
+# IaC tools
+command -v terraform >/dev/null 2>&1 && echo "IAC_TERRAFORM=true" || echo "IAC_TERRAFORM=false"
+command -v cdk >/dev/null 2>&1 && echo "IAC_CDK=true" || echo "IAC_CDK=false"
+command -v sam >/dev/null 2>&1 && echo "IAC_SAM=true" || echo "IAC_SAM=false"
+command -v helm >/dev/null 2>&1 && echo "IAC_HELM=true" || echo "IAC_HELM=false"
+
+# Database CLIs
+command -v psql >/dev/null 2>&1 && echo "DB_POSTGRES=true" || echo "DB_POSTGRES=false"
+command -v mysql >/dev/null 2>&1 && echo "DB_MYSQL=true" || echo "DB_MYSQL=false"
+command -v mongosh >/dev/null 2>&1 && echo "DB_MONGO=true" || echo "DB_MONGO=false"
+command -v sqlcmd >/dev/null 2>&1 && echo "DB_MSSQL=true" || echo "DB_MSSQL=false"
+
+# Utility tools
+command -v jq >/dev/null 2>&1 && echo "UTIL_JQ=true" || echo "UTIL_JQ=false"
+command -v openssl >/dev/null 2>&1 && echo "UTIL_OPENSSL=true" || echo "UTIL_OPENSSL=false"
+command -v nmap >/dev/null 2>&1 && echo "UTIL_NMAP=true" || echo "UTIL_NMAP=false"
