@@ -4,13 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>em-dash</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-family='monospace'>—</text></svg>">
   <link rel="stylesheet" href="/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div id="app">
+    <!-- Mobile sidebar backdrop -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
     <!-- Sidebar -->
-    <nav id="sidebar">
+    <nav id="sidebar" aria-label="Main navigation">
       <div class="sidebar-brand">
         <h1>em-dash</h1>
       </div>
@@ -59,12 +63,12 @@
     <div id="content">
       <header id="header">
         <div class="header-left">
-          <button class="sidebar-toggle" id="sidebar-toggle">&#9776;</button>
+          <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle navigation">&#9776;</button>
           <span class="header-project" id="project-name">Loading...</span>
         </div>
         <div class="header-right">
           <div class="score-ring" id="score-ring">
-            <svg viewBox="0 0 36 36">
+            <svg viewBox="0 0 36 36" role="img" aria-label="Compliance percentage">
               <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
               <path class="ring-fill" id="ring-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
             </svg>
@@ -74,7 +78,7 @@
         </div>
       </header>
 
-      <main>
+      <main role="main">
         <!-- Overview (Pipeline + Charts + Gaps) -->
         <section class="page active" id="page-overview">
           <div class="section" id="pipeline-section">

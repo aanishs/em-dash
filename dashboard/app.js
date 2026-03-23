@@ -63,20 +63,32 @@
         switchSection(item.dataset.section);
         // Close mobile sidebar
         document.getElementById('sidebar').classList.remove('open');
+        const bd = document.getElementById('sidebar-backdrop');
+        if (bd) bd.classList.remove('visible');
       });
     });
 
     // Mobile toggle
     const toggle = document.getElementById('sidebar-toggle');
+    const backdrop = document.getElementById('sidebar-backdrop');
     if (toggle) {
       toggle.addEventListener('click', () => {
-        document.getElementById('sidebar').classList.toggle('open');
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('open');
+        if (backdrop) backdrop.classList.toggle('visible', sidebar.classList.contains('open'));
       });
     }
 
-    // Close sidebar on content click (mobile)
+    // Close sidebar on backdrop or content click (mobile)
+    if (backdrop) {
+      backdrop.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.remove('open');
+        backdrop.classList.remove('visible');
+      });
+    }
     document.getElementById('content').addEventListener('click', () => {
       document.getElementById('sidebar').classList.remove('open');
+      if (backdrop) backdrop.classList.remove('visible');
     });
   }
 
@@ -225,14 +237,15 @@
       const labels = { assess: 'Assess', scan: 'Scan', remediate: 'Remediate', report: 'Report', monitor: 'Monitor', breach: 'Breach' };
 
       for (const step of steps) {
-        const s = skills[step] || { status: 'pending' };
-        const cls = s.status === 'complete' ? 'complete' : s.status === 'in-progress' ? 'in-progress' : 'pending';
+        const s = skills[step] || skills[`${fwName}-${step}`] || { status: 'pending' };
+        const st = s.status === 'completed' ? 'complete' : s.status === 'not-run' ? 'pending' : s.status;
+        const cls = st === 'complete' ? 'complete' : st === 'in-progress' ? 'in-progress' : 'pending';
         const meta = s.findings != null ? `${s.findings} findings` : '';
         const when = s.timestamp ? timeAgo(s.timestamp) : '';
         const summary = s.summary ? escapeHtml(s.summary) : '';
         html += `
           <div class="pipeline-step ${cls}">
-            <div class="pipeline-icon">${icons[s.status] || icons.pending}</div>
+            <div class="pipeline-icon">${icons[st] || icons.pending}</div>
             <div class="pipeline-name">${labels[step]}</div>
             ${when ? `<div class="pipeline-meta">${when}</div>` : ''}
             ${meta ? `<div class="pipeline-meta">${meta}</div>` : ''}
@@ -255,15 +268,19 @@
     const skills = fw.skills || {};
     const findings = (fw.findings || []).filter(f => f.status !== 'resolved');
     const criticals = findings.filter(f => f.severity === 'critical').length;
-    const highs = findings.filter(f => f.severity === 'high').length;
 
-    if (!skills.assess || skills.assess.status === 'pending') return 'Next: Run <code>/hipaa-assess</code> to start your compliance assessment.';
-    if (!skills.scan || skills.scan.status === 'pending') return 'Next: Run <code>/hipaa-scan</code> to scan your code and infrastructure.';
-    if (findings.length > 0 && (!skills.remediate || skills.remediate.status !== 'complete')) {
+    // Helper to look up skill by short or prefixed key
+    const sk = (name) => skills[name] || skills[`hipaa-${name}`] || {};
+    const isDone = (name) => { const s = sk(name).status; return s === 'complete' || s === 'completed'; };
+    const isPending = (name) => { const s = sk(name).status; return !s || s === 'pending' || s === 'not-run'; };
+
+    if (isPending('assess')) return 'Next: Run <code>/hipaa-assess</code> to start your compliance assessment.';
+    if (isPending('scan')) return 'Next: Run <code>/hipaa-scan</code> to scan your code and infrastructure.';
+    if (findings.length > 0 && !isDone('remediate')) {
       return `Next: Run <code>/hipaa-remediate</code> to fix ${findings.length} open findings${criticals ? ` (${criticals} critical)` : ''}.`;
     }
-    if (!skills.report || skills.report.status === 'pending') return 'Next: Run <code>/hipaa-report</code> to generate your compliance report.';
-    if (!skills.monitor || skills.monitor.status === 'pending') return 'Next: Run <code>/hipaa-monitor</code> to check for compliance drift.';
+    if (isPending('report')) return 'Next: Run <code>/hipaa-report</code> to generate your compliance report.';
+    if (isPending('monitor')) return 'Next: Run <code>/hipaa-monitor</code> to check for compliance drift.';
     return 'All up to date. Run <code>/hipaa-monitor</code> periodically to detect drift.';
   }
 
