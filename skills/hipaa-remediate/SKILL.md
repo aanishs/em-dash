@@ -127,6 +127,110 @@ _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-da
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-remediate" "<STATUS>" <FINDINGS_COUNT>
 ```
 
+## Dashboard Sync
+
+After logging the review, if `.em-dash/dashboard.json` exists in the project root, update the skill status:
+
+```bash
+if [ -f .em-dash/dashboard.json ]; then
+  _SKILL_KEY="remediate"
+  _STATUS_VAL="<STATUS>"
+  _FINDINGS_VAL=<FINDINGS_COUNT>
+  _SUMMARY="<ONE_LINE_SUMMARY>"
+  _TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  bun -e "
+    const fs = require('fs');
+    const d = JSON.parse(fs.readFileSync('.em-dash/dashboard.json', 'utf-8'));
+    if (!d.frameworks) d.frameworks = {};
+    if (!d.frameworks.hipaa) d.frameworks.hipaa = { status: 'in-progress', skills: {}, checklist: [], evidence_gaps: [] };
+    d.frameworks.hipaa.skills['$_SKILL_KEY'] = {
+      status: '$_STATUS_VAL'.toLowerCase(),
+      timestamp: '$_TIMESTAMP',
+      findings: $_FINDINGS_VAL,
+      summary: '$_SUMMARY'
+    };
+    d.frameworks.hipaa.last_updated = '$_TIMESTAMP';
+    fs.writeFileSync('.em-dash/dashboard.json', JSON.stringify(d, null, 2) + '\\n');
+  " 2>/dev/null || true
+fi
+```
+
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use `hipaa-dashboard-update` to update individual checklist items based on actual results:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Mark a checklist item as complete with a note:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
+# Mark as pending with an evidence gap:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
+# Add evidence file to an item:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
+```
+
+## Dashboard Updates
+
+As you generate policy documents and apply code fixes, update the dashboard. Policy generation is straightforward — if you wrote the document, the control is documented. Code fixes require judgment — verify the fix actually addresses the finding.
+
+**You write to: checklist (fixed items), findings (resolve), evidence (policies)**
+
+**Principle:** Generating a policy document means the policy *exists as documentation*. It does NOT mean the organization is *following* it. Mark the documentation requirement as complete, but only mark the operational requirement as complete if you've verified the control is implemented in code/infrastructure.
+
+**Reference — remediation outputs and their checklist IDs:**
+
+| Remediation | Checklist ID | What to mark complete |
+|-------------|-------------|----------------------|
+| access-control.md generated | 164.308(a)(4)(i) | Access management policy documented |
+| audit-logging.md generated | 164.312(b) | Audit control policy documented (operational check is separate) |
+| encryption.md generated | 164.312(a)(2)(iv), 164.312(e)(2)(ii) | Encryption policy documented |
+| incident-response.md generated | 164.308(a)(6)(i), 164.308(a)(6)(ii) | Incident response procedures documented |
+| risk-assessment.md generated | 164.308(a)(1)(ii)(A) | Risk assessment procedure documented |
+| workforce-security.md generated | 164.308(a)(3)(i) | Workforce security policy documented |
+| contingency-plan.md generated | 164.308(a)(7)(i), 164.308(a)(7)(ii)(A) | Contingency and backup plan documented |
+| baa-template.md generated | 164.314(a)(1) | BAA template available (still needs signing with each vendor) |
+| Any policy generated | 164.316(a), 164.308(a)(1)(i) | Policies and procedures exist; security management process established |
+| Code fix: added audit middleware | 164.312(b) | Audit controls implemented (not just documented) |
+| Code fix: removed PHI from logs | 164.312(b) | PHI no longer exposed in log output |
+| Code fix: added encryption | 164.312(a)(2)(iv) | Encryption implemented in code |
+| Code fix: added session timeout | 164.312(a)(2)(iii) | Auto-logoff implemented |
+
+**Examples of good judgment:**
+
+- Generated access-control.md → complete 164.308(a)(4)(i) "Access management policy generated"
+- Applied code fix adding RBAC middleware → complete 164.312(a)(1) "RBAC middleware added to PHI routes in src/middleware/auth.ts"
+- Generated BAA template → complete 164.314(a)(1) ONLY if user confirms they'll sign it with vendors. Otherwise: note "BAA template generated — needs signing with [vendors]"
+
+**Findings — resolve as you fix:**
+After each successful remediation, resolve the corresponding finding:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "RDS instance lacks encryption at rest"
+```
+
+**How to update the dashboard:**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Checklist: mark an item as complete with reasoning
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete "<your reasoning>"
+# Checklist: mark as pending with an evidence gap
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" pending --gap "<what's missing>"
+# Checklist: attach evidence file
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete --evidence "<filename>"
+
+# Finding: add a new finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "<title>" --severity <critical|high|medium|low> --requirement "<id>" --source "<skill>"
+# Finding: resolve a finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "<title>"
+
+# Vendor: add a vendor/BA
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "<name>" --service "<service>" --baa-status <signed|pending|none> --risk-tier <low|medium|high|critical>
+# Vendor: update BAA status
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor update --name "<name>" --baa-status signed
+
+# Risk: add a risk
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "<desc>" --likelihood <1-5> --impact <1-5> --treatment <mitigate|accept|transfer|avoid> --owner "<owner>" --requirement "<ids>"
+```
+
 # /hipaa-remediate: HIPAA Compliance Remediation
 
 You are running the `/hipaa-remediate` skill. Fix HIPAA compliance findings from prior assessment and scan reports. For each finding: apply the fix, collect evidence, and track progress. Ask one question at a time. Never apply destructive changes without user confirmation.

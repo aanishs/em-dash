@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>em-dash</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <nav id="sidebar">
+      <div class="sidebar-brand">
+        <h1>em-dash</h1>
+      </div>
+
+      <div class="sidebar-nav">
+        <a class="nav-item active" data-section="overview" href="#">
+          <span class="nav-icon">O</span><span class="nav-label">Overview</span>
+        </a>
+        <a class="nav-item" data-section="findings" href="#">
+          <span class="nav-icon">!</span><span class="nav-label">Findings</span>
+          <span class="nav-badge" id="nav-findings-badge"></span>
+        </a>
+        <a class="nav-item" data-section="checklist" href="#">
+          <span class="nav-icon">&check;</span><span class="nav-label">Checklist</span>
+          <span class="nav-badge" id="nav-checklist-badge"></span>
+        </a>
+        <a class="nav-item" data-section="evidence" href="#">
+          <span class="nav-icon">E</span><span class="nav-label">Evidence</span>
+        </a>
+        <a class="nav-item" data-section="risks" href="#">
+          <span class="nav-icon">R</span><span class="nav-label">Risks</span>
+          <span class="nav-badge" id="nav-risks-badge"></span>
+        </a>
+        <a class="nav-item" data-section="vendors" href="#">
+          <span class="nav-icon">V</span><span class="nav-label">Vendors</span>
+        </a>
+        <a class="nav-item" data-section="activity" href="#">
+          <span class="nav-icon">A</span><span class="nav-label">Activity</span>
+        </a>
+      </div>
+
+      <div class="sidebar-bottom">
+        <a class="nav-item" href="/api/export/report" download>
+          <span class="nav-icon">D</span><span class="nav-label">Export Report</span>
+        </a>
+        <a class="nav-item" href="/api/export/csv" download>
+          <span class="nav-icon">C</span><span class="nav-label">Export CSV</span>
+        </a>
+        <a class="nav-item" href="#" id="open-finder-btn">
+          <span class="nav-icon">F</span><span class="nav-label">Open in Finder</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <div id="content">
+      <header id="header">
+        <div class="header-left">
+          <button class="sidebar-toggle" id="sidebar-toggle">&#9776;</button>
+          <span class="header-project" id="project-name">Loading...</span>
+        </div>
+        <div class="header-right">
+          <div class="score-ring" id="score-ring">
+            <svg viewBox="0 0 36 36">
+              <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+              <path class="ring-fill" id="ring-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+            </svg>
+            <span class="score-text" id="score-text">--%</span>
+          </div>
+          <span class="score-label">Compliance</span>
+        </div>
+      </header>
+
+      <main>
+        <!-- Overview (Pipeline + Charts + Gaps) -->
+        <section class="page active" id="page-overview">
+          <div class="section" id="pipeline-section">
+            <h2>Audit Pipeline</h2>
+            <div class="pipeline" id="pipeline"></div>
+          </div>
+          <div class="section" id="charts-section">
+            <h2>Overview</h2>
+            <div class="charts-grid">
+              <div class="chart-container">
+                <h3>Requirements by Section</h3>
+                <canvas id="chart-sections"></canvas>
+              </div>
+              <div class="chart-container">
+                <h3>Findings by Severity</h3>
+                <canvas id="chart-findings"></canvas>
+              </div>
+              <div class="chart-container">
+                <h3>Evidence Coverage</h3>
+                <canvas id="chart-evidence"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="section" id="gaps-section">
+            <h2>Evidence Gaps</h2>
+            <div class="gaps-list" id="gaps-list"></div>
+          </div>
+        </section>
+
+        <!-- Findings -->
+        <section class="page" id="page-findings">
+          <div class="section">
+            <div class="section-header">
+              <h2>Findings</h2>
+              <button class="btn btn-sm" id="add-finding-btn">+ Add Finding</button>
+            </div>
+            <div class="findings-summary" id="findings-summary"></div>
+            <div class="filter-tabs" id="findings-filters"></div>
+            <div class="findings-list" id="findings-list"></div>
+          </div>
+        </section>
+
+        <!-- Checklist -->
+        <section class="page" id="page-checklist">
+          <div class="section">
+            <div class="section-header">
+              <h2>Requirements Checklist</h2>
+              <button class="btn btn-sm" id="add-custom-btn">+ Add item</button>
+            </div>
+            <div class="checklist-controls">
+              <div class="filter-tabs" id="checklist-filters"></div>
+            </div>
+            <div class="checklist" id="checklist"></div>
+          </div>
+        </section>
+
+        <!-- Evidence -->
+        <section class="page" id="page-evidence">
+          <div class="section">
+            <div class="section-header">
+              <h2>Evidence Library</h2>
+            </div>
+            <div class="evidence-controls">
+              <input type="text" class="evidence-search" id="evidence-search" placeholder="Search evidence...">
+            </div>
+            <div class="upload-zone" id="upload-zone">
+              <div class="upload-icon">+</div>
+              <p>Drop files here or <label for="file-input" class="upload-link">browse</label></p>
+              <input type="file" id="file-input" multiple hidden>
+              <div class="upload-meta" id="upload-meta">
+                <select id="upload-framework"><option value="hipaa">HIPAA</option></select>
+                <input type="text" id="upload-requirement" placeholder="Requirement (e.g., 164.314(a))">
+                <select id="upload-type">
+                  <option value="baa">BAA</option>
+                  <option value="policy">Policy Document</option>
+                  <option value="screenshot">Screenshot</option>
+                  <option value="scan-result">Scan Result</option>
+                  <option value="config">Configuration</option>
+                  <option value="training">Training Record</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="evidence-list" id="evidence-list"></div>
+            <div class="evidence-pagination" id="evidence-pagination"></div>
+          </div>
+        </section>
+
+        <!-- Risks -->
+        <section class="page" id="page-risks">
+          <div class="section">
+            <div class="section-header">
+              <h2>Risk Register</h2>
+              <div class="section-actions">
+                <div class="view-toggle">
+                  <button class="view-btn active" data-view="matrix" id="risk-view-matrix">Matrix</button>
+                  <button class="view-btn" data-view="table" id="risk-view-table">Table</button>
+                </div>
+                <button class="btn btn-sm" id="add-risk-btn">+ Add Risk</button>
+              </div>
+            </div>
+            <div id="risk-matrix"></div>
+            <div id="risk-table" hidden></div>
+          </div>
+        </section>
+
+        <!-- Vendors -->
+        <section class="page" id="page-vendors">
+          <div class="section">
+            <div class="section-header">
+              <h2>Business Associates</h2>
+              <button class="btn btn-sm" id="add-vendor-btn">+ Add Vendor</button>
+            </div>
+            <div class="vendor-list" id="vendor-list"></div>
+          </div>
+        </section>
+
+        <!-- Activity -->
+        <section class="page" id="page-activity">
+          <div class="section">
+            <h2>Activity</h2>
+            <div class="activity-timeline" id="activity-timeline"></div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <p>em-dash &mdash; open-source compliance. Not legal advice.</p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Confirm dialog (replaces browser confirm()) -->
+  <dialog id="confirm-modal">
+    <div class="confirm-content">
+      <h3 id="confirm-title">Confirm</h3>
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Custom item modal -->
+  <dialog id="custom-modal">
+    <form method="dialog" id="custom-form">
+      <h3>Add Custom Checklist Item</h3>
+      <input type="text" id="custom-text" placeholder="Requirement description" required>
+      <input type="text" id="custom-section" placeholder="Section (e.g., Organizational)">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="custom-cancel">Cancel</button>
+        <button type="submit" class="btn">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Evidence edit modal -->
+  <dialog id="evidence-edit-modal">
+    <form method="dialog" id="evidence-edit-form">
+      <h3>Edit Evidence</h3>
+      <input type="hidden" id="evidence-edit-filename">
+      <label class="form-label">Type</label>
+      <select id="evidence-edit-type" class="form-select">
+        <option value="baa">BAA</option>
+        <option value="policy">Policy Document</option>
+        <option value="screenshot">Screenshot</option>
+        <option value="scan-result">Scan Result</option>
+        <option value="config">Configuration</option>
+        <option value="training">Training Record</option>
+        <option value="other">Other</option>
+      </select>
+      <label class="form-label">Requirement</label>
+      <input type="text" id="evidence-edit-requirement" placeholder="e.g., 164.314(a)">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="evidence-edit-cancel">Cancel</button>
+        <button type="submit" class="btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Finding modal -->
+  <dialog id="finding-modal">
+    <form method="dialog" id="finding-form">
+      <h3>Add Finding</h3>
+      <input type="text" id="finding-title" placeholder="Finding title" required>
+      <textarea id="finding-description" placeholder="Description" rows="3"></textarea>
+      <label class="form-label">Severity</label>
+      <select id="finding-severity" class="form-select">
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium" selected>Medium</option>
+        <option value="low">Low</option>
+      </select>
+      <label class="form-label">Requirement</label>
+      <input type="text" id="finding-requirement" placeholder="e.g., 164.312(a)(1)">
+      <label class="form-label">Source</label>
+      <input type="text" id="finding-source" placeholder="e.g., scan, manual, audit">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="finding-cancel">Cancel</button>
+        <button type="submit" class="btn">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Risk modal -->
+  <dialog id="risk-modal">
+    <form method="dialog" id="risk-form">
+      <h3 id="risk-modal-title">Add Risk</h3>
+      <input type="hidden" id="risk-edit-id">
+      <textarea id="risk-description" placeholder="Risk description" rows="2" required></textarea>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Likelihood</label>
+          <select id="risk-likelihood" class="form-select">
+            <option value="1">1 - Very Unlikely</option>
+            <option value="2">2 - Unlikely</option>
+            <option value="3" selected>3 - Possible</option>
+            <option value="4">4 - Likely</option>
+            <option value="5">5 - Very Likely</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Impact</label>
+          <select id="risk-impact" class="form-select">
+            <option value="1">1 - Insignificant</option>
+            <option value="2">2 - Minor</option>
+            <option value="3" selected>3 - Moderate</option>
+            <option value="4">4 - Major</option>
+            <option value="5">5 - Severe</option>
+          </select>
+        </div>
+      </div>
+      <label class="form-label">Treatment</label>
+      <select id="risk-treatment" class="form-select">
+        <option value="mitigate">Mitigate</option>
+        <option value="accept">Accept</option>
+        <option value="transfer">Transfer</option>
+        <option value="avoid">Avoid</option>
+      </select>
+      <label class="form-label">Owner</label>
+      <input type="text" id="risk-owner" placeholder="e.g., Security Officer">
+      <label class="form-label">Related Requirements</label>
+      <input type="text" id="risk-requirements" placeholder="e.g., 164.312(a)(2)(iv)">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="risk-cancel">Cancel</button>
+        <button type="submit" class="btn" id="risk-submit">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Vendor modal -->
+  <dialog id="vendor-modal">
+    <form method="dialog" id="vendor-form">
+      <h3 id="vendor-modal-title">Add Business Associate</h3>
+      <input type="hidden" id="vendor-edit-id">
+      <input type="text" id="vendor-name" placeholder="Vendor name" required>
+      <input type="text" id="vendor-service" placeholder="Service provided">
+      <label class="form-label">BAA Status</label>
+      <select id="vendor-baa-status" class="form-select">
+        <option value="none">None</option>
+        <option value="pending">Pending</option>
+        <option value="signed">Signed</option>
+      </select>
+      <label class="form-label">BAA Expiry</label>
+      <input type="date" id="vendor-baa-expiry">
+      <label class="form-label">Risk Tier</label>
+      <select id="vendor-risk-tier" class="form-select">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+      <input type="text" id="vendor-contact" placeholder="Contact email">
+      <textarea id="vendor-notes" placeholder="Notes" rows="2"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="vendor-cancel">Cancel</button>
+        <button type="submit" class="btn" id="vendor-submit">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>

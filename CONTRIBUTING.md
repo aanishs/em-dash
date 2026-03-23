@@ -6,7 +6,7 @@
 git clone https://github.com/aanishs/em-dash.git
 cd em-dash
 bun install
-bun test          # 280 tests, all free, under 3 seconds
+bun test          # ~330 tests, all free, under 3 seconds
 ```
 
 ## Project architecture
@@ -14,16 +14,17 @@ bun test          # 280 tests, all free, under 3 seconds
 em-dash is a collection of Claude Code skills that chain together. Here's the mental model:
 
 ```
-skills/           7 HIPAA skills, each with a SKILL.md.tmpl template
+skills/           10 skills (7 HIPAA + vendor + risk + dashboard), each with a SKILL.md.tmpl template
     ↓
 scripts/          gen-skill-docs.ts resolves {{PLACEHOLDERS}} → SKILL.md
     ↓
 SKILL.md          Generated files — Claude reads these at runtime
     ↓
+dashboard/        Static site (HTML/CSS/JS) + Bun server for visual compliance dashboard
 policies/         6 Rego/OPA rules for IaC policy scanning
 templates/        8 policy document templates (Markdown)
-bin/              6 CLI utilities (config, slug, tool-detect, evidence-hash, review-log, update-check)
-test/             280 tests across 4 test files + helpers
+bin/              7 CLI utilities (config, slug, tool-detect, evidence-hash, review-log, update-check, dashboard-update)
+test/             ~330 tests across 5 test files + helpers
 ```
 
 **Skills** are prompt templates. They tell Claude what to do — run commands, ask questions, generate reports. The template engine (`scripts/gen-skill-docs.ts`) injects shared blocks like PHI scanning patterns, cloud CLI commands, and evidence collection logic.
@@ -40,7 +41,7 @@ SKILL.md files are **generated** — don't edit them directly. They'd be overwri
 2. Run `bun run gen:skill-docs`
 3. Commit both the `.tmpl` and generated `.md` files
 
-**Why generated files?** The 7 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
+**Why generated files?** The 10 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
 
 **Watch mode:** Run `bun run dev:skill` to auto-regenerate and validate on every template save.
 
@@ -114,11 +115,12 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 | `{{GCP_CHECKS}}` | ~40 gcloud commands for HIPAA scanning |
 | `{{AZURE_CHECKS}}` | ~28 az CLI commands for HIPAA scanning |
 | `{{IAC_POLICY_ENGINE}}` | Checkov + Conftest/Rego policy scanning |
+| `{{DASHBOARD_UPDATES}}` | Per-skill dashboard.json update instructions (checklist, findings, vendors, risks) |
 
 ## Testing
 
 ```bash
-bun test                  # 280 tests, free, <3s
+bun test                  # ~330 tests, free, <3s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
 ```
@@ -127,10 +129,11 @@ bun run dev:skill         # watch mode: auto-regen + validate on change
 
 | File | Tests | What it validates |
 |------|-------|------------------|
-| `test/skill-validation.test.ts` | ~200 | Skill templates, generated files, frontmatter, PHI checks, cloud coverage, bin utilities, path hygiene, preamble sections |
+| `test/skill-validation.test.ts` | ~250 | 10 skill templates, generated files, frontmatter, PHI checks, cloud coverage, bin utilities, path hygiene, preamble sections |
 | `test/rego-policy.test.ts` | ~22 | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s) |
 | `test/bin-smoke.test.ts` | ~11 | Actually executes bin utilities and validates output format |
 | `test/touchfiles.test.ts` | ~11 | Diff-based test selection logic (glob matching, touchfile maps) |
+| `test/skill-e2e.test.ts` | (stub) | E2E skill tests — gated behind EVALS=1 |
 
 ### Eval infrastructure (for paid E2E tests)
 
@@ -172,7 +175,7 @@ test("my new check appears in generated scan skill", () => {
 
 Before submitting:
 
-- [ ] `bun test` passes (280 tests)
+- [ ] `bun test` passes (~330 tests)
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
 - [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)

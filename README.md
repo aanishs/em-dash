@@ -26,9 +26,11 @@ Because "pay $10k a year" and "guess" should not be the two main options.
 
 em-dash is Claude Code plus HIPAA compliance.
 
-Seven slash commands. Assess. Scan. Remediate. Report.
+Ten slash commands. A visual dashboard. Assess. Scan. Remediate. Report. Track vendors. Score risks. Export everything.
 
-It checks your code, your cloud, your policies, and the gaps between them. It fixes what it can. Writes what's missing. Generates reports an auditor can actually use. Everything runs locally. Everything is readable. No mystery score. No compliance cosplay.
+It checks your code, your cloud, your policies, and the gaps between them. It fixes what it can. Writes what's missing. Generates reports an auditor can actually use. And now it gives you a real-time compliance dashboard — evidence management, risk register, vendor/BAA tracking, findings, exportable reports — the things Vanta charges $10k/year for.
+
+Everything runs locally. Everything is readable. No mystery score. No compliance cosplay.
 
 (Why "em-dash"? The em dash and "delve" are both classic AI tells. LLMs can't stop using them. The Delve scandal pushed us to ship this publicly, so the name just... worked.)
 
@@ -36,7 +38,7 @@ It checks your code, your cloud, your policies, and the gaps between them. It fi
 - You handle PHI and don't have a compliance person
 - You know you need HIPAA but don't know where to start
 - You got burned by vendor lock-in and want to own your compliance
-- You'd rather read the checks yourself than trust a dashboard
+- You want to see your compliance state, not just hear about it
 
 ---
 
@@ -124,22 +126,27 @@ Open Claude Code in any project that handles PHI.
 | 3 | `/hipaa-remediate` | Fix findings. Code patches, Terraform fixes, policy document generation, evidence collection. |
 | 4 | `/hipaa-report` | Generate compliance reports. Full report, executive summary, or trust report. |
 | Ongoing | `/hipaa-monitor` | Detect compliance drift since last audit. |
+| Ongoing | `/hipaa-vendor` | Vendor/BA management. Auto-detects services, tracks BAA status and risk tiers. |
+| Ongoing | `/hipaa-risk` | NIST SP 800-30 risk assessment. Threat identification, scoring, treatment planning. |
 | Anytime | `/hipaa-breach` | Guided breach notification with 4-factor risk assessment. |
 | Start here | `/hipaa` | Compliance dashboard. Shows current state and recommends what to run next. |
+| Dashboard | `/em-dashboard` | Opens the visual compliance dashboard at localhost:3000. |
 
 ### Workflow
 
 ```
-/hipaa-assess ──> Assessment Report ──┐
-                                      ├──> /hipaa-remediate ──> /hipaa-report
-/hipaa-scan ────> Scan Report ────────┘           │
-                                                  v
-                                        /hipaa-monitor (ongoing)
+/hipaa           ──> init dashboard + route to next step
+/hipaa-assess    ──> Assessment Report ──┐
+/hipaa-vendor    ──> Vendor/BAA Registry  ├──> /hipaa-remediate ──> /hipaa-report
+/hipaa-scan      ──> Scan Findings ──────┘           │
+/hipaa-risk      ──> Risk Register                   v
+                                           /hipaa-monitor (ongoing)
 
 /hipaa-breach (standalone — use when things go wrong)
+/em-dashboard (opens visual dashboard at localhost:3000)
 ```
 
-All artifacts are written to `~/.em-dash/projects/{slug}/`. Each skill automatically discovers what the previous one produced.
+All skills auto-update `.em-dash/dashboard.json` as they run. The visual dashboard (`bun run dashboard` or `/em-dashboard`) shows checklists, findings, risks, vendors, evidence, and activity in real time.
 
 ## What it checks
 
@@ -195,6 +202,21 @@ All optional. em-dash works with just grep.
 </details>
 
 ## What it produces
+
+### Dashboard
+
+Run `bun run dashboard` to open the compliance dashboard at localhost:3000.
+
+| Feature | Description |
+|---------|-------------|
+| **NL Summary** | Auto-generated compliance summary: score, open findings, missing BAAs, top risk, next step |
+| **Audit Pipeline** | Visual skill status with timestamps, finding counts, and 1-line summaries |
+| **Requirements Checklist** | 49 HIPAA items, filterable by section, with evidence linking and notes |
+| **Findings** | Expandable rows with severity, description, dates, linked evidence |
+| **Risk Register** | 5x5 likelihood/impact matrix + table view with treatment strategies |
+| **Vendor Tracker** | BAA status, expiry warnings, risk tiers, notes |
+| **Evidence Library** | Drag-and-drop upload, SHA-256 integrity, search, pagination |
+| **Export** | HTML compliance report + CSV findings export |
 
 ### Reports
 

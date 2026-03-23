@@ -1,6 +1,6 @@
 {
   "name": "em-dash",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Open-source compliance audit suite for Claude Code. HIPAA interview assessments + automated cloud/code scanning + policy-as-code + actionable remediation.",
   "license": "MIT",
   "repository": {
@@ -19,7 +19,8 @@
     "eval:list": "bun run scripts/eval-list.ts",
     "eval:select": "bun run scripts/eval-select.ts",
     "eval:compare": "bun run scripts/eval-compare.ts",
-    "eval:summary": "bun run scripts/eval-summary.ts"
+    "eval:summary": "bun run scripts/eval-summary.ts",
+    "dashboard": "bun run scripts/dashboard-server.ts"
   },
   "engines": {
     "bun": ">=1.0.0"

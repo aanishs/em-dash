@@ -10,6 +10,7 @@ description: |
 allowed-tools:
   - Bash
   - Read
+  - Write
   - Glob
   - Grep
   - AskUserQuestion
@@ -123,6 +124,46 @@ _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-da
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa" "<STATUS>" <FINDINGS_COUNT>
 ```
 
+## Dashboard Sync
+
+After logging the review, if `.em-dash/dashboard.json` exists in the project root, update the skill status:
+
+```bash
+if [ -f .em-dash/dashboard.json ]; then
+  _SKILL_KEY="hipaa"
+  _STATUS_VAL="<STATUS>"
+  _FINDINGS_VAL=<FINDINGS_COUNT>
+  _SUMMARY="<ONE_LINE_SUMMARY>"
+  _TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  bun -e "
+    const fs = require('fs');
+    const d = JSON.parse(fs.readFileSync('.em-dash/dashboard.json', 'utf-8'));
+    if (!d.frameworks) d.frameworks = {};
+    if (!d.frameworks.hipaa) d.frameworks.hipaa = { status: 'in-progress', skills: {}, checklist: [], evidence_gaps: [] };
+    d.frameworks.hipaa.skills['$_SKILL_KEY'] = {
+      status: '$_STATUS_VAL'.toLowerCase(),
+      timestamp: '$_TIMESTAMP',
+      findings: $_FINDINGS_VAL,
+      summary: '$_SUMMARY'
+    };
+    d.frameworks.hipaa.last_updated = '$_TIMESTAMP';
+    fs.writeFileSync('.em-dash/dashboard.json', JSON.stringify(d, null, 2) + '\\n');
+  " 2>/dev/null || true
+fi
+```
+
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use `hipaa-dashboard-update` to update individual checklist items based on actual results:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Mark a checklist item as complete with a note:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
+# Mark as pending with an evidence gap:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
+# Add evidence file to an item:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
+```
+
 ## Compliance Dashboard
 
 Display the current compliance status by running:
@@ -187,6 +228,120 @@ If the user chooses A, install the missing tools before proceeding. If B, contin
 
 ---
 
+## Step 1.75: Initialize Dashboard
+
+Check if `.em-dash/dashboard.json` exists. If not, create it with the full HIPAA checklist.
+
+```bash
+if [ -f .em-dash/dashboard.json ]; then
+  echo "DASHBOARD_EXISTS"
+else
+  echo "DASHBOARD_INIT_NEEDED"
+fi
+```
+
+**If `DASHBOARD_INIT_NEEDED`:** Create the dashboard config. Use the Write tool to write `.em-dash/dashboard.json` with this structure:
+
+```bash
+mkdir -p .em-dash/evidence
+```
+
+The JSON must contain:
+- `"version": 1`
+- `"project"` with name (from git remote repo name), slug (from `$SLUG`), and `"frameworks": ["hipaa"]`
+- `"frameworks.hipaa"` with `"status": "in-progress"`, empty `"skills"` object, full `"checklist"` array (below), empty `"evidence_gaps"` array
+- `"evidence"` with empty `"files"` array
+
+**HIPAA Checklist Items** — include ALL of these in the checklist array. Each item uses this format:
+```json
+{"id": "<id>", "section": "<section>", "text": "<text>", "status": "pending", "evidence": [], "notes": "", "custom": false}
+```
+
+Administrative Safeguards (§164.308):
+
+| id | text |
+|----|------|
+| 164.308(a)(1)(i) | Security Management Process — policies to prevent, detect, contain, and correct security violations |
+| 164.308(a)(1)(ii)(A) | Risk Analysis — accurate and thorough assessment of potential risks to ePHI |
+| 164.308(a)(1)(ii)(B) | Risk Management — security measures to reduce risks to reasonable level |
+| 164.308(a)(1)(ii)(C) | Sanction Policy — sanctions against workforce members who violate policies |
+| 164.308(a)(1)(ii)(D) | Information System Activity Review — regular review of audit logs and access reports |
+| 164.308(a)(2) | Assigned Security Responsibility — designate a HIPAA Security Officer |
+| 164.308(a)(3)(i) | Workforce Security — ensure appropriate access and prevent unauthorized access |
+| 164.308(a)(3)(ii)(A) | Authorization and Supervision — authorize and supervise workforce ePHI access |
+| 164.308(a)(3)(ii)(B) | Workforce Clearance Procedure — determine appropriate access levels |
+| 164.308(a)(3)(ii)(C) | Termination Procedures — revoke access when employment ends |
+| 164.308(a)(4)(i) | Information Access Management — authorize access consistent with Privacy Rule |
+| 164.308(a)(4)(ii)(B) | Access Authorization — policies for granting ePHI access |
+| 164.308(a)(4)(ii)(C) | Access Establishment and Modification — procedures for creating and revoking access |
+| 164.308(a)(5)(i) | Security Awareness and Training — security awareness training program |
+| 164.308(a)(5)(ii)(A) | Security Reminders — periodic security updates to workforce |
+| 164.308(a)(5)(ii)(B) | Protection from Malicious Software — procedures for guarding against malware |
+| 164.308(a)(5)(ii)(C) | Log-in Monitoring — procedures for monitoring log-in attempts |
+| 164.308(a)(5)(ii)(D) | Password Management — procedures for creating, changing, safeguarding passwords |
+| 164.308(a)(6)(i) | Security Incident Procedures — identify and respond to security incidents |
+| 164.308(a)(6)(ii) | Response and Reporting — mitigate harmful effects and document incidents |
+| 164.308(a)(7)(i) | Contingency Plan — policies for responding to emergencies |
+| 164.308(a)(7)(ii)(A) | Data Backup Plan — create and maintain retrievable copies of ePHI |
+| 164.308(a)(7)(ii)(B) | Disaster Recovery Plan — procedures to restore lost data |
+| 164.308(a)(7)(ii)(C) | Emergency Mode Operation Plan — critical business processes during emergency |
+| 164.308(a)(7)(ii)(D) | Testing and Revision — periodically test and revise contingency plans |
+| 164.308(a)(8) | Evaluation — periodic technical and non-technical evaluation |
+| 164.308(b)(1) | Business Associate Contracts — satisfactory assurances from business associates |
+
+Physical Safeguards (§164.310):
+
+| id | text |
+|----|------|
+| 164.310(a)(1) | Facility Access Controls — limit physical access to electronic information systems |
+| 164.310(a)(2)(ii) | Facility Security Plan — safeguard facility and equipment |
+| 164.310(a)(2)(iv) | Maintenance Records — document repairs and modifications to physical security |
+| 164.310(b) | Workstation Use — specify proper functions and physical attributes of workstations |
+| 164.310(c) | Workstation Security — physical safeguards restricting access to authorized users |
+| 164.310(d)(1) | Device and Media Controls — govern receipt and removal of hardware and media |
+| 164.310(d)(2)(i) | Disposal — procedures for final disposal of ePHI and hardware |
+| 164.310(d)(2)(ii) | Media Re-use — remove ePHI before re-using electronic media |
+
+Technical Safeguards (§164.312):
+
+| id | text |
+|----|------|
+| 164.312(a)(1) | Access Control — technical policies to allow access only to authorized persons |
+| 164.312(a)(2)(i) | Unique User Identification — assign unique name/number to track user identity |
+| 164.312(a)(2)(ii) | Emergency Access Procedure — procedures for obtaining ePHI during emergency |
+| 164.312(a)(2)(iii) | Automatic Logoff — terminate session after period of inactivity |
+| 164.312(a)(2)(iv) | Encryption and Decryption — encrypt and decrypt ePHI at rest |
+| 164.312(b) | Audit Controls — record and examine system activity |
+| 164.312(c)(1) | Integrity — protect ePHI from improper alteration or destruction |
+| 164.312(c)(2) | Mechanism to Authenticate ePHI — corroborate that ePHI has not been altered |
+| 164.312(d) | Person or Entity Authentication — verify identity of person seeking access |
+| 164.312(e)(1) | Transmission Security — guard against unauthorized access during transmission |
+| 164.312(e)(2)(i) | Integrity Controls — ensure transmitted ePHI is not improperly modified |
+| 164.312(e)(2)(ii) | Encryption — encrypt ePHI in transit |
+
+Organizational Requirements (§164.314):
+
+| id | text |
+|----|------|
+| 164.314(a)(1) | Business Associate Contracts — document satisfactory assurances from BAs |
+| 164.314(a)(2)(i) | BA Contract Requirements — establish permitted uses and disclosures |
+
+Policies and Documentation (§164.316):
+
+| id | text |
+|----|------|
+| 164.316(a) | Policies and Procedures — implement reasonable and appropriate policies |
+| 164.316(b)(1) | Documentation — maintain written policies and records of required actions |
+| 164.316(b)(2)(i) | Time Limit — retain documentation for 6 years |
+| 164.316(b)(2)(ii) | Availability — make documentation available to responsible persons |
+| 164.316(b)(2)(iii) | Updates — review and update documentation periodically |
+
+After writing the JSON, confirm: "Initialized HIPAA compliance dashboard with 49 checklist items."
+
+**If `DASHBOARD_EXISTS`:** Read it and continue to the next step.
+
+---
+
 ## Step 2: Check Existing Compliance Artifacts
 
 Look for prior audit artifacts to understand where the user is in their compliance journey.
@@ -229,6 +384,34 @@ Based on the artifacts found, display a compliance dashboard showing the current
 ```
 
 Status values: COMPLETE, IN PROGRESS, NOT STARTED, STALE (>90 days old)
+
+### Evidence Gap Analysis
+
+If `.em-dash/dashboard.json` exists, read it and analyze the checklist for gaps:
+
+```bash
+cat .em-dash/dashboard.json 2>/dev/null || echo "{}"
+```
+
+Count checklist items by status. For each `pending` item with no evidence, it's a gap. Display a summary:
+
+```
+Evidence & Checklist
+═══════════════════
+Checklist: X/49 complete (Y%)
+Evidence:  N files uploaded
+Gaps:      N items need attention
+
+Top gaps:
+  ⚠ No BAA uploaded — 164.314(a)(1)
+  ⚠ No risk analysis evidence — 164.308(a)(1)(ii)(A)
+  ⚠ No security officer designated — 164.308(a)(2)
+
+Run /em-dashboard to open the visual dashboard.
+Upload evidence via drag-and-drop at http://localhost:3000.
+```
+
+Only show the top 5 most critical gaps (prioritize: BAA, risk analysis, security officer, audit controls, encryption).
 
 ---
 

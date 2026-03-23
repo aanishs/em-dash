@@ -129,6 +129,118 @@ _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-da
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-assess" "<STATUS>" <FINDINGS_COUNT>
 ```
 
+## Dashboard Sync
+
+After logging the review, if `.em-dash/dashboard.json` exists in the project root, update the skill status:
+
+```bash
+if [ -f .em-dash/dashboard.json ]; then
+  _SKILL_KEY="assess"
+  _STATUS_VAL="<STATUS>"
+  _FINDINGS_VAL=<FINDINGS_COUNT>
+  _SUMMARY="<ONE_LINE_SUMMARY>"
+  _TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  bun -e "
+    const fs = require('fs');
+    const d = JSON.parse(fs.readFileSync('.em-dash/dashboard.json', 'utf-8'));
+    if (!d.frameworks) d.frameworks = {};
+    if (!d.frameworks.hipaa) d.frameworks.hipaa = { status: 'in-progress', skills: {}, checklist: [], evidence_gaps: [] };
+    d.frameworks.hipaa.skills['$_SKILL_KEY'] = {
+      status: '$_STATUS_VAL'.toLowerCase(),
+      timestamp: '$_TIMESTAMP',
+      findings: $_FINDINGS_VAL,
+      summary: '$_SUMMARY'
+    };
+    d.frameworks.hipaa.last_updated = '$_TIMESTAMP';
+    fs.writeFileSync('.em-dash/dashboard.json', JSON.stringify(d, null, 2) + '\\n');
+  " 2>/dev/null || true
+fi
+```
+
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use `hipaa-dashboard-update` to update individual checklist items based on actual results:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Mark a checklist item as complete with a note:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
+# Mark as pending with an evidence gap:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
+# Add evidence file to an item:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
+```
+
+## Dashboard Checklist Updates
+
+As you conduct the interview, update the dashboard after each meaningful answer. Use your judgment — the user's answer tells you whether a control is genuinely in place or just aspirational.
+
+**Principle:** An answer like "yeah we probably should do that" is NOT a complete control. "Our CTO handles security, we review access quarterly" IS evidence of a control in place.
+
+**Reference — interview topics and their checklist IDs:**
+
+| Topic | Checklist ID | What "complete" means |
+|-------|-------------|----------------------|
+| Security officer | 164.308(a)(2) | A specific person is designated and actively responsible — not "we all kind of do it" |
+| Risk analysis | 164.308(a)(1)(ii)(A) | A formal risk assessment was conducted — not "we think about security" |
+| Security training | 164.308(a)(5)(i) | An actual training program exists with records — not "we tell people to be careful" |
+| Incident response | 164.308(a)(6)(i) | A documented procedure exists — not "we'd figure it out" |
+| Contingency plan | 164.308(a)(7)(i) | Documented backup, disaster recovery, and emergency procedures — not just "we use AWS" |
+| Termination procedures | 164.308(a)(3)(ii)(C) | Documented process to revoke access when someone leaves — not "we'd probably disable their account" |
+| Workforce clearance | 164.308(a)(3)(i) | Defined process for granting/reviewing ePHI access levels |
+| Password management | 164.308(a)(5)(ii)(D) | Enforced password policies (length, complexity, rotation) |
+| BAAs with vendors | 164.314(a)(1) | Signed BAA on file for each vendor handling PHI |
+
+**Beyond checklist — you also write vendors and risks:**
+
+When the user mentions third-party services that handle PHI, add them as vendors:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud hosting" --baa-status signed --risk-tier high
+```
+
+When you identify organizational risks from interview answers, add them:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "Phishing risk — no MFA enforced" --likelihood 4 --impact 4 --treatment mitigate --owner "Security Officer"
+```
+
+For vendors without BAAs, also create evidence gaps:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.314(a)(1)" pending --gap "No BAA with Stripe"
+```
+
+**Examples of good judgment:**
+
+- User: "I'm the CTO and I handle security" → complete 164.308(a)(2) with note "CTO [name] is designated security officer"
+- User: "We haven't really done a formal risk assessment" → pending 164.308(a)(1)(ii)(A) with gap "No formal risk analysis conducted"
+- User: "We use AWS, Stripe, and Twilio for SMS" → add all three as vendors, check BAA status, add gaps for unsigned ones
+- User: "We don't have a disaster recovery plan" → add risk (likelihood 3, impact 5, treatment mitigate) + pending 164.308(a)(7)(i)
+
+**How to update the dashboard:**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Checklist: mark an item as complete with reasoning
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete "<your reasoning>"
+# Checklist: mark as pending with an evidence gap
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" pending --gap "<what's missing>"
+# Checklist: attach evidence file
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete --evidence "<filename>"
+
+# Finding: add a new finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "<title>" --severity <critical|high|medium|low> --requirement "<id>" --source "<skill>"
+# Finding: resolve a finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "<title>"
+
+# Vendor: add a vendor/BA
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "<name>" --service "<service>" --baa-status <signed|pending|none> --risk-tier <low|medium|high|critical>
+# Vendor: update BAA status
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor update --name "<name>" --baa-status signed
+
+# Risk: add a risk
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "<desc>" --likelihood <1-5> --impact <1-5> --treatment <mitigate|accept|transfer|avoid> --owner "<owner>" --requirement "<ids>"
+```
+
 # HIPAA Compliance Assessment
 
 You are running the `/hipaa-assess` skill — a structured, interactive assessment that evaluates organizational HIPAA compliance across all major requirement domains. This works like TurboTax: one question at a time, adapting based on prior answers, skipping what's already been covered.

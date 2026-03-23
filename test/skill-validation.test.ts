@@ -31,8 +31,8 @@ function findGenerated(): string[] {
 describe('Skill template validation', () => {
   const templates = findTemplates();
 
-  test('all 7 skill templates exist', () => {
-    expect(templates.length).toBe(7);
+  test('all 10 skill templates exist', () => {
+    expect(templates.length).toBe(10);
   });
 
   for (const tmpl of templates) {
@@ -59,7 +59,7 @@ describe('Skill template validation', () => {
     test(`${name} has no unresolved placeholders (only known ones)`, () => {
       const content = fs.readFileSync(tmpl, 'utf-8');
       const placeholders = content.match(/\{\{(\w+)\}\}/g) || [];
-      const known = ['PREAMBLE', 'COMPLIANCE_DASHBOARD', 'TOOL_DETECTION', 'PHI_PATTERNS', 'EVIDENCE_COLLECTION', 'AWS_CHECKS', 'GCP_CHECKS', 'AZURE_CHECKS', 'IAC_POLICY_ENGINE'];
+      const known = ['PREAMBLE', 'COMPLIANCE_DASHBOARD', 'TOOL_DETECTION', 'PHI_PATTERNS', 'EVIDENCE_COLLECTION', 'AWS_CHECKS', 'GCP_CHECKS', 'AZURE_CHECKS', 'IAC_POLICY_ENGINE', 'DASHBOARD_UPDATES'];
       for (const ph of placeholders) {
         const name = ph.replace(/\{\{|\}\}/g, '');
         expect(known).toContain(name);
@@ -71,8 +71,8 @@ describe('Skill template validation', () => {
 describe('Generated SKILL.md files', () => {
   const generated = findGenerated();
 
-  test('all 7 generated SKILL.md files exist', () => {
-    expect(generated.length).toBe(7);
+  test('all 10 generated SKILL.md files exist', () => {
+    expect(generated.length).toBe(10);
   });
 
   for (const md of generated) {

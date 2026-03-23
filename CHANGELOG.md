@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.1.0 — Compliance dashboard + vendor/risk management
+
+**Visual compliance dashboard.** Run `bun run dashboard` or `/em-dashboard` to open a real-time dashboard at localhost:3000. Sidebar navigation, dark mode, live reload. Checklist tracking, evidence management, risk register, vendor/BAA tracking, findings, activity timeline, charts — running locally for free.
+
+**Natural language summary.** The Overview page generates a plain-English compliance summary from your data: "Your HIPAA compliance is 72%. 9 open findings (2 critical). 1 vendor missing BAA. Top risk: unencrypted PHI (score 20)." Plus a "Next step" recommendation based on which skills you've run.
+
+**Skill intelligence.** Pipeline cards show when each skill last ran ("4 days ago"), how many findings it produced, and a 1-line summary of what it did. Skills write a `summary` field to the dashboard on completion.
+
+**Two new skills.** `/hipaa-vendor` auto-detects third-party services from your codebase (AWS SDK, Stripe, Twilio, etc.) and interviews about BAA status. `/hipaa-risk` conducts a NIST SP 800-30 risk assessment with likelihood/impact scoring and treatment planning. Both write directly to the dashboard.
+
+**Dashboard-aware skills.** All 10 skills now auto-update `.em-dash/dashboard.json` as they work. Scan finds a public S3 bucket? Dashboard shows the finding. Assessment confirms a security officer? Checklist item gets checked. Remediation fixes an issue? Finding gets resolved. No manual sync needed.
+
+**Expandable findings.** Click any finding to see full description, discovered/resolved dates, linked evidence files, and requirement mapping. Evidence auto-matched by requirement ID.
+
+**`hipaa-dashboard-update` utility.** CLI tool with subcommands for all dashboard data types — `checklist`, `finding` (add/resolve), `vendor` (add/update), `risk` (add). Skills call it inline as they discover things.
+
+**Export.** Download a full HTML compliance report or CSV findings export from the sidebar.
+
+**Open in Finder.** Reveal evidence files and compliance artifacts in your system file manager. Per-file "Reveal" button + sidebar shortcut.
+
+**Styled confirm dialogs.** No more browser `confirm()` popups. All destructive actions use styled modals matching the dashboard design.
+
+**~330 tests. All free. Under 3 seconds.**
+
 ## v1.0.0 — Initial release
 
 em-dash: a HIPAA compliance platform for Claude Code. Built for teams handling PHI.
@@ -18,4 +42,4 @@ em-dash: a HIPAA compliance platform for Claude Code. Built for teams handling P
 
 **Evidence collection with integrity.** SHA-256 hashed evidence files with timestamps for auditor verification.
 
-**280 tests. All free. Under 3 seconds.**
+**280+ tests. All free. Under 3 seconds.**

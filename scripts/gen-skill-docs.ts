@@ -148,6 +148,50 @@ _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinD
 \`\`\``;
 }
 
+function generateDashboardSync(ctx: TemplateContext): string {
+  const skillKey = ctx.skillName.replace(/^hipaa-/, '');
+
+  return `## Dashboard Sync
+
+After logging the review, if \`.em-dash/dashboard.json\` exists in the project root, update the skill status:
+
+\`\`\`bash
+if [ -f .em-dash/dashboard.json ]; then
+  _SKILL_KEY="${skillKey}"
+  _STATUS_VAL="<STATUS>"
+  _FINDINGS_VAL=<FINDINGS_COUNT>
+  _SUMMARY="<ONE_LINE_SUMMARY>"
+  _TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  bun -e "
+    const fs = require('fs');
+    const d = JSON.parse(fs.readFileSync('.em-dash/dashboard.json', 'utf-8'));
+    if (!d.frameworks) d.frameworks = {};
+    if (!d.frameworks.hipaa) d.frameworks.hipaa = { status: 'in-progress', skills: {}, checklist: [], evidence_gaps: [] };
+    d.frameworks.hipaa.skills['$_SKILL_KEY'] = {
+      status: '$_STATUS_VAL'.toLowerCase(),
+      timestamp: '$_TIMESTAMP',
+      findings: $_FINDINGS_VAL,
+      summary: '$_SUMMARY'
+    };
+    d.frameworks.hipaa.last_updated = '$_TIMESTAMP';
+    fs.writeFileSync('.em-dash/dashboard.json', JSON.stringify(d, null, 2) + '\\\\n');
+  " 2>/dev/null || true
+fi
+\`\`\`
+
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use \`hipaa-dashboard-update\` to update individual checklist items based on actual results:
+
+\`\`\`bash
+_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
+# Mark a checklist item as complete with a note:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
+# Mark as pending with an evidence gap:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
+# Add evidence file to an item:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
+\`\`\``;
+}
+
 // ─── Composed Preamble ──────────────────────────────────────
 
 function generatePreamble(ctx: TemplateContext): string {
@@ -161,6 +205,7 @@ function generatePreamble(ctx: TemplateContext): string {
     generateCompletionStatus(),
     generateEvidenceSection(ctx),
     generateReviewLogging(ctx),
+    generateDashboardSync(ctx),
   ].join('\n\n');
 }
 
@@ -1363,6 +1408,297 @@ Report which tools ran and their findings:
 | Manual Review | N | N findings | Pattern matching |`;
 }
 
+function generateDashboardUpdates(ctx: TemplateContext): string {
+  const binDetect = `_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})`;
+
+  const updateUsage = `**How to update the dashboard:**
+
+\`\`\`bash
+${binDetect}
+# Checklist: mark an item as complete with reasoning
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete "<your reasoning>"
+# Checklist: mark as pending with an evidence gap
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" pending --gap "<what's missing>"
+# Checklist: attach evidence file
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete --evidence "<filename>"
+
+# Finding: add a new finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "<title>" --severity <critical|high|medium|low> --requirement "<id>" --source "<skill>"
+# Finding: resolve a finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "<title>"
+
+# Vendor: add a vendor/BA
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "<name>" --service "<service>" --baa-status <signed|pending|none> --risk-tier <low|medium|high|critical>
+# Vendor: update BAA status
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor update --name "<name>" --baa-status signed
+
+# Risk: add a risk
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "<desc>" --likelihood <1-5> --impact <1-5> --treatment <mitigate|accept|transfer|avoid> --owner "<owner>" --requirement "<ids>"
+\`\`\``;
+
+  const maps: Record<string, string> = {
+    'hipaa-assess': `## Dashboard Checklist Updates
+
+As you conduct the interview, update the dashboard after each meaningful answer. Use your judgment — the user's answer tells you whether a control is genuinely in place or just aspirational.
+
+**Principle:** An answer like "yeah we probably should do that" is NOT a complete control. "Our CTO handles security, we review access quarterly" IS evidence of a control in place.
+
+**Reference — interview topics and their checklist IDs:**
+
+| Topic | Checklist ID | What "complete" means |
+|-------|-------------|----------------------|
+| Security officer | 164.308(a)(2) | A specific person is designated and actively responsible — not "we all kind of do it" |
+| Risk analysis | 164.308(a)(1)(ii)(A) | A formal risk assessment was conducted — not "we think about security" |
+| Security training | 164.308(a)(5)(i) | An actual training program exists with records — not "we tell people to be careful" |
+| Incident response | 164.308(a)(6)(i) | A documented procedure exists — not "we'd figure it out" |
+| Contingency plan | 164.308(a)(7)(i) | Documented backup, disaster recovery, and emergency procedures — not just "we use AWS" |
+| Termination procedures | 164.308(a)(3)(ii)(C) | Documented process to revoke access when someone leaves — not "we'd probably disable their account" |
+| Workforce clearance | 164.308(a)(3)(i) | Defined process for granting/reviewing ePHI access levels |
+| Password management | 164.308(a)(5)(ii)(D) | Enforced password policies (length, complexity, rotation) |
+| BAAs with vendors | 164.314(a)(1) | Signed BAA on file for each vendor handling PHI |
+
+**Beyond checklist — you also write vendors and risks:**
+
+When the user mentions third-party services that handle PHI, add them as vendors:
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud hosting" --baa-status signed --risk-tier high
+\`\`\`
+
+When you identify organizational risks from interview answers, add them:
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "Phishing risk — no MFA enforced" --likelihood 4 --impact 4 --treatment mitigate --owner "Security Officer"
+\`\`\`
+
+For vendors without BAAs, also create evidence gaps:
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.314(a)(1)" pending --gap "No BAA with Stripe"
+\`\`\`
+
+**Examples of good judgment:**
+
+- User: "I'm the CTO and I handle security" → complete 164.308(a)(2) with note "CTO [name] is designated security officer"
+- User: "We haven't really done a formal risk assessment" → pending 164.308(a)(1)(ii)(A) with gap "No formal risk analysis conducted"
+- User: "We use AWS, Stripe, and Twilio for SMS" → add all three as vendors, check BAA status, add gaps for unsigned ones
+- User: "We don't have a disaster recovery plan" → add risk (likelihood 3, impact 5, treatment mitigate) + pending 164.308(a)(7)(i)
+
+${updateUsage}`,
+
+    'hipaa-scan': `## Dashboard Updates
+
+As you complete each scan check, update the dashboard based on your **interpretation** of the results. A grep match does NOT automatically mean a control is in place — you must read the code and understand whether the control is real.
+
+**You write to: checklist, findings (MAIN SOURCE), vendors (detect clouds)**
+
+**Principle:** You are an auditor, not a pattern matcher. \`grep -r "role"\` finding a variable called \`userRole\` in a React component is not the same as finding RBAC middleware protecting PHI endpoints. Read the context. Understand the intent. Then update.
+
+**Reference — scan checks and their checklist IDs:**
+
+| Check | Checklist ID | What "complete" actually means |
+|-------|-------------|-------------------------------|
+| CHECK 1-2: PHI identifiers | (informational) | These checks identify where PHI exists — they don't map to a pass/fail checklist item, but inform other checks |
+| CHECK 3: PHI in logs | 164.312(b) | No PHI fields flowing into log output — not just "logging exists" |
+| CHECK 5: RBAC | 164.312(a)(1) | Real role-based access control on PHI endpoints — not just a variable named \`role\` |
+| CHECK 6: Audit logging | 164.312(b) | Audit trail recording who accessed what PHI when — not console.log debugging |
+| CHECK 7: Encryption at rest | 164.312(a)(2)(iv) | ePHI encrypted with AES-256/KMS/pgcrypto — not just \`crypto\` imported for hashing tokens |
+| CHECK 8: Session timeout | 164.312(a)(2)(iii) | Auto-logoff after inactivity (<=15 min for PHI systems) — not just a \`maxAge\` on a cookie |
+| CHECK 9: Password hashing | 164.312(d) | bcrypt/argon2/scrypt actually used on user passwords — not just listed in package.json |
+| CHECK 10: PHI in tests | (informational) | Real SSN patterns in test fixtures — flag but don't block |
+| CHECK 11: PHI in errors | 164.312(a)(1) | Stack traces or error messages don't leak PHI to users |
+| CHECK 12: IAM/permissions | 164.308(a)(4)(i) | Least-privilege IAM — no \`"Action": "*"\` on production policies |
+| CHECK 13-16: DB security | 164.312(a)(1), 164.312(b) | DB columns with PHI have encryption, audit logging, and access controls |
+| CHECK 17: DB SSL | 164.312(e)(2)(ii) | Database connections use SSL — \`sslmode=disable\` is a critical finding |
+| CHECK 18: Push/email PHI | 164.312(a)(1) | PHI not exposed in push notifications or unencrypted email |
+| CHECK 19: Secrets in config | 164.308(a)(5)(ii)(B) | No passwords/keys in committed config files; .env is gitignored |
+| Unique user IDs | 164.312(a)(2)(i) | Auth system assigns unique identifiers (userId, email-based login) |
+| Transmission security | 164.312(e)(1) | HTTPS enforced, TLS on all external connections |
+
+**Cloud infrastructure checks:**
+
+| Finding | Checklist ID | What "complete" means |
+|---------|-------------|----------------------|
+| CloudTrail / audit logs enabled | 164.312(b), 164.308(a)(1)(ii)(D) | Multi-region trail with log validation, actively logging |
+| S3/storage encryption | 164.312(a)(2)(iv) | Default encryption on all buckets containing ePHI |
+| VPC flow logs | 164.312(b) | Flow logs enabled on all VPCs — not just the default VPC |
+| Cloud provider detected | 164.314(a)(1) | If AWS/GCP/Azure is in use, check for BAA evidence — add gap if missing |
+| MFA enabled | 164.312(d) | MFA on all IAM users, especially root/admin |
+| KMS key rotation | 164.312(a)(2)(iv) | Automatic key rotation enabled for encryption keys |
+
+**Examples of good judgment:**
+
+- grep finds \`bcrypt.hash(password)\` in \`src/auth/register.ts\` → **complete**: "Password hashing with bcrypt in src/auth/register.ts"
+- grep finds \`bcrypt\` only in \`package.json\` dependencies → **NOT complete**: library installed but usage not verified — add gap
+- grep finds \`auditLog.record({ userId, action, resourceId })\` on patient routes → **complete**: "PHI access audit trail in src/middleware/audit.ts"
+- grep finds \`console.log('audit check')\` → **NOT complete**: debug logging is not an audit trail
+- AWS CloudTrail exists but \`IsLogging: false\` → **NOT complete**: trail exists but isn't actively logging
+- S3 bucket has encryption but \`PublicAccessBlock\` is not set → **partial**: encryption complete but access control needs work
+
+**Findings — your main output:**
+Every scan issue becomes a finding. Add them as you discover them:
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "S3 bucket has public ACL" --severity critical --requirement "164.312(a)(1)" --source scan
+\`\`\`
+
+**Vendor detection:**
+If you detect AWS/GCP/Azure in use (from CLI checks or code imports), add as vendor if not already present:
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud infrastructure" --baa-status pending --risk-tier high
+\`\`\`
+
+${updateUsage}`,
+
+    'hipaa-remediate': `## Dashboard Updates
+
+As you generate policy documents and apply code fixes, update the dashboard. Policy generation is straightforward — if you wrote the document, the control is documented. Code fixes require judgment — verify the fix actually addresses the finding.
+
+**You write to: checklist (fixed items), findings (resolve), evidence (policies)**
+
+**Principle:** Generating a policy document means the policy *exists as documentation*. It does NOT mean the organization is *following* it. Mark the documentation requirement as complete, but only mark the operational requirement as complete if you've verified the control is implemented in code/infrastructure.
+
+**Reference — remediation outputs and their checklist IDs:**
+
+| Remediation | Checklist ID | What to mark complete |
+|-------------|-------------|----------------------|
+| access-control.md generated | 164.308(a)(4)(i) | Access management policy documented |
+| audit-logging.md generated | 164.312(b) | Audit control policy documented (operational check is separate) |
+| encryption.md generated | 164.312(a)(2)(iv), 164.312(e)(2)(ii) | Encryption policy documented |
+| incident-response.md generated | 164.308(a)(6)(i), 164.308(a)(6)(ii) | Incident response procedures documented |
+| risk-assessment.md generated | 164.308(a)(1)(ii)(A) | Risk assessment procedure documented |
+| workforce-security.md generated | 164.308(a)(3)(i) | Workforce security policy documented |
+| contingency-plan.md generated | 164.308(a)(7)(i), 164.308(a)(7)(ii)(A) | Contingency and backup plan documented |
+| baa-template.md generated | 164.314(a)(1) | BAA template available (still needs signing with each vendor) |
+| Any policy generated | 164.316(a), 164.308(a)(1)(i) | Policies and procedures exist; security management process established |
+| Code fix: added audit middleware | 164.312(b) | Audit controls implemented (not just documented) |
+| Code fix: removed PHI from logs | 164.312(b) | PHI no longer exposed in log output |
+| Code fix: added encryption | 164.312(a)(2)(iv) | Encryption implemented in code |
+| Code fix: added session timeout | 164.312(a)(2)(iii) | Auto-logoff implemented |
+
+**Examples of good judgment:**
+
+- Generated access-control.md → complete 164.308(a)(4)(i) "Access management policy generated"
+- Applied code fix adding RBAC middleware → complete 164.312(a)(1) "RBAC middleware added to PHI routes in src/middleware/auth.ts"
+- Generated BAA template → complete 164.314(a)(1) ONLY if user confirms they'll sign it with vendors. Otherwise: note "BAA template generated — needs signing with [vendors]"
+
+**Findings — resolve as you fix:**
+After each successful remediation, resolve the corresponding finding:
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "RDS instance lacks encryption at rest"
+\`\`\`
+
+${updateUsage}`,
+
+    'hipaa-report': `## Dashboard Updates
+
+After generating reports, update the documentation and evaluation checklist items.
+
+**Reference:**
+
+| Report | Checklist ID | Update |
+|--------|-------------|--------|
+| Full compliance report | 164.316(b)(1) | Documentation requirement met |
+| Executive summary | 164.316(b)(2)(ii) | Documentation available to responsible persons |
+| Trust report | 164.308(a)(8) | Evaluation conducted and documented |
+| Any report | 164.316(b)(2)(i) | Documentation retention initiated (6-year requirement) |
+
+${updateUsage}`,
+
+    'hipaa-monitor': `## Dashboard Checklist Updates
+
+Monitor is unique — it can both **complete** and **un-check** items. If a control has drifted (code removed, config changed, permission widened), downgrade it back to pending with a gap.
+
+**Principle:** Compliance is not permanent. A control that was in place last month may have been removed by a deploy this week. Your job is to re-verify and update honestly.
+
+**Reference:**
+
+| Finding | Action |
+|---------|--------|
+| Control still in place | Update note: "Re-verified [date]" |
+| Control drifted/removed | **Downgrade to pending** with gap: "Drift detected: [description]" |
+| New finding not in baseline | Add gap for the relevant checklist item |
+| Finding resolved since baseline | Mark complete with note |
+
+**Monitor itself satisfies:**
+- 164.308(a)(1)(ii)(D) — Information system activity review (this IS the review)
+- 164.316(b)(2)(iii) — Documentation updates (you're updating the compliance state)
+
+${updateUsage}`,
+
+    'hipaa-breach': `## Dashboard Checklist Updates
+
+After documenting the breach response, update incident-related items based on how the response actually went.
+
+**Principle:** A breach response is evidence that your incident procedures work (or don't). Update the dashboard based on what actually happened, not what the policy says should happen.
+
+**Reference:**
+
+| Outcome | Checklist ID | Update |
+|---------|-------------|--------|
+| Incident identified and documented | 164.308(a)(6)(i) | Security incident procedures followed |
+| Response completed, notifications sent | 164.308(a)(6)(ii) | Response and reporting procedures work |
+| Breach report saved | 164.308(a)(6)(ii) | Attach as evidence with --evidence flag |
+| Response revealed gaps in procedures | 164.308(a)(6)(i) | Downgrade to pending if procedures failed |
+
+${updateUsage}`,
+  };
+
+  // ─── New skills ──────────────────────────────────────────
+
+  maps['hipaa-vendor'] = `## Dashboard Updates
+
+As you discover vendors and confirm BAA status, update the dashboard in real time.
+
+**Data types you write:**
+- \`vendor add\` — for each discovered service
+- \`checklist\` — 164.314(a)(1), 164.314(a)(2)(i), 164.308(b)(1) based on BAA coverage
+- \`checklist ... --gap\` — for vendors missing BAAs
+
+**Vendor detection → dashboard:**
+After confirming each vendor's status, immediately update so the dashboard reflects progress:
+
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud infrastructure" --baa-status signed --risk-tier high --baa-expiry "2027-01-15"
+\`\`\`
+
+**BAA gaps:**
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.314(a)(1)" pending --gap "No BAA with Stripe"
+\`\`\`
+
+${updateUsage}`;
+
+  maps['hipaa-risk'] = `## Dashboard Updates
+
+As you identify and score risks with the user, update the dashboard in real time.
+
+**Data types you write:**
+- \`risk add\` — for each confirmed risk
+- \`checklist\` — 164.308(a)(1)(ii)(A) Risk Analysis, 164.308(a)(1)(ii)(B) Risk Management
+
+**After each confirmed risk:**
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "Unencrypted PHI at rest" --likelihood 4 --impact 5 --treatment mitigate --owner "Engineering" --requirement "164.312(a)(2)(iv)"
+\`\`\`
+
+**After completing the full assessment:**
+\`\`\`bash
+${binDetect}
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.308(a)(1)(ii)(A)" complete "Risk analysis completed — N risks identified"
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.308(a)(1)(ii)(B)" complete "Risk treatment plan established"
+\`\`\`
+
+${updateUsage}`;
+
+  return maps[ctx.skillName] || '';
+}
+
 // ─── Resolver Registry ──────────────────────────────────────
 
 type Resolver = (ctx: TemplateContext) => string;
@@ -1377,6 +1713,7 @@ const RESOLVERS: Record<string, Resolver> = {
   GCP_CHECKS: generateGcpChecks,
   AZURE_CHECKS: generateAzureChecks,
   IAC_POLICY_ENGINE: generateIacPolicyEngine,
+  DASHBOARD_UPDATES: generateDashboardUpdates,
 };
 
 // ─── Template Processing ────────────────────────────────────

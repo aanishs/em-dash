@@ -1,0 +1,67 @@
+---
+name: em-dashboard
+version: 0.1.0
+description: |
+  Opens the em-dash compliance dashboard in your browser.
+  Visual evidence management, checklists, and compliance tracking.
+
+  Run /em-dashboard to start the dashboard server on localhost.
+allowed-tools:
+  - Bash
+  - AskUserQuestion
+hipaa_sections: []
+risk_level: low
+requires_prior: []
+---
+
+{{PREAMBLE}}
+
+# em-dash Compliance Dashboard
+
+You are running the `/em-dashboard` skill. Your only job is to start the dashboard server so the user can view their compliance state in the browser.
+
+---
+
+## Step 1: Check Prerequisites
+
+Verify that `.em-dash/dashboard.json` exists in the project root:
+
+```bash
+if [ -f .em-dash/dashboard.json ]; then
+  echo "DASHBOARD_READY"
+  cat .em-dash/dashboard.json | head -5
+else
+  echo "NO_DASHBOARD"
+fi
+```
+
+If `NO_DASHBOARD`: tell the user "No dashboard config found. Run `/hipaa` first to initialize your HIPAA compliance dashboard, then come back here."
+
+---
+
+## Step 2: Start Dashboard Server
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash ] && echo ~/.claude/skills/em-dash || echo .claude/skills/em-dash)
+cd "$_EMDASH_BIN" 2>/dev/null || true
+bun run scripts/dashboard-server.ts --project-dir "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" &
+echo "Dashboard running at http://localhost:3000"
+```
+
+Tell the user:
+
+> Dashboard is running at **http://localhost:3000**
+>
+> - View your compliance checklist and progress
+> - Drag and drop evidence files (BAAs, screenshots, policies)
+> - Track evidence gaps
+>
+> The dashboard live-reloads when you run `/hipaa-scan`, `/hipaa-remediate`, or other skills.
+>
+> Press Ctrl+C to stop the server.
+
+---
+
+## Completion
+
+Report status: **DONE**

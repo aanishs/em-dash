@@ -128,6 +128,134 @@ _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-da
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-scan" "<STATUS>" <FINDINGS_COUNT>
 ```
 
+## Dashboard Sync
+
+After logging the review, if `.em-dash/dashboard.json` exists in the project root, update the skill status:
+
+```bash
+if [ -f .em-dash/dashboard.json ]; then
+  _SKILL_KEY="scan"
+  _STATUS_VAL="<STATUS>"
+  _FINDINGS_VAL=<FINDINGS_COUNT>
+  _SUMMARY="<ONE_LINE_SUMMARY>"
+  _TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  bun -e "
+    const fs = require('fs');
+    const d = JSON.parse(fs.readFileSync('.em-dash/dashboard.json', 'utf-8'));
+    if (!d.frameworks) d.frameworks = {};
+    if (!d.frameworks.hipaa) d.frameworks.hipaa = { status: 'in-progress', skills: {}, checklist: [], evidence_gaps: [] };
+    d.frameworks.hipaa.skills['$_SKILL_KEY'] = {
+      status: '$_STATUS_VAL'.toLowerCase(),
+      timestamp: '$_TIMESTAMP',
+      findings: $_FINDINGS_VAL,
+      summary: '$_SUMMARY'
+    };
+    d.frameworks.hipaa.last_updated = '$_TIMESTAMP';
+    fs.writeFileSync('.em-dash/dashboard.json', JSON.stringify(d, null, 2) + '\\n');
+  " 2>/dev/null || true
+fi
+```
+
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use `hipaa-dashboard-update` to update individual checklist items based on actual results:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Mark a checklist item as complete with a note:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
+# Mark as pending with an evidence gap:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
+# Add evidence file to an item:
+"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
+```
+
+## Dashboard Updates
+
+As you complete each scan check, update the dashboard based on your **interpretation** of the results. A grep match does NOT automatically mean a control is in place — you must read the code and understand whether the control is real.
+
+**You write to: checklist, findings (MAIN SOURCE), vendors (detect clouds)**
+
+**Principle:** You are an auditor, not a pattern matcher. `grep -r "role"` finding a variable called `userRole` in a React component is not the same as finding RBAC middleware protecting PHI endpoints. Read the context. Understand the intent. Then update.
+
+**Reference — scan checks and their checklist IDs:**
+
+| Check | Checklist ID | What "complete" actually means |
+|-------|-------------|-------------------------------|
+| CHECK 1-2: PHI identifiers | (informational) | These checks identify where PHI exists — they don't map to a pass/fail checklist item, but inform other checks |
+| CHECK 3: PHI in logs | 164.312(b) | No PHI fields flowing into log output — not just "logging exists" |
+| CHECK 5: RBAC | 164.312(a)(1) | Real role-based access control on PHI endpoints — not just a variable named `role` |
+| CHECK 6: Audit logging | 164.312(b) | Audit trail recording who accessed what PHI when — not console.log debugging |
+| CHECK 7: Encryption at rest | 164.312(a)(2)(iv) | ePHI encrypted with AES-256/KMS/pgcrypto — not just `crypto` imported for hashing tokens |
+| CHECK 8: Session timeout | 164.312(a)(2)(iii) | Auto-logoff after inactivity (<=15 min for PHI systems) — not just a `maxAge` on a cookie |
+| CHECK 9: Password hashing | 164.312(d) | bcrypt/argon2/scrypt actually used on user passwords — not just listed in package.json |
+| CHECK 10: PHI in tests | (informational) | Real SSN patterns in test fixtures — flag but don't block |
+| CHECK 11: PHI in errors | 164.312(a)(1) | Stack traces or error messages don't leak PHI to users |
+| CHECK 12: IAM/permissions | 164.308(a)(4)(i) | Least-privilege IAM — no `"Action": "*"` on production policies |
+| CHECK 13-16: DB security | 164.312(a)(1), 164.312(b) | DB columns with PHI have encryption, audit logging, and access controls |
+| CHECK 17: DB SSL | 164.312(e)(2)(ii) | Database connections use SSL — `sslmode=disable` is a critical finding |
+| CHECK 18: Push/email PHI | 164.312(a)(1) | PHI not exposed in push notifications or unencrypted email |
+| CHECK 19: Secrets in config | 164.308(a)(5)(ii)(B) | No passwords/keys in committed config files; .env is gitignored |
+| Unique user IDs | 164.312(a)(2)(i) | Auth system assigns unique identifiers (userId, email-based login) |
+| Transmission security | 164.312(e)(1) | HTTPS enforced, TLS on all external connections |
+
+**Cloud infrastructure checks:**
+
+| Finding | Checklist ID | What "complete" means |
+|---------|-------------|----------------------|
+| CloudTrail / audit logs enabled | 164.312(b), 164.308(a)(1)(ii)(D) | Multi-region trail with log validation, actively logging |
+| S3/storage encryption | 164.312(a)(2)(iv) | Default encryption on all buckets containing ePHI |
+| VPC flow logs | 164.312(b) | Flow logs enabled on all VPCs — not just the default VPC |
+| Cloud provider detected | 164.314(a)(1) | If AWS/GCP/Azure is in use, check for BAA evidence — add gap if missing |
+| MFA enabled | 164.312(d) | MFA on all IAM users, especially root/admin |
+| KMS key rotation | 164.312(a)(2)(iv) | Automatic key rotation enabled for encryption keys |
+
+**Examples of good judgment:**
+
+- grep finds `bcrypt.hash(password)` in `src/auth/register.ts` → **complete**: "Password hashing with bcrypt in src/auth/register.ts"
+- grep finds `bcrypt` only in `package.json` dependencies → **NOT complete**: library installed but usage not verified — add gap
+- grep finds `auditLog.record({ userId, action, resourceId })` on patient routes → **complete**: "PHI access audit trail in src/middleware/audit.ts"
+- grep finds `console.log('audit check')` → **NOT complete**: debug logging is not an audit trail
+- AWS CloudTrail exists but `IsLogging: false` → **NOT complete**: trail exists but isn't actively logging
+- S3 bucket has encryption but `PublicAccessBlock` is not set → **partial**: encryption complete but access control needs work
+
+**Findings — your main output:**
+Every scan issue becomes a finding. Add them as you discover them:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "S3 bucket has public ACL" --severity critical --requirement "164.312(a)(1)" --source scan
+```
+
+**Vendor detection:**
+If you detect AWS/GCP/Azure in use (from CLI checks or code imports), add as vendor if not already present:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud infrastructure" --baa-status pending --risk-tier high
+```
+
+**How to update the dashboard:**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Checklist: mark an item as complete with reasoning
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete "<your reasoning>"
+# Checklist: mark as pending with an evidence gap
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" pending --gap "<what's missing>"
+# Checklist: attach evidence file
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete --evidence "<filename>"
+
+# Finding: add a new finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "<title>" --severity <critical|high|medium|low> --requirement "<id>" --source "<skill>"
+# Finding: resolve a finding
+"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "<title>"
+
+# Vendor: add a vendor/BA
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "<name>" --service "<service>" --baa-status <signed|pending|none> --risk-tier <low|medium|high|critical>
+# Vendor: update BAA status
+"$_EMDASH_BIN"/hipaa-dashboard-update vendor update --name "<name>" --baa-status signed
+
+# Risk: add a risk
+"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "<desc>" --likelihood <1-5> --impact <1-5> --treatment <mitigate|accept|transfer|avoid> --owner "<owner>" --requirement "<ids>"
+```
+
 ## Tool Detection
 
 Run tool detection to understand what's available:
