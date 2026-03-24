@@ -6,6 +6,7 @@
  * and pushes live-reload events via WebSocket when .em-dash/ changes.
  *
  * Usage: bun run dashboard [--port 3000] [--project-dir .]
+ *        PORT=3001 bun run dashboard  # also works via env var
  */
 
 import * as fs from 'fs';
@@ -20,7 +21,7 @@ const DASHBOARD_DIR = path.join(ROOT, 'dashboard');
 // Parse CLI args
 const args = process.argv.slice(2);
 const portIdx = args.indexOf('--port');
-const PORT = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 3000;
+const PORT = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : parseInt(process.env.PORT || '3000', 10);
 const dirIdx = args.indexOf('--project-dir');
 const PROJECT_DIR = dirIdx !== -1 ? path.resolve(args[dirIdx + 1]) : process.cwd();
 const EMDASH_DIR = path.join(PROJECT_DIR, '.em-dash');
@@ -74,7 +75,9 @@ function getMime(filePath: string): string {
 
 // ─── Server ─────────────────────────────────────────────────
 
-const server = Bun.serve({
+let server: ReturnType<typeof Bun.serve>;
+try {
+  server = Bun.serve({
   port: PORT,
 
   fetch(req, server) {
@@ -164,6 +167,18 @@ const server = Bun.serve({
     message() {},
   },
 });
+} catch (err: any) {
+  if (err?.code === 'EADDRINUSE') {
+    const who = spawnSync('lsof', ['-ti', `:${PORT}`], { encoding: 'utf-8' });
+    const pid = who.stdout?.trim();
+    console.error(`Error: Port ${PORT} is already in use${pid ? ` (PID ${pid})` : ''}.`);
+    console.error(`\nOptions:`);
+    console.error(`  PORT=${PORT + 1} bun run dashboard     # use a different port`);
+    console.error(`  kill ${pid || '<PID>'}                          # stop the existing server`);
+    process.exit(1);
+  }
+  throw err;
+}
 
 // ─── Upload handler ─────────────────────────────────────────
 
