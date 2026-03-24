@@ -133,12 +133,14 @@ const server = Bun.serve({
 
     // API: export as CSV (findings)
     if (url.pathname === '/api/export/csv' && req.method === 'GET') {
-      return handleExportCsv();
+      const fw = url.searchParams.get('framework') || 'hipaa';
+      return handleExportCsv(fw);
     }
 
     // API: export as HTML report
     if (url.pathname === '/api/export/report' && req.method === 'GET') {
-      return handleExportReport();
+      const fw = url.searchParams.get('framework') || 'hipaa';
+      return handleExportReport(fw);
     }
 
     // Static files from dashboard/
@@ -378,9 +380,9 @@ async function handleOpen(req: Request): Promise<Response> {
 
 // ─── Export handlers ────────────────────────────────────────
 
-function handleExportCsv(): Response {
+function handleExportCsv(frameworkId: string = 'hipaa'): Response {
   const dashboard = readDashboard();
-  const findings = dashboard.frameworks?.hipaa?.findings || [];
+  const findings = dashboard.frameworks?.[frameworkId]?.findings || [];
 
   const header = 'ID,Title,Severity,Status,Requirement,Source,Discovered,Resolved,Description';
   const rows = findings.map((f: any) =>
@@ -405,9 +407,9 @@ function csvEscape(s: string): string {
   return s;
 }
 
-function handleExportReport(): Response {
+function handleExportReport(frameworkId: string = 'hipaa'): Response {
   const d = readDashboard();
-  const fw = d.frameworks?.hipaa || {};
+  const fw = d.frameworks?.[frameworkId] || {};
   const checklist = fw.checklist || [];
   const findings = fw.findings || [];
   const vendors = d.vendors || [];
@@ -522,7 +524,7 @@ ${gaps.length ? `<h2>Evidence Gaps (${gaps.length})</h2><ul>${gaps.map((g:any) =
 ${evidence.length ? `<table><tr><th>File</th><th>Type</th><th>Requirement</th><th>Uploaded</th><th>SHA-256</th></tr>${evidence.map((e:any) => `<tr><td>${esc(e.filename)}</td><td>${esc(e.type)}</td><td><code>${esc(e.requirement)}</code></td><td>${esc(e.uploaded_at?.split('T')[0] || '')}</td><td><code>${esc((e.sha256||'').slice(0,16))}...</code></td></tr>`).join('')}</table>` : '<p>No evidence uploaded.</p>'}
 
 <div class="disclaimer">
-<strong>Disclaimer:</strong> This report provides technical guidance for HIPAA compliance. It is NOT legal advice and does not constitute HIPAA certification. Consult qualified legal counsel for formal compliance verification.
+<strong>Disclaimer:</strong> This report provides technical guidance for compliance. It is NOT legal advice and does not constitute certification. Consult qualified legal counsel for formal compliance verification.
 </div>
 </body></html>`;
 
