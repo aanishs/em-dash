@@ -23,7 +23,13 @@ else
   echo "  Install: curl -fsSL https://bun.sh/install | bash"
 fi
 
-# 3. Make bin scripts executable
+# 3. Install dependencies (needed for canonicalize, Ed25519 signing)
+if command -v bun >/dev/null 2>&1; then
+  (cd "$EMDASH_DIR" && bun install --frozen-lockfile 2>/dev/null || bun install) >/dev/null 2>&1
+  echo "  dependencies: installed"
+fi
+
+# 4. Make bin scripts executable
 chmod +x "$EMDASH_DIR"/bin/* 2>/dev/null || true
 echo "  bin scripts: executable"
 
@@ -73,10 +79,16 @@ fi
 
 echo ""
 echo "Available skills:"
-echo "  /hipaa           — compliance dashboard + router"
-echo "  /hipaa-assess    — organizational assessment interview"
-echo "  /hipaa-scan      — automated technical scanning"
-echo "  /hipaa-remediate — fix findings + generate policies"
-echo "  /hipaa-report    — compliance report generation"
-echo "  /hipaa-monitor   — compliance drift detection"
-echo "  /hipaa-breach    — breach notification workflow"
+echo "  /hipaa              — compliance dashboard + router"
+echo "  /hipaa-assess       — organizational assessment interview"
+echo "  /hipaa-scan         — automated technical scanning"
+echo "  /hipaa-remediate    — fix findings + generate policies"
+echo "  /hipaa-report       — compliance report generation"
+echo "  /hipaa-monitor      — compliance drift detection"
+echo "  /hipaa-breach       — breach notification workflow"
+echo ""
+echo "OSCAL Bridge utilities:"
+echo "  bin/hipaa-oscal-import  — OSCAL catalog management"
+echo "  bin/hipaa-attest        — Ed25519 attestation signing"
+echo "  bin/hipaa-verify        — attestation verification"
+echo "  bin/hipaa-audit-packet  — signed audit packet generation"

@@ -11,7 +11,7 @@
   "scripts": {
     "build": "bun run gen:skill-docs",
     "gen:skill-docs": "bun run scripts/gen-skill-docs.ts",
-    "test": "bun test test/skill-validation.test.ts test/rego-policy.test.ts test/bin-smoke.test.ts test/touchfiles.test.ts",
+    "test": "bun test test/skill-validation.test.ts test/rego-policy.test.ts test/bin-smoke.test.ts test/touchfiles.test.ts test/oscal-bridge.test.ts",
     "test:evals": "EVALS=1 bun test test/skill-e2e.test.ts",
     "test:evals:all": "EVALS_ALL=1 bun test test/skill-e2e.test.ts",
     "skill:check": "bun run scripts/skill-check.ts",
@@ -33,5 +33,8 @@
     "claude",
     "ai-agent",
     "security"
-  ]
+  ],
+  "dependencies": {
+    "canonicalize": "^2.1.0"
+  }
 }

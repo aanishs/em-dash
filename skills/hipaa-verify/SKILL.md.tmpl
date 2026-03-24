@@ -1,0 +1,72 @@
+---
+name: hipaa-verify
+version: 0.1.0
+description: |
+  Verify em-dash attestation integrity. Validates Ed25519 signatures on
+  check and session attestations. Detects tampering.
+allowed-tools:
+  - Bash
+  - Read
+  - AskUserQuestion
+framework: hipaa
+hipaa_sections:
+  - "164.312(c)(1)"
+  - "164.312(b)"
+risk_level: low
+requires_prior: [hipaa-scan]
+---
+
+{{PREAMBLE}}
+
+# /hipaa-verify: Attestation Verification
+
+Verify the integrity of em-dash compliance attestations. This skill validates
+that scan results haven't been tampered with since they were signed.
+
+## What Verification Proves
+
+- **Integrity:** The attestation data hasn't been modified since signing
+- **Provenance:** The attestation was signed by a specific Ed25519 key
+- **Session completeness:** All check attestations referenced by the session exist and match
+
+Verification does NOT prove identity — knowing who holds the signing key requires
+external validation (future: auditor co-signing).
+
+## Phase 1: Locate Attestations
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+eval "$("$_EMDASH_BIN"/hipaa-slug 2>/dev/null)"
+_ATTEST_DIR=~/.em-dash/projects/$SLUG/attestations
+ls -la "$_ATTEST_DIR" 2>/dev/null || echo "NO_ATTESTATIONS"
+```
+
+If `NO_ATTESTATIONS`: tell the user they need to run `/hipaa-scan` first to
+generate attestations.
+
+## Phase 2: Verify All Attestations
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-verify --attestation-dir "$_ATTEST_DIR"
+```
+
+Report the results:
+- PASS/FAIL for each attestation (check and session)
+- Session integrity check (do check hashes match?)
+- Overall verdict
+
+If verification fails, explain what failed and why:
+- **Signature invalid:** The attestation was modified after signing. Re-run the scan.
+- **Session integrity failed:** A check attestation was modified or deleted. Re-run the scan.
+- **File not found:** Attestation files may have been moved or deleted.
+
+## Phase 3: Single File Verification (optional)
+
+If the user wants to verify a specific attestation:
+
+```bash
+"$_EMDASH_BIN"/hipaa-verify --file <path-to-attestation.json>
+```
+
+{{DASHBOARD_UPDATES}}

@@ -1,0 +1,111 @@
+{
+  "profile_id": "hipaa-sp800-66r2-v1",
+  "profile_name": "HIPAA Security Rule — SP 800-66r2 Mapping",
+  "description": "Maps HIPAA Security Rule requirements to NIST 800-53 controls based on SP 800-66 Rev. 2 guidance. Phase 1 covers the 10 most critical controls.",
+  "source": "NIST SP 800-66 Rev. 2 (2024)",
+  "version": "1.0.0",
+  "phase": 1,
+  "note": "This mapping encodes one interpretation of SP 800-66r2 guidance. It is NOT an authoritative OSCAL catalog. Review with qualified compliance counsel.",
+  "controls": [
+    {
+      "oscal_id": "AC-2",
+      "title": "Account Management",
+      "family": "Access Control",
+      "hipaa_refs": ["164.308(a)(3)(ii)(C)", "164.308(a)(4)", "164.312(a)(1)"],
+      "description": "Manage system accounts including establishing, activating, modifying, reviewing, disabling, and removing accounts.",
+      "plain_english": "Every person who touches patient data needs their own account. When someone leaves or changes roles, their access must be updated immediately — not next week, not when IT gets around to it. You need a documented process for who can grant access, who reviews it, and how quickly terminated employees lose access.",
+      "automated_checks": ["aws-iam-wildcard", "rego-iam-wildcard", "iam-least-privilege-code"],
+      "evidence_types": ["iam_policy_export", "user_access_review_log", "termination_checklist"]
+    },
+    {
+      "oscal_id": "AC-6",
+      "title": "Least Privilege",
+      "family": "Access Control",
+      "hipaa_refs": ["164.308(a)(4)", "164.312(a)(1)"],
+      "description": "Employ the principle of least privilege, allowing only authorized accesses for users that are necessary to accomplish assigned organizational tasks.",
+      "plain_english": "Nobody gets more access than they need for their job. A billing clerk doesn't need access to clinical notes. A developer doesn't need production database admin rights. Each role gets the minimum permissions required — and you can prove it.",
+      "automated_checks": ["iam-least-privilege-code", "aws-iam-wildcard", "rego-iam-wildcard", "rego-k8s-rbac-wildcard"],
+      "evidence_types": ["iam_role_definitions", "rbac_configuration"]
+    },
+    {
+      "oscal_id": "AU-2",
+      "title": "Event Logging",
+      "family": "Audit and Accountability",
+      "hipaa_refs": ["164.312(b)"],
+      "description": "Identify the types of events that the system is capable of logging in support of the audit function.",
+      "plain_english": "Your system must record who did what, when, and to which patient data. Every login, every data access, every change. These logs are your proof that you know what's happening in your system. If you can't show an auditor who accessed patient records last Tuesday at 3pm, that's a finding.",
+      "automated_checks": ["audit-logging-code", "aws-cloudtrail", "aws-cloudwatch-retention", "rego-cloudtrail-enabled"],
+      "evidence_types": ["cloudtrail_config", "log_retention_policy", "audit_log_sample"]
+    },
+    {
+      "oscal_id": "IA-2",
+      "title": "Identification and Authentication (Organizational Users)",
+      "family": "Identification and Authentication",
+      "hipaa_refs": ["164.312(d)"],
+      "description": "Uniquely identify and authenticate organizational users and associate that unique identification with processes acting on behalf of those users.",
+      "plain_english": "Every person has a unique login — no shared accounts, no generic 'admin' passwords. You must be able to trace any action back to a specific person. Multi-factor authentication (MFA) is strongly recommended for anyone accessing patient data.",
+      "automated_checks": ["password-hashing", "aws-iam-mfa", "aws-iam-password-policy", "rego-mfa-required"],
+      "evidence_types": ["mfa_enforcement_config", "password_policy", "user_list_unique_ids"]
+    },
+    {
+      "oscal_id": "SC-8",
+      "title": "Transmission Confidentiality and Integrity",
+      "family": "System and Communications Protection",
+      "hipaa_refs": ["164.312(e)(1)"],
+      "description": "Protect the confidentiality and integrity of transmitted information.",
+      "plain_english": "Patient data must be encrypted whenever it moves — between your app and the user's browser (HTTPS), between your servers (TLS), between your app and the database (SSL). If someone intercepted the data in transit, they should see only encrypted gibberish.",
+      "automated_checks": ["db-connection-ssl", "aws-security-groups", "rego-security-group-open"],
+      "evidence_types": ["tls_config", "certificate_inventory", "network_diagram"]
+    },
+    {
+      "oscal_id": "SC-28",
+      "title": "Protection of Information at Rest",
+      "family": "System and Communications Protection",
+      "hipaa_refs": ["164.312(a)(2)(iv)"],
+      "description": "Protect the confidentiality and integrity of information at rest.",
+      "plain_english": "Patient data stored on disk — in databases, file systems, backups, S3 buckets — must be encrypted. If someone stole a hard drive or gained access to a storage bucket, the data should be unreadable without the encryption key. This is 'addressable' under HIPAA, meaning you can use an alternative if you document why.",
+      "automated_checks": ["encryption-at-rest-code", "db-encryption", "aws-s3-encryption", "aws-rds-encryption", "rego-s3-encryption", "rego-rds-encryption"],
+      "evidence_types": ["encryption_config", "kms_key_inventory", "storage_encryption_audit"]
+    },
+    {
+      "oscal_id": "RA-3",
+      "title": "Risk Assessment",
+      "family": "Risk Assessment",
+      "hipaa_refs": ["164.308(a)(1)(ii)(A)"],
+      "description": "Conduct an assessment of risk, including the likelihood and magnitude of harm, from the unauthorized access, use, disclosure, disruption, modification, or destruction of the system.",
+      "plain_english": "You must formally identify what could go wrong with patient data — what are the threats, how likely are they, and how bad would it be? This isn't a one-time checkbox. Risk assessments should be updated when your systems change, when new threats emerge, or at least annually.",
+      "automated_checks": [],
+      "evidence_types": ["risk_assessment_report", "threat_inventory", "risk_register"]
+    },
+    {
+      "oscal_id": "IR-6",
+      "title": "Incident Reporting",
+      "family": "Incident Response",
+      "hipaa_refs": ["164.308(a)(6)(i)"],
+      "description": "Require personnel to report suspected incidents to the organizational incident response capability.",
+      "plain_english": "When something goes wrong — a breach, a suspicious login, a misconfigured server — your team needs to know how to report it and who to tell. You need a documented incident response plan that everyone knows about. Under HIPAA, breaches affecting 500+ people must be reported to HHS within 60 days.",
+      "automated_checks": [],
+      "evidence_types": ["incident_response_plan", "incident_log", "breach_notification_procedures"]
+    },
+    {
+      "oscal_id": "CP-2",
+      "title": "Contingency Plan",
+      "family": "Contingency Planning",
+      "hipaa_refs": ["164.308(a)(7)(i)"],
+      "description": "Develop a contingency plan for the system that addresses essential mission and business functions.",
+      "plain_english": "What happens when your system goes down? How do you get patient data back? You need a written plan covering data backups, disaster recovery, and how to keep operating during an emergency. The plan must be tested — not just written and filed away.",
+      "automated_checks": [],
+      "evidence_types": ["contingency_plan", "backup_test_results", "disaster_recovery_runbook"]
+    },
+    {
+      "oscal_id": "SI-7",
+      "title": "Software, Firmware, and Information Integrity",
+      "family": "System and Information Integrity",
+      "hipaa_refs": ["164.312(c)(1)"],
+      "description": "Employ integrity verification tools to detect unauthorized changes to software, firmware, and information.",
+      "plain_english": "You need to be able to detect if patient data has been improperly changed or deleted. This means versioning (so you can see what changed), checksums or hashes (so you can detect tampering), and access controls (so unauthorized changes are prevented in the first place).",
+      "automated_checks": ["aws-s3-versioning"],
+      "evidence_types": ["versioning_config", "integrity_monitoring_config"]
+    }
+  ]
+}

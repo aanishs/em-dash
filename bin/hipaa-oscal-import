@@ -1,0 +1,201 @@
+#!/usr/bin/env bun
+/**
+ * hipaa-oscal-import — Import and manage OSCAL catalog data for em-dash.
+ *
+ * Phase 1: Works with the bundled SP 800-66r2 HIPAA mapping (10 controls).
+ * Future: Will download and parse the full NIST 800-53 OSCAL catalog.
+ *
+ * Subcommands:
+ *   status           Show current OSCAL mapping status
+ *   controls         List all mapped controls with plain-English translations
+ *   validate         Validate mapping references against checks registry
+ *   export           Export mapping as human-readable markdown
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const args = process.argv.slice(2);
+const subcommand = args[0];
+
+// ─── Load mapping ───────────────────────────────────────────
+
+const MAPPING_PATH = path.join(import.meta.dir, '..', 'frameworks', 'oscal', 'mappings', 'hipaa-sp800-66r2.json');
+
+function loadMapping() {
+  if (!fs.existsSync(MAPPING_PATH)) {
+    console.error('OSCAL mapping not found at ' + MAPPING_PATH);
+    console.error('The bundled HIPAA mapping should exist. Run setup or check your installation.');
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(MAPPING_PATH, 'utf-8'));
+}
+
+// ─── Load checks registry IDs ───────────────────────────────
+
+function loadCheckIds(): string[] {
+  // Import the checks registry to get valid check IDs
+  const registryPath = path.join(import.meta.dir, '..', 'frameworks', 'checks-registry.ts');
+  if (!fs.existsSync(registryPath)) return [];
+
+  const content = fs.readFileSync(registryPath, 'utf-8');
+  const ids: string[] = [];
+  const regex = /id:\s*['"]([^'"]+)['"]/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    ids.push(match[1]);
+  }
+  return ids;
+}
+
+// ─── Subcommands ────────────────────────────────────────────
+
+function status() {
+  const mapping = loadMapping();
+  console.log('OSCAL HIPAA Mapping Status');
+  console.log('═'.repeat(50));
+  console.log(`  Profile:    ${mapping.profile_id}`);
+  console.log(`  Source:     ${mapping.source}`);
+  console.log(`  Version:    ${mapping.version}`);
+  console.log(`  Phase:      ${mapping.phase}`);
+  console.log(`  Controls:   ${mapping.controls.length}`);
+
+  const withChecks = mapping.controls.filter(
+    (c: { automated_checks: string[] }) => c.automated_checks.length > 0,
+  ).length;
+  const manual = mapping.controls.length - withChecks;
+  console.log(`  Automated:  ${withChecks} controls have automated checks`);
+  console.log(`  Manual:     ${manual} controls require manual verification`);
+
+  // Collect unique HIPAA refs
+  const hipaaRefs = new Set<string>();
+  for (const control of mapping.controls) {
+    for (const ref of control.hipaa_refs) {
+      hipaaRefs.add(ref);
+    }
+  }
+  console.log(`  HIPAA refs: ${hipaaRefs.size} unique requirement references`);
+  console.log('');
+  console.log(`  Note: ${mapping.note}`);
+}
+
+function controls() {
+  const mapping = loadMapping();
+  console.log(`\nOSCAL HIPAA Controls (Phase ${mapping.phase})`);
+  console.log('═'.repeat(70));
+
+  for (const control of mapping.controls) {
+    const checkCount = control.automated_checks.length;
+    const checkLabel = checkCount > 0 ? `${checkCount} automated checks` : 'manual only';
+    console.log(`\n┌─ ${control.oscal_id}: ${control.title}`);
+    console.log(`│  Family: ${control.family} | Checks: ${checkLabel}`);
+    console.log(`│  HIPAA: ${control.hipaa_refs.join(', ')}`);
+    console.log(`│`);
+
+    // Wrap plain_english to ~70 chars per line
+    const words = control.plain_english.split(' ');
+    let line = '│  ';
+    for (const word of words) {
+      if (line.length + word.length > 73) {
+        console.log(line);
+        line = '│  ' + word + ' ';
+      } else {
+        line += word + ' ';
+      }
+    }
+    if (line.trim() !== '│') console.log(line);
+    console.log(`└${'─'.repeat(69)}`);
+  }
+}
+
+function validate() {
+  const mapping = loadMapping();
+  const checkIds = loadCheckIds();
+
+  console.log('Validating OSCAL mapping references...');
+  let errors = 0;
+
+  for (const control of mapping.controls) {
+    for (const checkId of control.automated_checks) {
+      if (!checkIds.includes(checkId)) {
+        console.error(`  ERROR: ${control.oscal_id} references unknown check '${checkId}'`);
+        errors++;
+      }
+    }
+  }
+
+  // Validate HIPAA refs exist in hipaa.json
+  const hipaaPath = path.join(import.meta.dir, '..', 'frameworks', 'hipaa.json');
+  if (fs.existsSync(hipaaPath)) {
+    const hipaa = JSON.parse(fs.readFileSync(hipaaPath, 'utf-8'));
+    const reqIds = new Set(hipaa.requirements.map((r: { id: string }) => r.id));
+
+    for (const control of mapping.controls) {
+      for (const ref of control.hipaa_refs) {
+        if (!reqIds.has(ref)) {
+          console.error(`  ERROR: ${control.oscal_id} references unknown HIPAA requirement '${ref}'`);
+          errors++;
+        }
+      }
+    }
+  }
+
+  if (errors === 0) {
+    console.log(`  VALID: All references in ${mapping.controls.length} controls are valid`);
+    process.exit(0);
+  } else {
+    console.error(`  ${errors} invalid references found`);
+    process.exit(1);
+  }
+}
+
+function exportMarkdown() {
+  const mapping = loadMapping();
+
+  let md = `# HIPAA → NIST 800-53 Control Mapping\n\n`;
+  md += `> ${mapping.note}\n\n`;
+  md += `**Source:** ${mapping.source} | **Version:** ${mapping.version} | **Phase:** ${mapping.phase}\n\n`;
+  md += `---\n\n`;
+
+  for (const control of mapping.controls) {
+    md += `## ${control.oscal_id}: ${control.title}\n\n`;
+    md += `**Family:** ${control.family} | **HIPAA:** ${control.hipaa_refs.join(', ')}\n\n`;
+    md += `${control.plain_english}\n\n`;
+
+    if (control.automated_checks.length > 0) {
+      md += `**Automated checks:** ${control.automated_checks.join(', ')}\n\n`;
+    } else {
+      md += `**Automated checks:** None (manual verification required)\n\n`;
+    }
+
+    md += `**Evidence needed:** ${control.evidence_types.join(', ')}\n\n`;
+    md += `---\n\n`;
+  }
+
+  console.log(md);
+}
+
+// ─── Router ─────────────────────────────────────────────────
+
+switch (subcommand) {
+  case 'status':
+    status();
+    break;
+  case 'controls':
+    controls();
+    break;
+  case 'validate':
+    validate();
+    break;
+  case 'export':
+    exportMarkdown();
+    break;
+  default:
+    console.error('Usage: hipaa-oscal-import <status|controls|validate|export>');
+    if (!subcommand) {
+      console.error('Run "hipaa-oscal-import status" to see current OSCAL mapping status.');
+    } else {
+      console.error(`Unknown subcommand: ${subcommand}`);
+    }
+    process.exit(1);
+}

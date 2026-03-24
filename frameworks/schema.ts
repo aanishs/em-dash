@@ -6,6 +6,9 @@
  * to generate framework-specific SKILL.md files.
  */
 
+/** HIPAA implementation specification applicability */
+export type Applicability = 'required' | 'addressable';
+
 /** A single compliance requirement within a framework */
 export interface Requirement {
   /** Unique ID within the framework (e.g., "164.312(a)(1)" for HIPAA) */
@@ -18,6 +21,10 @@ export interface Requirement {
   description: string;
   /** IDs of checks in the checks-registry that satisfy this requirement */
   check_ids: string[];
+  /** NIST 800-53 OSCAL control references (e.g., ["AC-2", "AC-3"]) */
+  oscal_refs?: string[];
+  /** Whether this requirement is required or addressable (HIPAA-specific) */
+  applicability?: Applicability;
 }
 
 /** A checklist item for tracking compliance progress */
