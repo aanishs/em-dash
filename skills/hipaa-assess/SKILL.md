@@ -254,7 +254,8 @@ You are running the `/hipaa-assess` skill — a structured, interactive assessme
 Understand the project and detect what infrastructure is in use before asking any questions.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 echo "PROJECT: $SLUG"
 ```
 
@@ -289,7 +290,8 @@ grep -rli "postgres\|mysql\|mongodb\|dynamodb\|redis" . --include="*.yml" --incl
 3. Check for existing assessment artifacts:
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 ls -t ~/.em-dash/projects/$SLUG/*-assessment-*.md 2>/dev/null | head -5
 ```
 
@@ -733,7 +735,8 @@ After the user responds, classify each vendor:
 After all phases are complete, generate the assessment report.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 USER=$(whoami)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 PROJ_DIR="$HOME/.em-dash/projects/$SLUG"

@@ -217,6 +217,16 @@ As you complete each scan check, update the dashboard based on your **interpreta
 - AWS CloudTrail exists but `IsLogging: false` → **NOT complete**: trail exists but isn't actively logging
 - S3 bucket has encryption but `PublicAccessBlock` is not set → **partial**: encryption complete but access control needs work
 
+**Evidence linking — connect checklist items to proof:**
+When marking a checklist item complete or partial, always attach the relevant evidence file:
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+# Link scan evidence to checklist items when marking them
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.312(e)(1)" complete "TLS 1.2 verified" --evidence "scan-evidence/aws-tls-check.json"
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.312(b)" complete "CloudTrail active, multi-region" --evidence "scan-evidence/prowler-results.json"
+```
+**Rule:** Every checklist item marked during scanning MUST include an `--evidence` reference to the scan output file that proves it. Use the evidence directory path from the Raw Evidence Preservation step.
+
 **Findings — your main output:**
 Every scan issue becomes a finding. Add them as you discover them:
 ```bash
@@ -367,6 +377,11 @@ prowler aws --compliance hipaa_aws --output-formats json-ocsf \
 Prowler maps 83 checks to HIPAA requirements automatically. Read the JSON output and extract:
 - Total checks run, passed, failed, skipped
 - Each failed check with its HIPAA requirement mapping
+
+**IMPORTANT: Prowler MUST complete before proceeding.** Do NOT run Prowler as a background task.
+Prowler typically takes 5-15 minutes. Wait for the full output — the scan report MUST include
+final Prowler results, not "Pending" placeholders. If Prowler exceeds 15 minutes, check progress
+before deciding to continue.
 
 Then run supplemental checks. If `TOOL_PROWLER=false`, run ALL checks below as primary scan.
 
@@ -1771,6 +1786,58 @@ nmap -sT -p 1-1024 <host> 2>&1
 ```
 
 If nmap is unavailable, skip with a note: "Install nmap for port scanning, or verify manually that only required ports are exposed."
+
+---
+
+## Pre-Report Checkpoint
+
+**Before writing the scan report, confirm ALL scan tools have completed:**
+
+1. If Prowler was launched, confirm it has finished and you have its JSON output
+2. If Lynis was launched, confirm it has finished and you have its output file
+3. If Trivy was launched, confirm all Trivy scans have returned results
+4. If any scan is still running, **WAIT** for it to complete before proceeding
+
+**Do NOT write the scan report with "Pending" status for any tool that was supposed to run.**
+If a tool crashed or timed out, record it as "Error" with the specific error message, not "Pending".
+
+## Raw Evidence Preservation
+
+**Copy ALL raw scan outputs to the evidence directory before writing the report.**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+_EVIDENCE_DIR=~/.em-dash/projects/${SLUG:-unknown}/evidence/scan-$(date +%Y%m%d-%H%M%S)
+mkdir -p "$_EVIDENCE_DIR"
+```
+
+**Copy raw outputs (run each that applies):**
+
+```bash
+# Prowler JSON output
+cp /tmp/hipaa-prowler-$(date +%Y%m%d)/*.json "$_EVIDENCE_DIR/" 2>/dev/null && echo "Prowler JSON copied" || echo "No Prowler output found"
+
+# Lynis output
+cp /tmp/hipaa-lynis-$(date +%Y%m%d).txt "$_EVIDENCE_DIR/" 2>/dev/null && echo "Lynis output copied" || echo "No Lynis output found"
+
+# Trivy JSON outputs
+cp /tmp/hipaa-trivy-*.json "$_EVIDENCE_DIR/" 2>/dev/null && echo "Trivy JSON copied" || echo "No Trivy output found"
+```
+
+For each cloud CLI command run during Phase 2, also save the raw output:
+```bash
+# Example — save AWS CLI outputs to evidence:
+aws cloudtrail describe-trails --output json > "$_EVIDENCE_DIR/aws-cloudtrail.json" 2>&1
+aws s3api list-buckets --output json > "$_EVIDENCE_DIR/aws-s3-buckets.json" 2>&1
+```
+
+**After copying all evidence, hash the directory:**
+```bash
+"$_EMDASH_BIN"/hipaa-evidence-hash "$_EVIDENCE_DIR"
+```
+
+**Minimum evidence standard:** The evidence directory MUST contain at least one raw output file per scan tool that was run. Summary-only text files are insufficient for auditors.
 
 ---
 

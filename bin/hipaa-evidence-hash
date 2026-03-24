@@ -33,10 +33,15 @@ case "${1:-}" in
       hash_file "$TARGET"
     elif [ -d "$TARGET" ]; then
       MANIFEST="$TARGET/evidence-manifest.sha256"
-      find "$TARGET" -type f ! -name 'evidence-manifest.sha256' -print0 | \
-        sort -z | \
-        xargs -0 -I {} sh -c 'sha256sum "{}" 2>/dev/null || shasum -a 256 "{}"' \
-        > "$MANIFEST"
+      : > "$MANIFEST"
+      while IFS= read -r -d '' file; do
+        hash_file "$file" >> "$MANIFEST"
+      done < <(find "$TARGET" -type f ! -name 'evidence-manifest.sha256' -print0 | sort -z)
+      if [ ! -s "$MANIFEST" ]; then
+        echo "Warning: No files found to hash in $TARGET" >&2
+        rm -f "$MANIFEST"
+        exit 1
+      fi
       echo "Manifest written: $MANIFEST"
       echo "$(wc -l < "$MANIFEST" | tr -d ' ') files hashed"
     else

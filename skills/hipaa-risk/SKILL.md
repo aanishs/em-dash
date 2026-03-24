@@ -228,7 +228,8 @@ Understand the scope of ePHI in the organization.
 Read prior assessment and scan results if they exist:
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 ls ~/.em-dash/projects/"$SLUG"/*-assessment-*.md 2>/dev/null | tail -1
 ls ~/.em-dash/projects/"$SLUG"/*-scan-*.md 2>/dev/null | tail -1
 ```

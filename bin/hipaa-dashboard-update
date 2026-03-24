@@ -81,7 +81,13 @@ function checklist() {
   const item = (fw.checklist || []).find((i: any) => i.id === itemId);
   if (item) {
     item.status = status;
-    if (note) item.notes = (item.notes ? item.notes + '; ' : '') + note;
+    if (note) {
+      if (!item.notes) {
+        item.notes = note;
+      } else if (!item.notes.includes(note)) {
+        item.notes = item.notes + '; ' + note;
+      }
+    }
     if (evidence) {
       if (!item.evidence) item.evidence = [];
       if (!item.evidence.includes(evidence)) item.evidence.push(evidence);
@@ -128,6 +134,16 @@ function findingAdd() {
     resolved_at: null,
   });
 
+  // Recalculate skill finding count to stay in sync
+  if (source && fw.skills) {
+    const skillKey = source.replace(/^hipaa-/, '');
+    if (fw.skills[skillKey]) {
+      fw.skills[skillKey].findings = fw.findings.filter(
+        (f: any) => f.source === source && f.status !== 'resolved'
+      ).length;
+    }
+  }
+
   write(d);
 }
 
@@ -137,12 +153,25 @@ function findingResolve() {
 
   const d = read();
   const fw = d.frameworks.hipaa;
+  let resolvedSource = '';
   for (const f of (fw.findings || [])) {
     if (f.title === title && f.status !== 'resolved') {
       f.status = 'resolved';
       f.resolved_at = new Date().toISOString();
+      resolvedSource = f.source || '';
     }
   }
+
+  // Recalculate skill finding count after resolution
+  if (resolvedSource && fw.skills) {
+    const skillKey = resolvedSource.replace(/^hipaa-/, '');
+    if (fw.skills[skillKey]) {
+      fw.skills[skillKey].findings = fw.findings.filter(
+        (f: any) => f.source === resolvedSource && f.status !== 'resolved'
+      ).length;
+    }
+  }
+
   write(d);
 }
 
@@ -263,6 +292,21 @@ if (cmd.startsWith('164.')) {
   const action = args[1];
   if (action === 'add') riskAdd();
   else { console.error('Usage: risk add --description D ...'); process.exit(1); }
+} else if (cmd === 'sync') {
+  const d = read();
+  const fw = d.frameworks.hipaa;
+  if (fw.skills) {
+    for (const key of Object.keys(fw.skills)) {
+      if (fw.skills[key]) {
+        fw.skills[key].findings = (fw.findings || []).filter(
+          (f: any) => f.source === key && f.status !== 'resolved'
+        ).length;
+      }
+    }
+  }
+  write(d);
+  const open = (fw.findings || []).filter((f: any) => f.status !== 'resolved').length;
+  console.log(`Synced: ${open} open findings`);
 } else {
   console.error(`Unknown subcommand: ${cmd}`);
   process.exit(1);

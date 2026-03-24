@@ -441,7 +441,8 @@ Write the breach assessment and notification plan to `~/.em-dash/projects/$SLUG/
 
 ```bash
 USER=$(whoami)
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 REPORT_PATH="$HOME/.em-dash/projects/$SLUG/${USER}-breach-${DATETIME}.md"
 mkdir -p "$HOME/.em-dash/projects/$SLUG"
@@ -490,9 +491,9 @@ Write the report using the Write tool.
 ### 6a: Log the review
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
 # Findings count = number of risk factors rated MEDIUM or HIGH
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
 ```
 
@@ -516,8 +517,8 @@ CRITICAL REMINDERS
 ### 6c: Display dashboard
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
 ```
 

@@ -189,7 +189,8 @@ You are running the `/hipaa` skill — the entry point to the HIPAA compliance a
 Gather information about the project and its compliance state.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 echo "PROJECT: $SLUG"
 ```
 
@@ -347,7 +348,8 @@ After writing the JSON, confirm: "Initialized HIPAA compliance dashboard with 49
 Look for prior audit artifacts to understand where the user is in their compliance journey.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 PROJ_DIR="$HOME/.em-dash/projects/$SLUG"
 echo "ARTIFACT_DIR: $PROJ_DIR"
 

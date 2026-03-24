@@ -1535,6 +1535,16 @@ As you complete each scan check, update the dashboard based on your **interpreta
 - AWS CloudTrail exists but \`IsLogging: false\` → **NOT complete**: trail exists but isn't actively logging
 - S3 bucket has encryption but \`PublicAccessBlock\` is not set → **partial**: encryption complete but access control needs work
 
+**Evidence linking — connect checklist items to proof:**
+When marking a checklist item complete or partial, always attach the relevant evidence file:
+\`\`\`bash
+${binDetect}
+# Link scan evidence to checklist items when marking them
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.312(e)(1)" complete "TLS 1.2 verified" --evidence "scan-evidence/aws-tls-check.json"
+"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.312(b)" complete "CloudTrail active, multi-region" --evidence "scan-evidence/prowler-results.json"
+\`\`\`
+**Rule:** Every checklist item marked during scanning MUST include an \`--evidence\` reference to the scan output file that proves it. Use the evidence directory path from the Raw Evidence Preservation step.
+
 **Findings — your main output:**
 Every scan issue becomes a finding. Add them as you discover them:
 \`\`\`bash

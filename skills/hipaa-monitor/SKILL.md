@@ -240,7 +240,8 @@ You are running the `/hipaa-monitor` skill. Your job is to detect compliance dri
 Find and read the most recent compliance report and scan results.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 PROJ_DIR="$HOME/.em-dash/projects/$SLUG"
 echo "PROJECT: $SLUG"
 echo "ARTIFACT_DIR: $PROJ_DIR"
@@ -259,7 +260,6 @@ ls -t "$PROJ_DIR"/*-drift-*.md 2>/dev/null | head -1 || echo "NONE"
 
 echo ""
 echo "=== Compliance Review History ==="
-_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 "$_EMDASH_BIN"/hipaa-review-log read "$SLUG" 2>/dev/null | tail -10 || echo "NO_HISTORY"
 ```
 
@@ -282,7 +282,8 @@ Run the same scans that `/hipaa-scan` performs against the current state. Adapt 
 **If Prowler is available (TOOL_PROWLER=true):**
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence/monitor-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$EVIDENCE_DIR"
 echo "EVIDENCE_DIR: $EVIDENCE_DIR"
@@ -294,7 +295,8 @@ prowler aws --compliance hipaa --output-formats json --output-directory "$EVIDEN
 **If Prowler is not available but AWS CLI is (CLOUD_AWS=true):** Fall back to targeted AWS CLI spot checks:
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence/monitor-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$EVIDENCE_DIR"
 
@@ -320,7 +322,8 @@ echo "Spot checks complete — results in $EVIDENCE_DIR"
 **If Lynis is available (TOOL_LYNIS=true):**
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence/monitor-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$EVIDENCE_DIR"
 
@@ -334,7 +337,8 @@ sudo lynis audit system --quick --no-colors 2>&1 | tee "$EVIDENCE_DIR/lynis-outp
 **If Trivy is available (TOOL_TRIVY=true):**
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence/monitor-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$EVIDENCE_DIR"
 
@@ -357,7 +361,8 @@ fi
 Always run code-level scanning regardless of tool availability — this uses only grep. Run the same comprehensive checks as `/hipaa-scan` Phase 5.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence/monitor-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$EVIDENCE_DIR"
 
@@ -403,10 +408,10 @@ echo "TOTAL FINDINGS: $TOTAL"
 ### 2e: Hash Evidence
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR=$(ls -td "$HOME/.em-dash/projects/$SLUG/evidence/monitor-"* 2>/dev/null | head -1)
 if [ -n "$EVIDENCE_DIR" ] && [ -d "$EVIDENCE_DIR" ]; then
-  _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
   "$_EMDASH_BIN"/hipaa-evidence-hash "$EVIDENCE_DIR"
 else
   echo "No evidence directory found for hashing"
@@ -453,7 +458,8 @@ For each unchanged finding, include:
 Infrastructure or code configuration changes detected since the baseline, regardless of whether they introduce findings. These are informational.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 
 echo "=== Git Changes Since Last Scan ==="
 LAST_SCAN_DATE=$(ls -t "$HOME/.em-dash/projects/$SLUG"/*-scan-*.md 2>/dev/null | head -1 | sed 's/.*-scan-\([0-9]*\)-.*/\1/' | sed 's/\(....\)\(..\)\(..\)/\1-\2-\3/')
@@ -480,8 +486,8 @@ Score formula: `(PASS controls + 0.5 * PARTIAL controls) / TOTAL controls * 100`
 Read the compliance review history and extract scores from prior reports to build a trend.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log read "$SLUG" 2>/dev/null || echo "NO_HISTORY"
 ```
 
@@ -521,7 +527,8 @@ The drift report must include:
 
 ```bash
 USER=$(whoami)
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 REPORT_PATH="$HOME/.em-dash/projects/$SLUG/${USER}-drift-${DATETIME}.md"
 echo "REPORT_PATH: $REPORT_PATH"
@@ -536,9 +543,9 @@ Write the report using the Write tool.
 ### 6a: Log the monitoring run
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
-NEW_FINDINGS=$(echo "PLACEHOLDER_COUNT")
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+NEW_FINDINGS=$(echo "PLACEHOLDER_COUNT")
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-monitor" "complete" "$NEW_FINDINGS"
 ```
 
@@ -547,8 +554,8 @@ Replace `PLACEHOLDER_COUNT` with the actual count of NEW findings detected durin
 ### 6b: Display dashboard
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
 ```
 

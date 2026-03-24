@@ -34,7 +34,8 @@ You are running the `/hipaa-report` skill. Your job is to aggregate all prior co
 Read all prior compliance artifacts from the project directory.
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 PROJ_DIR="$HOME/.em-dash/projects/$SLUG"
 echo "PROJECT: $SLUG"
 echo "ARTIFACT_DIR: $PROJ_DIR"
@@ -165,7 +166,8 @@ Summarize Breach Notification Rule (45 CFR 164.400-414) readiness:
 Populate from the evidence index JSONL file if it exists:
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 cat "$HOME/.em-dash/projects/$SLUG/evidence/evidence-index.jsonl" 2>/dev/null || echo "NO_EVIDENCE_INDEX"
 ```
 
@@ -282,10 +284,10 @@ Scope:                [infrastructure, codebase, containers — whatever was sca
 Generate a single aggregate hash covering all evidence files to prove integrity:
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 EVIDENCE_DIR="$HOME/.em-dash/projects/$SLUG/evidence"
 if [ -d "$EVIDENCE_DIR" ]; then
-  _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
   "$_EMDASH_BIN"/hipaa-evidence-hash "$EVIDENCE_DIR"
   echo ""
   echo "AGGREGATE_HASH:"
@@ -313,17 +315,17 @@ Include the DISCLAIMER from the preamble. Additionally, append:
 ### 6a: Log the review
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
-REPORT_COUNT=$(ls "$HOME/.em-dash/projects/$SLUG"/*-compliance-report-*.md "$HOME/.em-dash/projects/$SLUG"/*-executive-summary-*.md "$HOME/.em-dash/projects/$SLUG"/*-trust-report-*.md 2>/dev/null | wc -l | tr -d ' ')
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+REPORT_COUNT=$(ls "$HOME/.em-dash/projects/$SLUG"/*-compliance-report-*.md "$HOME/.em-dash/projects/$SLUG"/*-executive-summary-*.md "$HOME/.em-dash/projects/$SLUG"/*-trust-report-*.md 2>/dev/null | wc -l | tr -d ' ')
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-report" "complete" "$REPORT_COUNT"
 ```
 
 ### 6b: Display compliance dashboard
 
 ```bash
-SLUG=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
 ```
 
