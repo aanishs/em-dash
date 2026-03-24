@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>em-dash</title>
+  <script>
+    (function () {
+      const key = 'em-dash-theme';
+      const savedTheme = localStorage.getItem(key);
+      if (savedTheme === 'dark' || savedTheme === 'light') {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+    })();
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-family='monospace'>—</text></svg>">
   <link rel="stylesheet" href="/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
@@ -67,6 +76,7 @@
           <span class="header-project" id="project-name">Loading...</span>
         </div>
         <div class="header-right">
+          <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">Dark mode</button>
           <div class="score-ring" id="score-ring">
             <svg viewBox="0 0 36 36" role="img" aria-label="Compliance percentage">
               <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
