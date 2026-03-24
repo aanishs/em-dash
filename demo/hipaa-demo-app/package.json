@@ -1,0 +1,9 @@
+{
+  "name": "hipaa-demo-app",
+  "version": "0.1.0",
+  "description": "Deliberately insecure health-tech backend for em-dash demos",
+  "private": true,
+  "scripts": {
+    "start": "echo 'This is a demo app — it does not actually run. Use em-dash to scan it.'"
+  }
+}

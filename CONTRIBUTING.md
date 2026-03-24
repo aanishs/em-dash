@@ -6,7 +6,7 @@
 git clone https://github.com/aanishs/em-dash.git
 cd em-dash
 bun install
-bun test          # ~330 tests, all free, under 3 seconds
+bun test          # ~340 tests, all free, under 3 seconds
 ```
 
 ## Project architecture
@@ -24,7 +24,7 @@ dashboard/        Static site (HTML/CSS/JS) + Bun server for visual compliance d
 policies/         6 Rego/OPA rules for IaC policy scanning
 templates/        8 policy document templates (Markdown)
 bin/              7 CLI utilities (config, slug, tool-detect, evidence-hash, review-log, update-check, dashboard-update)
-test/             ~330 tests across 5 test files + helpers
+test/             ~340 tests across 5 test files + helpers
 ```
 
 **Skills** are prompt templates. They tell Claude what to do — run commands, ask questions, generate reports. The template engine (`scripts/gen-skill-docs.ts`) injects shared blocks like PHI scanning patterns, cloud CLI commands, and evidence collection logic.
@@ -45,9 +45,34 @@ SKILL.md files are **generated** — don't edit them directly. They'd be overwri
 
 **Watch mode:** Run `bun run dev:skill` to auto-regenerate and validate on every template save.
 
+## Your first PR in 15 minutes
+
+The fastest way to contribute: add a single Rego policy rule.
+
+```bash
+git clone https://github.com/aanishs/em-dash.git && cd em-dash && bun install
+```
+
+1. Open `policies/hipaa-encryption-at-rest.rego`
+2. Add a new `deny` rule (see example below)
+3. Run `bun test` — if it passes, you're done
+4. Open a PR
+
+That's it. Each Rego rule is self-contained — you don't need to understand the rest of the system.
+
 ## Five ways to contribute
 
-### 1. Add a Rego policy rule (easy)
+Pick your level:
+
+| Level | Contribution | Time |
+|-------|-------------|------|
+| Beginner | Add a Rego policy rule | 15 min |
+| Beginner | Add a policy template | 30 min |
+| Intermediate | Add a new scanning check | 1 hour |
+| Intermediate | Add cloud provider checks | 2-3 hours |
+| Advanced | Add a new compliance framework | 1-2 days |
+
+### 1. Add a Rego policy rule (beginner)
 
 Add one `deny` rule to an existing file in `policies/`. Every rule must include `hipaa_ref`, `severity`, `resource`, and `msg`.
 
@@ -66,7 +91,7 @@ deny[msg] {
 
 Then add the filename to `expectedPolicies` in `test/skill-validation.test.ts` and run `bun test`.
 
-### 2. Add a new scanning check (medium)
+### 2. Add a new scanning check (intermediate)
 
 Add a check to `PHI_PATTERNS` in `scripts/gen-skill-docs.ts`. Each check needs:
 - A grep/regex pattern that detects the problem
@@ -76,19 +101,19 @@ Add a check to `PHI_PATTERNS` in `scripts/gen-skill-docs.ts`. Each check needs:
 
 Then run `bun run gen:skill-docs` and `bun test` to verify it appears in all the right places.
 
-### 3. Add a policy template (medium)
+### 3. Add a policy template (beginner)
 
 Write an organizational policy document in `templates/policies/`. Follow the existing pattern — Markdown with placeholder sections for organization-specific details. Reference the relevant HIPAA sections.
 
 Add the filename to `expectedTemplates` in `test/skill-validation.test.ts`.
 
-### 4. Add a new cloud provider or expand existing checks (hard)
+### 4. Add a new cloud provider or expand existing checks (intermediate)
 
 Add a new resolver function in `scripts/gen-skill-docs.ts` for the provider's CLI commands. Follow the AWS/GCP/Azure pattern: group commands by HIPAA requirement, include the CLI command and what to check in the output.
 
 Add a new `{{PROVIDER_CHECKS}}` placeholder, wire it into the scan skill template, and add test coverage.
 
-### 5. Add a new compliance framework (hard)
+### 5. Add a new compliance framework (advanced)
 
 This is the big one. em-dash is designed for it — the architecture supports SOC 2, HITRUST, ISO 27001, and more. Here's how:
 
@@ -120,7 +145,7 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 ## Testing
 
 ```bash
-bun test                  # ~330 tests, free, <3s
+bun test                  # ~340 tests, free, <3s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
 ```
@@ -131,7 +156,7 @@ bun run dev:skill         # watch mode: auto-regen + validate on change
 |------|-------|------------------|
 | `test/skill-validation.test.ts` | ~250 | 10 skill templates, generated files, frontmatter, PHI checks, cloud coverage, bin utilities, path hygiene, preamble sections |
 | `test/rego-policy.test.ts` | ~22 | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s) |
-| `test/bin-smoke.test.ts` | ~11 | Actually executes bin utilities and validates output format |
+| `test/bin-smoke.test.ts` | ~20 | Actually executes bin utilities and validates output format |
 | `test/touchfiles.test.ts` | ~11 | Diff-based test selection logic (glob matching, touchfile maps) |
 | `test/skill-e2e.test.ts` | (stub) | E2E skill tests — gated behind EVALS=1 |
 
@@ -175,7 +200,7 @@ test("my new check appears in generated scan skill", () => {
 
 Before submitting:
 
-- [ ] `bun test` passes (~330 tests)
+- [ ] `bun test` passes (~340 tests)
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
 - [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)

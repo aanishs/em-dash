@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>em-dash — Open Source HIPAA Compliance for Claude Code</title>
+  <meta name="description" content="Free, open source HIPAA compliance toolkit. AI-powered scanning, remediation, and reporting. Alternative to Vanta, Drata, and Comp AI.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fafafa; line-height: 1.6; }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .hero { padding: 80px 0 60px; text-align: center; }
+    .hero h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.02em; }
+    .hero h1 span { color: #6366f1; }
+    .hero p { font-size: 1.2rem; color: #555; max-width: 600px; margin: 0 auto 32px; }
+    .hero .cta { display: inline-block; background: #1a1a2e; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1rem; transition: background 0.2s; }
+    .hero .cta:hover { background: #6366f1; }
+    .hero .secondary { display: inline-block; margin-left: 16px; color: #555; text-decoration: none; font-weight: 500; }
+    .hero .secondary:hover { color: #1a1a2e; }
+
+    /* Stats */
+    .stats { display: flex; justify-content: center; gap: 48px; padding: 40px 0; border-top: 1px solid #eee; border-bottom: 1px solid #eee; margin-bottom: 60px; }
+    .stat { text-align: center; }
+    .stat .number { font-size: 2rem; font-weight: 700; color: #6366f1; }
+    .stat .label { font-size: 0.875rem; color: #777; margin-top: 4px; }
+
+    /* Comparison */
+    .comparison { padding: 60px 0; }
+    .comparison h2 { font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: 40px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    thead { background: #1a1a2e; color: white; }
+    th { padding: 14px 16px; text-align: left; font-weight: 600; }
+    td { padding: 12px 16px; border-bottom: 1px solid #eee; }
+    tr:hover td { background: #f8f8ff; }
+    .check { color: #22c55e; font-weight: 700; }
+    .cross { color: #ccc; }
+    .partial { color: #f59e0b; }
+    .price-free { color: #22c55e; font-weight: 700; }
+    .price-paid { color: #ef4444; }
+
+    /* Features */
+    .features { padding: 60px 0; }
+    .features h2 { font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: 40px; }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .feature { background: white; border: 1px solid #eee; border-radius: 12px; padding: 24px; }
+    .feature h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+    .feature p { font-size: 0.875rem; color: #555; }
+
+    /* CTA */
+    .bottom-cta { padding: 60px 0; text-align: center; background: #1a1a2e; color: white; margin-top: 60px; }
+    .bottom-cta h2 { font-size: 1.75rem; margin-bottom: 16px; }
+    .bottom-cta p { color: #aaa; margin-bottom: 24px; }
+    .bottom-cta code { background: #2a2a4e; padding: 12px 24px; border-radius: 8px; font-size: 0.95rem; display: inline-block; color: #a5b4fc; }
+
+    /* Footer */
+    footer { padding: 40px 0; text-align: center; font-size: 0.8rem; color: #999; }
+    footer a { color: #6366f1; text-decoration: none; }
+
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 1.75rem; }
+      .stats { flex-direction: column; gap: 24px; }
+      table { font-size: 0.8rem; }
+      th, td { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="container">
+    <h1><span>em-dash</span> — HIPAA compliance<br>that doesn't cost $10k/year</h1>
+    <p>Open source. AI-powered. Runs in your terminal. Scan your code, cloud, and policies in 18 minutes. See every action the AI takes.</p>
+    <a href="https://github.com/aanishs/em-dash" class="cta">View on GitHub</a>
+    <a href="https://github.com/aanishs/em-dash#install" class="secondary">Install in 30 seconds</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats">
+    <div class="stat"><div class="number">10</div><div class="label">Claude Code skills</div></div>
+    <div class="stat"><div class="number">340+</div><div class="label">tests passing</div></div>
+    <div class="stat"><div class="number">19</div><div class="label">code-level checks</div></div>
+    <div class="stat"><div class="number">133</div><div class="label">cloud infra checks</div></div>
+    <div class="stat"><div class="number">6</div><div class="label">Rego policies</div></div>
+  </div>
+
+  <div class="comparison">
+    <h2>How em-dash compares</h2>
+    <table>
+      <thead>
+        <tr><th></th><th>em-dash</th><th>Vanta</th><th>Drata</th><th>Comp AI</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Price</strong></td><td class="price-free">Free</td><td class="price-paid">$10k+/yr</td><td class="price-paid">$10k+/yr</td><td class="price-free">Free (open core)</td></tr>
+        <tr><td><strong>Open source</strong></td><td class="check">MIT</td><td class="cross">No</td><td class="cross">No</td><td class="check">Yes</td></tr>
+        <tr><td><strong>Runs locally</strong></td><td class="check">Yes</td><td class="cross">No</td><td class="cross">No</td><td class="cross">No</td></tr>
+        <tr><td><strong>AI-powered</strong></td><td>Claude Code agent</td><td>Dashboard</td><td>Dashboard</td><td>AI agents</td></tr>
+        <tr><td><strong>See every action</strong></td><td class="check">Terminal</td><td class="cross">Black box</td><td class="cross">Black box</td><td class="partial">Partial</td></tr>
+        <tr><td><strong>Code scanning</strong></td><td>19 checks + Prowler/Trivy/Checkov</td><td>Via integrations</td><td>Via integrations</td><td>Via integrations</td></tr>
+        <tr><td><strong>Policy generation</strong></td><td>8 templates, auto-customized</td><td>Templates</td><td>Templates</td><td>Templates</td></tr>
+        <tr><td><strong>Remediation</strong></td><td class="check">AI generates fixes</td><td class="cross">Manual</td><td class="cross">Manual</td><td class="partial">AI suggestions</td></tr>
+        <tr><td><strong>Evidence integrity</strong></td><td>SHA-256 hashed</td><td>Vendor-managed</td><td>Vendor-managed</td><td>Self-hosted</td></tr>
+        <tr><td><strong>Multi-framework</strong></td><td>HIPAA (more planned)</td><td>HIPAA, SOC 2, ISO, GDPR</td><td>HIPAA, SOC 2, ISO, GDPR</td><td>SOC 2, ISO, HIPAA, GDPR</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="features">
+    <h2>What you get</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>/hipaa-assess</h3>
+        <p>20-minute organizational interview covering Security Rule, Privacy Rule, Breach Notification, and BAA requirements. Produces a gap analysis with prioritized findings.</p>
+      </div>
+      <div class="feature">
+        <h3>/hipaa-scan</h3>
+        <p>Automated scanning of your codebase (19 checks), cloud infrastructure (AWS/GCP/Azure), and IaC (Checkov + Rego). Maps every finding to a specific HIPAA requirement.</p>
+      </div>
+      <div class="feature">
+        <h3>/hipaa-remediate</h3>
+        <p>AI generates code patches, Terraform fixes, and 8 customized policy documents. SHA-256 hashed evidence for everything it produces.</p>
+      </div>
+      <div class="feature">
+        <h3>/hipaa-report</h3>
+        <p>Full compliance report, executive summary, and shareable trust report. Every requirement mapped, every finding linked to evidence.</p>
+      </div>
+      <div class="feature">
+        <h3>Visual Dashboard</h3>
+        <p>Real-time compliance dashboard at localhost:3000. Checklist, findings, risk register, vendor tracker, evidence library, exportable reports.</p>
+      </div>
+      <div class="feature">
+        <h3>Ongoing Monitoring</h3>
+        <p>Drift detection, vendor/BAA tracking, NIST risk assessment, and guided breach notification. Compliance is a process, not a checkbox.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-cta">
+  <div class="container">
+    <h2>Get started in 30 seconds</h2>
+    <p>Requires Claude Code and Bun. Works with or without AWS/GCP/Azure credentials.</p>
+    <code>cd ~/.claude/skills && git clone https://github.com/aanishs/em-dash.git && cd em-dash && ./setup</code>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <p><a href="https://github.com/aanishs/em-dash">GitHub</a> &middot; <a href="https://github.com/aanishs/em-dash/blob/main/LICENSE">MIT License</a> &middot; <a href="https://github.com/aanishs/em-dash/blob/main/CONTRIBUTING.md">Contribute</a></p>
+    <p style="margin-top: 8px;">Technical guidance, not legal advice. Consult qualified legal counsel for formal HIPAA compliance verification.</p>
+  </div>
+</footer>
+
+</body>
+</html>

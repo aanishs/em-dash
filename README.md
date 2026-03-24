@@ -1,5 +1,10 @@
 # em-dash
 
+[![Tests](https://img.shields.io/badge/tests-337%20passing-brightgreen)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.1.0-orange)]()
+[![Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet)]()
+
 I'm [Aanish](https://github.com/aanishs). I build [CoralEHR](https://coralehr.com), an EHR for behavioral therapists.
 
 We needed HIPAA compliance.
@@ -207,7 +212,10 @@ All optional. em-dash works with just grep.
 
 ### Dashboard
 
-Run `bun run dashboard` to open the compliance dashboard at localhost:3000.
+Run `bun run dashboard` or `/em-dashboard` to open the compliance dashboard at localhost:3000.
+
+<!-- TODO: Add dashboard screenshot here -->
+<!-- ![Dashboard](docs/images/dashboard.png) -->
 
 | Feature | Description |
 |---------|-------------|
@@ -255,6 +263,21 @@ Scan every PR automatically. Add the `hipaa-scan` label to trigger a compliance 
 ```
 
 See [docs/ci-setup.md](docs/ci-setup.md) for full setup instructions.
+
+## How em-dash compares
+
+|  | em-dash | Vanta | Drata | Comp AI |
+|--|---------|-------|-------|---------|
+| **Price** | Free | $10k+/yr | $10k+/yr | Free (open core) |
+| **Open source** | MIT | No | No | Yes |
+| **Runs locally** | Yes | No | No | No |
+| **AI-powered** | Claude Code agent | Dashboard + integrations | Dashboard + integrations | AI agents |
+| **See every action** | Yes (terminal) | No (black box) | No (black box) | Partial |
+| **Code scanning** | 19 checks + Prowler/Trivy/Checkov | Via integrations | Via integrations | Via integrations |
+| **Policy generation** | 8 templates, auto-customized | Templates | Templates | Templates |
+| **Evidence integrity** | SHA-256 hashed | Vendor-managed | Vendor-managed | Self-hosted |
+| **Remediation** | AI generates fixes + Terraform patches | Manual guidance | Manual guidance | AI suggestions |
+| **Multi-framework** | HIPAA (SOC 2, GDPR planned) | HIPAA, SOC 2, ISO, GDPR | HIPAA, SOC 2, ISO, GDPR | SOC 2, ISO, HIPAA, GDPR |
 
 ## Roadmap
 
