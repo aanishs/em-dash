@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.3.0 — Multi-framework architecture + launch kit
+
+**Framework abstraction layer.** em-dash is no longer HIPAA-only. A new `frameworks/` directory defines compliance frameworks as JSON files with requirements, checklists, thresholds, terminology, and assessment questions. A shared checks registry (~50 checks) maps each check to requirements across multiple frameworks. Adding a new framework means writing a JSON definition — not duplicating the skill set.
+
+**SOC 2 scaffolding.** Two new skills: `/soc2` (router) and `/soc2-scan` (automated scanning mapped to Trust Service Criteria). Same scanning infrastructure as HIPAA, different requirement lens. The SOC 2 definition is a stub that needs domain expertise — contributions welcome.
+
+**Framework-agnostic Rego policies.** All 6 policy files renamed (removed `hipaa-` prefix), package names changed from `hipaa.*` to `compliance.*`, and `hipaa_ref` replaced with `check_id` in all 43 deny rules. Framework-specific mapping happens in the checks registry, not in Rego.
+
+**Framework-aware dashboard.** `hipaa-dashboard-update` now accepts `--framework soc2` (or any framework ID). Export endpoints support `?framework=` query param. Upload form offers HIPAA, SOC 2, GDPR, PCI-DSS, and ISO 27001. Each framework's findings, checklist, and evidence tracked separately in `dashboard.json`.
+
+**Template engine parameterization.** `gen-skill-docs.ts` loads framework definitions and uses them for disclaimers, terminology ("PHI" vs "sensitive information" vs "cardholder data"), and section headers. Generates 12 skills (10 HIPAA + 2 SOC 2).
+
+**Bug fixes from real-world scanning.** 7 bugs fixed after running em-dash against a production AWS account:
+- Slug inconsistency: 6 skills used `basename` while others used `hipaa-slug` — standardized all 30+ calls
+- Evidence hash: `xargs` pipeline failed silently on macOS — rewrote using `hash_file()` with validation
+- Dashboard note duplication: same note appended twice — added `includes()` dedup
+- Prowler timing: scan report written before Prowler finished — added must-complete instructions
+- Finding count drift: `findingAdd()` didn't update skill counts — now auto-recalculates
+- Evidence linking: scan skill never used `--evidence` flag — added examples and instructions
+- Evidence preservation: raw Prowler/Trivy/Checkov output not saved — added explicit copy section
+
+**Demo app.** `demo/hipaa-demo-app` — a deliberately insecure health-tech backend with 15 intentional HIPAA violations across code (PHI in logs, weak auth, no RBAC) and Terraform (open S3, unencrypted RDS, IAM wildcards). Safe surface for demos and testing.
+
+**Launch kit.** README badges + comparison table (em-dash vs Vanta vs Drata vs Comp AI). CONTRIBUTING.md "first PR in 15 minutes" guide with skill-level labels. Comparison landing page for GitHub Pages. 9 good-first-issues seeded.
+
+**Dark mode persistence.** Dashboard theme preference saved in localStorage. Early `<script>` in `<head>` prevents flash on load. (Thanks @adityakulraj — PR #13)
+
+**Workforce training policy template.** New `templates/policies/workforce-training.md` with new hire training, ongoing refresher, sanctions, remote worker requirements. (Thanks @weedorflow — PR #14)
+
+**CONTRIBUTING.md examples.** Collapsible diff examples for each of the 5 contribution types. (Thanks @shogun444 — PR #15)
+
+**~390 tests. 12 skills. 50 checks. 6 Rego policies. 9 policy templates.**
+
 ## v1.2.0 — Design system polish + documentation
 
 **Pipeline fix.** The audit pipeline now correctly reads skill status from `dashboard.json`. Previously all 6 steps showed `–` because the code looked up `assess` but the data used `hipaa-assess`. Fixed key resolution, status normalization (`completed`→`complete`, `not-run`→`pending`), and the next-step recommendation logic.
