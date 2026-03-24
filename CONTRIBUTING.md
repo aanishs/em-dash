@@ -53,7 +53,7 @@ The fastest way to contribute: add a single Rego policy rule.
 git clone https://github.com/aanishs/em-dash.git && cd em-dash && bun install
 ```
 
-1. Open `policies/hipaa-encryption-at-rest.rego`
+1. Open `policies/encryption-at-rest.rego`
 2. Add a new `deny` rule (see example below)
 3. Run `bun test` — if it passes, you're done
 4. Open a PR
@@ -74,15 +74,15 @@ Pick your level:
 
 ### 1. Add a Rego policy rule (beginner)
 
-Add one `deny` rule to an existing file in `policies/`. Every rule must include `hipaa_ref`, `severity`, `resource`, and `msg`.
+Add one `deny` rule to an existing file in `policies/`. Every rule must include `check_id`, `severity`, `resource`, and `msg`.
 
-Example — add a rule to `policies/hipaa-encryption-at-rest.rego`:
+Example — add a rule to `policies/encryption-at-rest.rego`:
 
 ```rego
 deny[msg] {
     input.resource.aws_s3_bucket[name].versioning[_].enabled != true
     msg := {
-        "hipaa_ref": "§164.312(c)(1)",
+        "check_id": "rego-s3-encryption",
         "severity": "HIGH",
         "resource": name,
         "msg": sprintf("S3 bucket '%s' does not have versioning enabled", [name])
@@ -95,13 +95,13 @@ Then add the filename to `expectedPolicies` in `test/skill-validation.test.ts` a
 <details>
 <summary>Example PR: Add a Rego policy rule</summary>
 
-File: `policies/hipaa-encryption-at-rest.rego`
+File: `policies/encryption-at-rest.rego`
 
 ```diff
-diff --git a/policies/hipaa-encryption-at-rest.rego b/policies/hipaa-encryption-at-rest.rego
+diff --git a/policies/encryption-at-rest.rego b/policies/encryption-at-rest.rego
 index 1a2b3c4..5d6e7f8 100644
---- a/policies/hipaa-encryption-at-rest.rego
-+++ b/policies/hipaa-encryption-at-rest.rego
+--- a/policies/encryption-at-rest.rego
++++ b/policies/encryption-at-rest.rego
 @@ -45,3 +45,13 @@ deny[msg] {
          "msg": sprintf("RDS instance '%s' does not have encryption enabled", [name])
      }
@@ -110,7 +110,7 @@ index 1a2b3c4..5d6e7f8 100644
 +deny[msg] {
 +    input.resource.aws_s3_bucket[name].versioning[_].enabled != true
 +    msg := {
-+        "hipaa_ref": "§164.312(c)(1)",
++        "check_id": "rego-s3-encryption",
 +        "severity": "HIGH",
 +        "resource": name,
 +        "msg": sprintf("S3 bucket '%s' does not have versioning enabled", [name])
@@ -538,7 +538,7 @@ Before submitting:
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
 - [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)
-- [ ] New Rego policies have `hipaa_ref` and `severity` in all `deny` rules
+- [ ] New Rego policies have `check_id` and `severity` in all `deny` rules
 - [ ] New policy templates added to `expectedTemplates` in tests
 - [ ] CHANGELOG updated (user-facing language, not implementation details)
 - [ ] README updated if adding a new skill or check category
