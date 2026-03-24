@@ -11,10 +11,49 @@
   let risksView = 'matrix';
   let charts = {};
   const EVIDENCE_PER_PAGE = 10;
+  const THEME_KEY = 'em-dash-theme';
+
+  function getSavedTheme() {
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    return savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : null;
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+    updateThemeToggleLabel(theme);
+  }
+
+  function updateThemeToggleLabel(theme) {
+    const button = document.getElementById('theme-toggle');
+    if (button) button.textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+  }
+
+  function setupThemeToggle() {
+    const button = document.getElementById('theme-toggle');
+    if (!button) return;
+
+    const savedTheme = getSavedTheme();
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      updateThemeToggleLabel(systemTheme);
+    }
+
+    button.addEventListener('click', () => {
+      const currentTheme = document.documentElement.dataset.theme
+        || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      applyTheme(nextTheme);
+    });
+  }
 
   // ─── Init ───────────────────────────────────────────────
 
   async function init() {
+    setupThemeToggle();
+
     // Configure Chart.js defaults
     if (typeof Chart !== 'undefined') {
       Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
