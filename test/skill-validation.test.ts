@@ -198,11 +198,12 @@ describe('Policy templates', () => {
     'incident-response.md',
     'risk-assessment.md',
     'workforce-security.md',
+    'workforce-training.md',
     'contingency-plan.md',
     'baa-template.md',
   ];
 
-  test('all 8 policy templates exist', () => {
+  test('all 9 policy templates exist', () => {
     for (const policy of expectedPolicies) {
       expect(fs.existsSync(path.join(policyDir, policy))).toBe(true);
     }
