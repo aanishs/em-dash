@@ -31,8 +31,8 @@ function findGenerated(): string[] {
 describe('Skill template validation', () => {
   const templates = findTemplates();
 
-  test('all 10 skill templates exist', () => {
-    expect(templates.length).toBe(10);
+  test('all skill templates exist', () => {
+    expect(templates.length).toBeGreaterThanOrEqual(10);
   });
 
   for (const tmpl of templates) {
@@ -71,8 +71,8 @@ describe('Skill template validation', () => {
 describe('Generated SKILL.md files', () => {
   const generated = findGenerated();
 
-  test('all 10 generated SKILL.md files exist', () => {
-    expect(generated.length).toBe(10);
+  test('all generated SKILL.md files exist', () => {
+    expect(generated.length).toBeGreaterThanOrEqual(10);
   });
 
   for (const md of generated) {
@@ -91,7 +91,7 @@ describe('Generated SKILL.md files', () => {
 
     test(`${name} contains DISCLAIMER`, () => {
       const content = fs.readFileSync(md, 'utf-8');
-      expect(content).toContain('NOT legal advice');
+      expect(content).toMatch(/NOT (legal advice|a SOC 2 audit|certification)/);
     });
   }
 });

@@ -1,0 +1,134 @@
+---
+name: soc2-scan
+version: 0.1.0
+description: |
+  Automated SOC 2 technical scanning. Maps findings to Trust Service Criteria.
+  Wraps Prowler (AWS), Trivy (code/containers), and Checkov (IaC) with
+  SOC 2 requirement mappings. Scans codebase for sensitive data exposure.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Glob
+  - Grep
+  - AskUserQuestion
+hipaa_sections: []
+risk_level: low
+requires_prior: []
+---
+
+{{PREAMBLE}}
+
+# SOC 2 Technical Scan
+
+You are running `/soc2-scan` — automated compliance scanning mapped to **SOC 2 Trust Service Criteria**.
+
+**Framework:** SOC 2 Type II
+**Requirement mappings:** From `frameworks/soc2.json` via the checks registry
+
+This skill uses the same scanning infrastructure as `/hipaa-scan` — same tools, same checks — but maps findings to SOC 2 Trust Service Criteria (CC6.x, CC7.x, C1.x) instead of HIPAA sections.
+
+---
+
+## Phase 1: Scan Context
+
+{{TOOL_DETECTION}}
+
+---
+
+## Phase 2: Cloud Infrastructure Scan
+
+{{AWS_CHECKS}}
+
+{{GCP_CHECKS}}
+
+{{AZURE_CHECKS}}
+
+**SOC 2 Requirement Mapping:** After each finding, map it to the relevant Trust Service Criteria:
+
+| Check Category | SOC 2 Criteria | What to look for |
+|---------------|---------------|-----------------|
+| Access Control | CC6.1, CC6.3 | Least privilege, role-based access, no wildcards |
+| Encryption | CC6.1 | Data at rest and in transit encrypted |
+| Audit Logging | CC7.2, CC7.3 | Activity monitoring, anomaly detection |
+| Network Security | CC6.6 | System boundaries, network restrictions |
+| Change Management | CC8.1 | Configuration tracking, change authorization |
+| Monitoring | CC7.1, CC7.2 | Security Hub, GuardDuty, Config |
+| Secrets | CC6.1 | No hardcoded credentials, rotation configured |
+
+---
+
+## Phase 3: Code-Level Scan
+
+{{PHI_PATTERNS}}
+
+**Note:** For SOC 2, these patterns detect sensitive data exposure broadly — not just health data. Look for PII (names, emails, SSNs), financial data, authentication credentials, and any data classified as confidential in the system description.
+
+---
+
+## Phase 4: IaC Policy Scan
+
+{{IAC_POLICY_ENGINE}}
+
+---
+
+## Pre-Report Checkpoint
+
+Before writing the scan report, confirm ALL scan tools have completed.
+If any tool shows "Pending" or is still running, **WAIT**. Do NOT write the report
+with incomplete data. Record tools that crashed/timed out as "Error", not "Pending".
+
+---
+
+## Phase 5: Generate Scan Report
+
+{{EVIDENCE_COLLECTION}}
+
+**Compile all findings into a structured scan report.**
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+_USER=$(whoami 2>/dev/null || echo "unknown")
+_DATETIME=$(date +%Y%m%d-%H%M%S)
+_REPORT_PATH="$HOME/.em-dash/projects/${SLUG:-unknown}/${_USER}-soc2-scan-${_DATETIME}.md"
+echo "REPORT_PATH: $_REPORT_PATH"
+```
+
+Write the report with SOC 2 Trust Service Criteria mappings:
+
+```markdown
+# SOC 2 Technical Scan Report
+**Project:** [project name]
+**Date:** [date]
+**Framework:** SOC 2 Type II — Trust Service Criteria
+
+## Requirement Mapping
+
+| Criteria | Requirement | Status | Evidence |
+|----------|-------------|--------|----------|
+| CC6.1 | Logical Access Security | PASS/FAIL | [evidence] |
+| CC6.3 | Role-Based Access | PASS/FAIL | [evidence] |
+| CC6.6 | System Boundaries | PASS/FAIL | [evidence] |
+| CC7.1 | Configuration Management | PASS/FAIL | [evidence] |
+| CC7.2 | Monitoring | PASS/FAIL | [evidence] |
+| CC7.3 | Incident Response | PASS/FAIL | [evidence] |
+```
+
+---
+
+## Phase 6: Dashboard Updates
+
+Update the dashboard with SOC 2 findings. Use `--framework soc2` to ensure findings are tracked under the SOC 2 framework:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-dashboard-update --framework soc2 finding add --title "<title>" --severity <severity> --requirement "<CC6.x>" --source "soc2-scan"
+```
+
+For checklist updates:
+```bash
+"$_EMDASH_BIN"/hipaa-dashboard-update --framework soc2 checklist "<CC6.1>" complete "<reasoning>"
+```
+
+{{DASHBOARD_UPDATES}}
