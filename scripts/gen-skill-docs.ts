@@ -10,9 +10,28 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import type { FrameworkDefinition } from '../frameworks/schema';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const DRY_RUN = process.argv.includes('--dry-run');
+
+// ─── Framework Loading ──────────────────────────────────────
+
+function loadFrameworkForSkill(skillName: string): FrameworkDefinition | null {
+  // Extract framework ID from skill name (e.g., "hipaa-scan" → "hipaa", "soc2-assess" → "soc2")
+  const match = skillName.match(/^([a-z0-9]+)-(?:assess|scan|remediate|report|monitor|breach|vendor|risk)$/);
+  const frameworkId = match ? match[1] : (skillName === 'hipaa' || skillName === 'soc2' ? skillName : null);
+  if (!frameworkId) return null;
+
+  const defPath = path.join(ROOT, 'frameworks', `${frameworkId}.json`);
+  if (!fs.existsSync(defPath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(defPath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
 
 // ─── Placeholder Resolvers ──────────────────────────────────
 
@@ -23,6 +42,7 @@ interface TemplateContext {
   localBinDir: string;
   policyDir: string;
   localPolicyDir: string;
+  framework: FrameworkDefinition | null;
 }
 
 // ─── Composed Preamble Sections ─────────────────────────────
@@ -63,23 +83,29 @@ If the preamble printed \`UPGRADE_AVAILABLE <current> <latest>\`, inform the use
 If \`JUST_UPGRADED\` was printed, note it and continue. Otherwise, skip this section silently.`;
 }
 
-function generateDisclaimerSection(_ctx: TemplateContext): string {
+function generateDisclaimerSection(ctx: TemplateContext): string {
+  if (ctx.framework?.disclaimer) {
+    return `## DISCLAIMER — Not Legal Advice
+
+> **IMPORTANT:** ${ctx.framework.disclaimer}`;
+  }
   return `## DISCLAIMER — Not Legal Advice
 
-> **IMPORTANT:** This tool provides technical guidance for implementing HIPAA compliance
-> controls. It is NOT legal advice and does not constitute HIPAA certification. HIPAA
-> compliance is a legal determination that depends on your specific circumstances. Always
-> consult qualified legal counsel and consider engaging a certified HIPAA auditor for
+> **IMPORTANT:** This tool provides technical guidance for implementing compliance
+> controls. It is NOT legal advice and does not constitute certification. Compliance
+> is a legal determination that depends on your specific circumstances. Always
+> consult qualified legal counsel and consider engaging a certified auditor for
 > formal compliance verification. This tool helps you implement and verify technical
 > safeguards — it does not certify compliance.`;
 }
 
-function generateAskUserFormat(_ctx: TemplateContext): string {
+function generateAskUserFormat(ctx: TemplateContext): string {
+  const fwName = ctx.framework?.name ?? 'compliance';
   return `## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch, and the current compliance phase (e.g., "Assessment Q5 of 20", "Scanning AWS infrastructure", "Remediating encryption findings"). (1-2 sentences)
-2. **Simplify:** Explain the compliance requirement in plain English. No HIPAA regulation numbers in the question itself — reference them in a note below.
+2. **Simplify:** Explain the compliance requirement in plain English. No ${fwName} regulation numbers in the question itself — reference them in a note below.
 3. **Recommend:** \`RECOMMENDATION: Choose [X] because [one-line reason]\`
 4. **Options:** Lettered options: \`A) ... B) ... C) ...\`
 
@@ -247,10 +273,11 @@ _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinD
 - **Tier 3 (guided manual):** No scanning tools — provide CLI commands for user to run`;
 }
 
-function generatePhiPatterns(_ctx: TemplateContext): string {
-  return `## PHI Detection Patterns
+function generatePhiPatterns(ctx: TemplateContext): string {
+  const dataType = ctx.framework?.terminology?.sensitive_data ?? 'Protected Health Information (PHI)';
+  return `## Sensitive Data Detection Patterns
 
-Scan the codebase for potential PHI exposure using these patterns. Exclude \`node_modules/\`, \`vendor/\`, \`.git/\`, and test fixture directories with obviously mock data.
+Scan the codebase for potential ${dataType} exposure using these patterns. Exclude \`node_modules/\`, \`vendor/\`, \`.git/\`, and test fixture directories with obviously mock data.
 
 ---
 
@@ -1400,9 +1427,9 @@ C) Skip policy scanning — rely on cloud CLI checks and code-level scanning onl
 
 Report which tools ran and their findings:
 
-| Tool | Files Scanned | Findings | HIPAA Checks |
-|------|--------------|----------|-------------|
-| Checkov | N | N passed / N failed | HIPAA framework |
+| Tool | Files Scanned | Findings | Compliance Checks |
+|------|--------------|----------|-------------------|
+| Checkov | N | N passed / N failed | Built-in compliance framework |
 | Conftest | N | N denials | 6 Rego policy files |
 | Trivy Config | N | N findings | Built-in misconfig rules |
 | Manual Review | N | N findings | Pattern matching |`;
@@ -1739,6 +1766,8 @@ function processTemplate(tmplPath: string): { outputPath: string; content: strin
   const nameMatch = tmplContent.match(/^name:\s*(.+)$/m);
   const skillName = nameMatch ? nameMatch[1].trim() : path.basename(path.dirname(tmplPath));
 
+  const framework = loadFrameworkForSkill(skillName);
+
   const ctx: TemplateContext = {
     skillName,
     tmplPath,
@@ -1746,6 +1775,7 @@ function processTemplate(tmplPath: string): { outputPath: string; content: strin
     localBinDir: '.claude/skills/em-dash/bin',
     policyDir: '~/.claude/skills/em-dash/policies',
     localPolicyDir: '.claude/skills/em-dash/policies',
+    framework,
   };
 
   // Replace placeholders

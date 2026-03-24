@@ -36,6 +36,10 @@ function hasFlag(name: string): boolean {
   return args.includes(`--${name}`);
 }
 
+// ─── Framework Detection ────────────────────────────────────
+
+const FRAMEWORK = getFlag('framework') || 'hipaa';
+
 // ─── Read/Write ─────────────────────────────────────────────
 
 function read(): any {
@@ -46,13 +50,13 @@ function read(): any {
     if (!d.vendors) d.vendors = [];
   }
   if (!d.frameworks) d.frameworks = {};
-  if (!d.frameworks.hipaa) d.frameworks.hipaa = { status: 'in-progress', skills: {}, checklist: [], findings: [], evidence_gaps: [] };
+  if (!d.frameworks[FRAMEWORK]) d.frameworks[FRAMEWORK] = { status: 'in-progress', skills: {}, checklist: [], findings: [], evidence_gaps: [] };
   if (!d.evidence) d.evidence = { files: [] };
   return d;
 }
 
 function write(d: any) {
-  d.frameworks.hipaa.last_updated = new Date().toISOString();
+  d.frameworks[FRAMEWORK].last_updated = new Date().toISOString();
   fs.writeFileSync(DASHBOARD, JSON.stringify(d, null, 2) + '\n');
 }
 
@@ -76,7 +80,7 @@ function checklist() {
   }
 
   const d = read();
-  const fw = d.frameworks.hipaa;
+  const fw = d.frameworks[FRAMEWORK];
 
   const item = (fw.checklist || []).find((i: any) => i.id === itemId);
   if (item) {
@@ -113,7 +117,7 @@ function findingAdd() {
   if (!title) { console.error('Usage: finding add --title T --severity S'); process.exit(1); }
 
   const d = read();
-  const fw = d.frameworks.hipaa;
+  const fw = d.frameworks[FRAMEWORK];
   if (!fw.findings) fw.findings = [];
 
   // Don't duplicate by title
@@ -152,7 +156,7 @@ function findingResolve() {
   if (!title) { console.error('Usage: finding resolve --title T'); process.exit(1); }
 
   const d = read();
-  const fw = d.frameworks.hipaa;
+  const fw = d.frameworks[FRAMEWORK];
   let resolvedSource = '';
   for (const f of (fw.findings || [])) {
     if (f.title === title && f.status !== 'resolved') {
@@ -294,7 +298,7 @@ if (cmd.startsWith('164.')) {
   else { console.error('Usage: risk add --description D ...'); process.exit(1); }
 } else if (cmd === 'sync') {
   const d = read();
-  const fw = d.frameworks.hipaa;
+  const fw = d.frameworks[FRAMEWORK];
   if (fw.skills) {
     for (const key of Object.keys(fw.skills)) {
       if (fw.skills[key]) {

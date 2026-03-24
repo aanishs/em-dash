@@ -60,18 +60,13 @@ If `JUST_UPGRADED` was printed, note it and continue. Otherwise, skip this secti
 
 ## DISCLAIMER — Not Legal Advice
 
-> **IMPORTANT:** This tool provides technical guidance for implementing HIPAA compliance
-> controls. It is NOT legal advice and does not constitute HIPAA certification. HIPAA
-> compliance is a legal determination that depends on your specific circumstances. Always
-> consult qualified legal counsel and consider engaging a certified HIPAA auditor for
-> formal compliance verification. This tool helps you implement and verify technical
-> safeguards — it does not certify compliance.
+> **IMPORTANT:** This provides technical guidance for implementing HIPAA compliance controls. It is NOT legal advice and does not constitute HIPAA certification. Consult qualified legal counsel and consider engaging a certified HIPAA auditor for formal compliance verification.
 
 ## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch, and the current compliance phase (e.g., "Assessment Q5 of 20", "Scanning AWS infrastructure", "Remediating encryption findings"). (1-2 sentences)
-2. **Simplify:** Explain the compliance requirement in plain English. No HIPAA regulation numbers in the question itself — reference them in a note below.
+2. **Simplify:** Explain the compliance requirement in plain English. No HIPAA Security Rule regulation numbers in the question itself — reference them in a note below.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]`
 4. **Options:** Lettered options: `A) ... B) ... C) ...`
 
