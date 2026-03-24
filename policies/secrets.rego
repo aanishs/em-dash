@@ -1,7 +1,6 @@
-package hipaa.secrets
+package compliance.secrets
 
-# HIPAA 164.312(a)(1) — Access Control / Credential Management
-# Ensures no hardcoded secrets in infrastructure-as-code or container definitions.
+# Secrets Management — ensures no hardcoded secrets in infrastructure-as-code or container definitions
 
 # No hardcoded AWS access keys in Terraform providers
 deny[msg] {
@@ -9,7 +8,7 @@ deny[msg] {
     resource.access_key
     msg := {
         "msg": sprintf("AWS provider '%s' has hardcoded access_key — use environment variables or IAM roles", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-no-hardcoded-secrets",
         "severity": "CRITICAL",
         "resource": name,
     }
@@ -21,7 +20,7 @@ deny[msg] {
     resource.secret_key
     msg := {
         "msg": sprintf("AWS provider '%s' has hardcoded secret_key — use environment variables or IAM roles", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-no-hardcoded-secrets",
         "severity": "CRITICAL",
         "resource": name,
     }
@@ -35,7 +34,7 @@ deny[msg] {
     resource.default != ""
     msg := {
         "msg": sprintf("Terraform variable '%s' has a default value — password variables must not have defaults", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-no-hardcoded-secrets",
         "severity": "HIGH",
         "resource": name,
     }
@@ -50,7 +49,7 @@ deny[msg] {
     resource.default != ""
     msg := {
         "msg": sprintf("Terraform variable '%s' has a default value — secret variables must not have defaults", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-no-hardcoded-secrets",
         "severity": "HIGH",
         "resource": name,
     }
@@ -68,7 +67,7 @@ deny[msg] {
     not env.valueFrom
     msg := {
         "msg": sprintf("Container '%s' env var '%s' uses inline value — must use secretKeyRef", [container.name, env.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-no-hardcoded-secrets",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }

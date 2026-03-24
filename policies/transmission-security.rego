@@ -1,7 +1,6 @@
-package hipaa.transmission_security
+package compliance.transmission_security
 
-# HIPAA 164.312(e)(1) — Transmission Security
-# Ensures PHI is encrypted in transit and network access is restricted.
+# Transmission Security — ensures sensitive data is encrypted in transit and network access is restricted
 
 # AWS — Security groups must not allow 0.0.0.0/0 on sensitive ports
 deny[msg] {
@@ -12,7 +11,7 @@ deny[msg] {
     sensitive_ports[resource.from_port]
     msg := {
         "msg": sprintf("Security group rule '%s' allows 0.0.0.0/0 on sensitive port %d", [name, resource.from_port]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -29,7 +28,7 @@ deny[msg] {
     port <= ingress.to_port
     msg := {
         "msg": sprintf("Security group '%s' allows 0.0.0.0/0 ingress on port %d", [name, port]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -42,7 +41,7 @@ deny[msg] {
     resource.protocol != "TLS"
     msg := {
         "msg": sprintf("Load balancer listener '%s' uses protocol '%s' instead of HTTPS/TLS", [name, resource.protocol]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -54,7 +53,7 @@ deny[msg] {
     resource.publicly_accessible == true
     msg := {
         "msg": sprintf("RDS instance '%s' is publicly accessible", [name]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-rds-public",
         "severity": "CRITICAL",
         "resource": name,
     }
@@ -66,7 +65,7 @@ deny[msg] {
     not resource.parameter_group_name
     msg := {
         "msg": sprintf("RDS instance '%s' may not enforce SSL — verify parameter group requires ssl", [name]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -80,7 +79,7 @@ deny[msg] {
     not ip_config.require_ssl
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' does not require SSL for connections", [name]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -94,7 +93,7 @@ deny[msg] {
     ip_config.ipv4_enabled == true
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' has public IPv4 enabled — use private IP only", [name]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -110,7 +109,7 @@ deny[msg] {
     allowed.ports[_] == sensitive_ports[_]
     msg := {
         "msg": sprintf("GCP firewall rule '%s' allows 0.0.0.0/0 on sensitive port", [name]),
-        "hipaa_ref": "164.312(e)(1)",
+        "check_id": "rego-security-group-open",
         "severity": "HIGH",
         "resource": name,
     }

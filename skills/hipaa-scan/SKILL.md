@@ -1260,14 +1260,14 @@ If Checkov finds no IaC files, it will report 0 checks — this is fine, note "N
 
 **Conftest integration (if `TOOL_CONFTEST=true` and policies exist):**
 
-Conftest runs custom Rego policies against configuration files. em-dash ships 6 healthcare-specific Rego policies in its `policies/` directory:
+Conftest runs custom Rego policies against configuration files. em-dash ships 6 compliance Rego policies in its `policies/` directory:
 
-- `hipaa-encryption-at-rest.rego` — RDS, S3, EBS, KMS, GCP SQL/Storage encryption rules
-- `hipaa-transmission-security.rego` — Security groups, load balancers, SSL, firewall rules
-- `hipaa-access-control.rego` — IAM wildcards, MFA, GCP/Azure role scoping
-- `hipaa-audit-logging.rego` — CloudTrail, VPC flow logs, CloudWatch retention, GCP audit configs
-- `hipaa-k8s-security.rego` — Pod security, privileged containers, network policies, image registries
-- `hipaa-secrets.rego` — Hardcoded credentials in Terraform, K8s inline secrets
+- `encryption-at-rest.rego` — RDS, S3, EBS, KMS, GCP SQL/Storage encryption rules
+- `transmission-security.rego` — Security groups, load balancers, SSL, firewall rules
+- `access-control.rego` — IAM wildcards, MFA, GCP/Azure role scoping
+- `audit-logging.rego` — CloudTrail, VPC flow logs, CloudWatch retention, GCP audit configs
+- `k8s-security.rego` — Pod security, privileged containers, network policies, image registries
+- `secrets.rego` — Hardcoded credentials in Terraform, K8s inline secrets
 
 Run Conftest against detected IaC files:
 

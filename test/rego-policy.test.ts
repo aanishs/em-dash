@@ -15,7 +15,7 @@ interface ConftestResult {
   failures?: Array<{
     msg: string;
     metadata: {
-      hipaa_ref: string;
+      check_id: string;
       severity: string;
       resource: string;
       query: string;
@@ -72,7 +72,7 @@ describe('AWS encryption at rest', () => {
   test('denies unencrypted RDS, S3, EBS, KMS, SNS, SQS', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-encryption.json'));
-    const failures = getFailures(results, 'hipaa.encryption_at_rest');
+    const failures = getFailures(results, 'compliance.encryption_at_rest');
     expect(failures.length).toBe(6);
 
     const messages = failures.map(f => f.msg);
@@ -84,14 +84,14 @@ describe('AWS encryption at rest', () => {
     expect(messages.some(m => m.includes('SQS queue'))).toBe(true);
 
     for (const f of failures) {
-      expect(f.metadata.hipaa_ref).toBe('164.312(a)(2)(iv)');
+      expect(['rego-s3-encryption', 'rego-rds-encryption', 'rego-kms-rotation']).toContain(f.metadata.check_id);
     }
   });
 
   test('passes compliant AWS resources', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'good-aws.json'));
-    const failures = getFailures(results, 'hipaa.encryption_at_rest');
+    const failures = getFailures(results, 'compliance.encryption_at_rest');
     expect(failures.length).toBe(0);
   });
 });
@@ -102,7 +102,7 @@ describe('AWS transmission security', () => {
   test('denies open SG, HTTP listener, public RDS', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-transmission.json'));
-    const failures = getFailures(results, 'hipaa.transmission_security');
+    const failures = getFailures(results, 'compliance.transmission_security');
     expect(failures.length).toBe(5);
 
     const messages = failures.map(f => f.msg);
@@ -112,14 +112,14 @@ describe('AWS transmission security', () => {
     expect(messages.some(m => m.includes('publicly accessible'))).toBe(true);
 
     for (const f of failures) {
-      expect(f.metadata.hipaa_ref).toBe('164.312(e)(1)');
+      expect(['rego-security-group-open', 'rego-rds-public']).toContain(f.metadata.check_id);
     }
   });
 
   test('passes compliant AWS resources', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'good-aws.json'));
-    const failures = getFailures(results, 'hipaa.transmission_security');
+    const failures = getFailures(results, 'compliance.transmission_security');
     expect(failures.length).toBe(0);
   });
 });
@@ -130,7 +130,7 @@ describe('AWS access control', () => {
   test('denies wildcard IAM policies and missing MFA', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-access.json'));
-    const failures = getFailures(results, 'hipaa.access_control');
+    const failures = getFailures(results, 'compliance.access_control');
     expect(failures.length).toBe(4);
 
     const messages = failures.map(f => f.msg);
@@ -143,7 +143,7 @@ describe('AWS access control', () => {
   test('passes compliant AWS resources', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'good-aws.json'));
-    const failures = getFailures(results, 'hipaa.access_control');
+    const failures = getFailures(results, 'compliance.access_control');
     expect(failures.length).toBe(0);
   });
 });
@@ -154,7 +154,7 @@ describe('AWS audit logging', () => {
   test('denies misconfigured CloudTrail, VPC, CloudWatch', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-audit.json'));
-    const failures = getFailures(results, 'hipaa.audit_logging');
+    const failures = getFailures(results, 'compliance.audit_logging');
     expect(failures.length).toBe(6);
 
     const messages = failures.map(f => f.msg);
@@ -166,14 +166,14 @@ describe('AWS audit logging', () => {
     expect(messages.some(m => m.includes('no retention policy'))).toBe(true);
 
     for (const f of failures) {
-      expect(f.metadata.hipaa_ref).toBe('164.312(b)');
+      expect(f.metadata.check_id).toBe('rego-cloudtrail-enabled');
     }
   });
 
   test('passes compliant AWS resources', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'good-aws.json'));
-    const failures = getFailures(results, 'hipaa.audit_logging');
+    const failures = getFailures(results, 'compliance.audit_logging');
     expect(failures.length).toBe(0);
   });
 });
@@ -184,7 +184,7 @@ describe('AWS secrets', () => {
   test('denies hardcoded keys and default passwords', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-secrets.json'));
-    const failures = getFailures(results, 'hipaa.secrets');
+    const failures = getFailures(results, 'compliance.secrets');
     expect(failures.length).toBe(4);
 
     const messages = failures.map(f => f.msg);
@@ -201,7 +201,7 @@ describe('AWS secrets', () => {
   test('passes clean Terraform variables', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'good-aws.json'));
-    const failures = getFailures(results, 'hipaa.secrets');
+    const failures = getFailures(results, 'compliance.secrets');
     expect(failures.length).toBe(0);
   });
 });
@@ -216,19 +216,19 @@ describe('GCP controls', () => {
     expect(allFailures.length).toBe(8);
 
     // Encryption: Cloud SQL CMEK + GCS encryption
-    const encFailures = getFailures(results, 'hipaa.encryption_at_rest');
+    const encFailures = getFailures(results, 'compliance.encryption_at_rest');
     expect(encFailures.length).toBe(2);
 
     // Transmission: Cloud SQL SSL + public IP + firewall
-    const transFailures = getFailures(results, 'hipaa.transmission_security');
+    const transFailures = getFailures(results, 'compliance.transmission_security');
     expect(transFailures.length).toBe(3);
 
     // Access: SA owner + SA editor
-    const accessFailures = getFailures(results, 'hipaa.access_control');
+    const accessFailures = getFailures(results, 'compliance.access_control');
     expect(accessFailures.length).toBe(2);
 
     // Audit: exempted members
-    const auditFailures = getFailures(results, 'hipaa.audit_logging');
+    const auditFailures = getFailures(results, 'compliance.audit_logging');
     expect(auditFailures.length).toBe(1);
   });
 
@@ -246,10 +246,10 @@ describe('Azure controls', () => {
   test('denies subscription-scope Contributor', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-azure.json'));
-    const failures = getFailures(results, 'hipaa.access_control');
+    const failures = getFailures(results, 'compliance.access_control');
     expect(failures.length).toBe(1);
     expect(failures[0].msg).toContain('Contributor at subscription scope');
-    expect(failures[0].metadata.hipaa_ref).toBe('164.312(a)(1)');
+    expect(failures[0].metadata.check_id).toBe('rego-iam-wildcard');
   });
 
   test('passes resource-group-scoped assignment', () => {
@@ -267,7 +267,7 @@ describe('Kubernetes security', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-k8s-deployment.yaml'));
 
-    const k8sFailures = getFailures(results, 'hipaa.k8s_security');
+    const k8sFailures = getFailures(results, 'compliance.k8s_security');
     expect(k8sFailures.length).toBe(7);
 
     const messages = k8sFailures.map(f => f.msg);
@@ -278,14 +278,14 @@ describe('Kubernetes security', () => {
     expect(messages.some(m => m.includes('DB_PASSWORD') && m.includes('inline value'))).toBe(true);
 
     // Also triggers hipaa.secrets K8s rules
-    const secretsFailures = getFailures(results, 'hipaa.secrets');
+    const secretsFailures = getFailures(results, 'compliance.secrets');
     expect(secretsFailures.length).toBe(2);
   });
 
   test('denies wildcard ClusterRole', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-k8s-clusterrole.yaml'));
-    const failures = getFailures(results, 'hipaa.k8s_security');
+    const failures = getFailures(results, 'compliance.k8s_security');
     expect(failures.length).toBe(1);
     expect(failures[0].msg).toContain('wildcard verbs and resources');
   });
@@ -293,15 +293,15 @@ describe('Kubernetes security', () => {
   test('denies PHI namespace without NetworkPolicy', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-k8s-namespace.yaml'));
-    const failures = getFailures(results, 'hipaa.k8s_security');
+    const failures = getFailures(results, 'compliance.k8s_security');
     expect(failures.length).toBe(1);
-    expect(failures[0].msg).toContain('labeled for PHI');
+    expect(failures[0].msg).toContain('labeled for sensitive data');
   });
 
   test('denies privileged StatefulSet', () => {
     if (skipIfNoConftest()) return;
     const results = runConftest(path.join(FIXTURES_DIR, 'bad-k8s-statefulset.yaml'));
-    const failures = getFailures(results, 'hipaa.k8s_security');
+    const failures = getFailures(results, 'compliance.k8s_security');
     expect(failures.length).toBe(1);
     expect(failures[0].msg).toContain('StatefulSet runs in privileged mode');
   });
@@ -353,15 +353,14 @@ describe('Cross-policy coverage', () => {
     expect(totalRules).toBeGreaterThanOrEqual(40); // sanity: we know there are 47 rules
   });
 
-  test('all HIPAA references are valid', () => {
+  test('all check_ids are valid registry entries', () => {
     if (skipIfNoConftest()) return;
 
-    const validRefs = new Set([
-      '164.312(a)(1)',      // Access Control
-      '164.312(a)(2)(iv)',  // Encryption
-      '164.312(b)',         // Audit Controls
-      '164.312(d)',         // Authentication
-      '164.312(e)(1)',      // Transmission Security
+    const validCheckIds = new Set([
+      'rego-iam-wildcard', 'rego-mfa-required', 'rego-cloudtrail-enabled',
+      'rego-s3-encryption', 'rego-rds-encryption', 'rego-kms-rotation',
+      'rego-security-group-open', 'rego-rds-public', 'rego-no-hardcoded-secrets',
+      'rego-k8s-rbac-wildcard', 'rego-k8s-non-root',
     ]);
 
     const badFixtures = fs.readdirSync(FIXTURES_DIR).filter(f => f.startsWith('bad-'));
@@ -370,7 +369,7 @@ describe('Cross-policy coverage', () => {
       for (const r of results) {
         if (r.failures) {
           for (const f of r.failures) {
-            expect(validRefs.has(f.metadata.hipaa_ref)).toBe(true);
+            expect(validCheckIds.has(f.metadata.check_id)).toBe(true);
           }
         }
       }

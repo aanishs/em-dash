@@ -1,7 +1,6 @@
-package hipaa.encryption_at_rest
+package compliance.encryption_at_rest
 
-# HIPAA 164.312(a)(2)(iv) — Encryption and Decryption
-# Ensures PHI data stores are encrypted at rest.
+# Encryption at Rest — ensures sensitive data stores are encrypted at rest
 
 # AWS — RDS storage must be encrypted
 deny[msg] {
@@ -9,7 +8,7 @@ deny[msg] {
     not resource.storage_encrypted
     msg := {
         "msg": sprintf("RDS instance '%s' does not have storage encryption enabled", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-rds-encryption",
         "severity": "HIGH",
         "resource": name,
     }
@@ -21,7 +20,7 @@ deny[msg] {
     not resource.server_side_encryption_configuration
     msg := {
         "msg": sprintf("S3 bucket '%s' does not have server-side encryption configured", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-s3-encryption",
         "severity": "HIGH",
         "resource": name,
     }
@@ -33,7 +32,7 @@ deny[msg] {
     not resource.encrypted
     msg := {
         "msg": sprintf("EBS volume '%s' is not encrypted", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-s3-encryption",
         "severity": "HIGH",
         "resource": name,
     }
@@ -45,7 +44,7 @@ deny[msg] {
     not resource.enable_key_rotation
     msg := {
         "msg": sprintf("KMS key '%s' does not have automatic key rotation enabled", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-kms-rotation",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -57,7 +56,7 @@ deny[msg] {
     not resource.kms_master_key_id
     msg := {
         "msg": sprintf("SNS topic '%s' is not encrypted with KMS", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-s3-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -70,7 +69,7 @@ deny[msg] {
     not settings.disk_encryption_key_name
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' does not use customer-managed encryption key (CMEK)", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-rds-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -82,7 +81,7 @@ deny[msg] {
     not resource.encryption
     msg := {
         "msg": sprintf("GCS bucket '%s' does not have a customer-managed encryption configuration", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-s3-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -94,7 +93,7 @@ deny[msg] {
     not resource.kms_master_key_id
     msg := {
         "msg": sprintf("SQS queue '%s' is not encrypted with KMS", [name]),
-        "hipaa_ref": "164.312(a)(2)(iv)",
+        "check_id": "rego-s3-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }

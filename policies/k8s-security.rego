@@ -1,7 +1,6 @@
-package hipaa.k8s_security
+package compliance.k8s_security
 
-# HIPAA 164.312(a)(1) — Access Control for Kubernetes
-# Ensures Kubernetes workloads handling PHI are properly secured.
+# Kubernetes Security — ensures Kubernetes workloads handling sensitive data are properly secured
 
 # Pods must not run as root
 deny[msg] {
@@ -10,7 +9,7 @@ deny[msg] {
     container.securityContext.runAsUser == 0
     msg := {
         "msg": sprintf("Container '%s' in Deployment runs as root (UID 0)", [container.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-k8s-non-root",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -24,7 +23,7 @@ deny[msg] {
     not container.securityContext.runAsUser
     msg := {
         "msg": sprintf("Container '%s' in Deployment does not set runAsNonRoot — may run as root", [container.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-k8s-non-root",
         "severity": "MEDIUM",
         "resource": input.metadata.name,
     }
@@ -37,21 +36,21 @@ deny[msg] {
     container.securityContext.privileged == true
     msg := {
         "msg": sprintf("Container '%s' in Deployment runs in privileged mode", [container.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-k8s-non-root",
         "severity": "CRITICAL",
         "resource": input.metadata.name,
     }
 }
 
-# Network policies must exist in PHI namespaces
+# Network policies must exist in sensitive namespaces
 deny[msg] {
     input.kind == "Namespace"
     phi_labels := {"contains-phi", "hipaa", "phi"}
     input.metadata.labels[key] == "true"
     phi_labels[key]
     msg := {
-        "msg": sprintf("Namespace '%s' is labeled for PHI but should have NetworkPolicy resources applied", [input.metadata.name]),
-        "hipaa_ref": "164.312(e)(1)",
+        "msg": sprintf("Namespace '%s' is labeled for sensitive data but should have NetworkPolicy resources applied", [input.metadata.name]),
+        "check_id": "rego-k8s-non-root",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -65,7 +64,7 @@ deny[msg] {
     rule.resources[_] == "*"
     msg := {
         "msg": sprintf("ClusterRole '%s' grants wildcard verbs and resources — violates least privilege", [input.metadata.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-k8s-rbac-wildcard",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -78,7 +77,7 @@ deny[msg] {
     not approved_registry(container.image)
     msg := {
         "msg": sprintf("Container '%s' uses image '%s' from unapproved registry", [container.name, container.image]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-k8s-non-root",
         "severity": "MEDIUM",
         "resource": input.metadata.name,
     }
@@ -105,7 +104,7 @@ deny[msg] {
     not env.valueFrom
     msg := {
         "msg": sprintf("Container '%s' has env var '%s' with inline value — use secretKeyRef instead", [container.name, env.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-no-hardcoded-secrets",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -118,7 +117,7 @@ deny[msg] {
     container.securityContext.privileged == true
     msg := {
         "msg": sprintf("Container '%s' in StatefulSet runs in privileged mode", [container.name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-k8s-non-root",
         "severity": "CRITICAL",
         "resource": input.metadata.name,
     }

@@ -486,8 +486,8 @@ describe('IaC policy engine coverage', () => {
 
   test('references bundled Rego policies', () => {
     expect(scanMd).toContain('policies/');
-    expect(scanMd).toContain('hipaa-encryption-at-rest.rego');
-    expect(scanMd).toContain('hipaa-k8s-security.rego');
+    expect(scanMd).toContain('encryption-at-rest.rego');
+    expect(scanMd).toContain('k8s-security.rego');
   });
 
   test('includes IaC detection for all formats', () => {
@@ -512,12 +512,12 @@ describe('IaC policy engine coverage', () => {
 describe('Rego policy files', () => {
   const policyDir = path.join(ROOT, 'policies');
   const expectedPolicies = [
-    'hipaa-encryption-at-rest.rego',
-    'hipaa-transmission-security.rego',
-    'hipaa-access-control.rego',
-    'hipaa-audit-logging.rego',
-    'hipaa-k8s-security.rego',
-    'hipaa-secrets.rego',
+    'encryption-at-rest.rego',
+    'transmission-security.rego',
+    'access-control.rego',
+    'audit-logging.rego',
+    'k8s-security.rego',
+    'secrets.rego',
   ];
 
   test('all 6 Rego policy files exist', () => {
@@ -527,9 +527,9 @@ describe('Rego policy files', () => {
   });
 
   for (const policy of expectedPolicies) {
-    test(`${policy} has package hipaa.* declaration`, () => {
+    test(`${policy} has package compliance.* declaration`, () => {
       const content = fs.readFileSync(path.join(policyDir, policy), 'utf-8');
-      expect(content).toMatch(/^package hipaa\.\w+/m);
+      expect(content).toMatch(/^package compliance\.\w+/m);
     });
 
     test(`${policy} has at least one deny rule`, () => {
@@ -537,9 +537,9 @@ describe('Rego policy files', () => {
       expect(content).toContain('deny[msg]');
     });
 
-    test(`${policy} includes hipaa_ref in deny messages`, () => {
+    test(`${policy} includes check_id in deny messages`, () => {
       const content = fs.readFileSync(path.join(policyDir, policy), 'utf-8');
-      expect(content).toContain('hipaa_ref');
+      expect(content).toContain('check_id');
     });
 
     test(`${policy} includes severity in deny messages`, () => {

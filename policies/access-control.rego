@@ -1,7 +1,6 @@
-package hipaa.access_control
+package compliance.access_control
 
-# HIPAA 164.312(a)(1) — Access Control
-# Ensures only authorized users can access PHI.
+# Access Control — ensures only authorized users can access sensitive data
 
 # AWS — IAM policies must not grant Action:* with Resource:*
 deny[msg] {
@@ -12,7 +11,7 @@ deny[msg] {
     statement.Resource == "*"
     msg := {
         "msg": sprintf("IAM policy '%s' grants wildcard Action and Resource — violates least privilege", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-iam-wildcard",
         "severity": "HIGH",
         "resource": name,
     }
@@ -27,7 +26,7 @@ deny[msg] {
     statement.Resource[_] == "*"
     msg := {
         "msg": sprintf("IAM policy '%s' grants wildcard Action and Resource (array form) — violates least privilege", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-iam-wildcard",
         "severity": "HIGH",
         "resource": name,
     }
@@ -41,7 +40,7 @@ deny[msg] {
     statement.Action == "*"
     msg := {
         "msg": sprintf("IAM role policy '%s' grants wildcard Action — violates least privilege", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-iam-wildcard",
         "severity": "HIGH",
         "resource": name,
     }
@@ -53,7 +52,7 @@ deny[msg] {
     not input.resource.aws_iam_user_mfa_device[name]
     msg := {
         "msg": sprintf("IAM user '%s' has console access but no MFA device configured", [name]),
-        "hipaa_ref": "164.312(d)",
+        "check_id": "rego-mfa-required",
         "severity": "HIGH",
         "resource": name,
     }
@@ -66,7 +65,7 @@ deny[msg] {
     resource.role == "roles/owner"
     msg := {
         "msg": sprintf("GCP IAM binding '%s' grants roles/owner to a service account", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-iam-wildcard",
         "severity": "HIGH",
         "resource": name,
     }
@@ -79,7 +78,7 @@ deny[msg] {
     resource.role == "roles/editor"
     msg := {
         "msg": sprintf("GCP IAM binding '%s' grants roles/editor to a service account — use granular roles", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-iam-wildcard",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -93,7 +92,7 @@ deny[msg] {
     not contains(resource.scope, "/resourceGroups/")
     msg := {
         "msg": sprintf("Azure role assignment '%s' grants Contributor at subscription scope — scope down to resource group", [name]),
-        "hipaa_ref": "164.312(a)(1)",
+        "check_id": "rego-iam-wildcard",
         "severity": "MEDIUM",
         "resource": name,
     }

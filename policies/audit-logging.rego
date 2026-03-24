@@ -1,7 +1,6 @@
-package hipaa.audit_logging
+package compliance.audit_logging
 
-# HIPAA 164.312(b) — Audit Controls
-# Ensures systems record and examine activity in information systems containing PHI.
+# Audit Logging — ensures systems record and examine activity in information systems containing sensitive data
 
 # AWS — CloudTrail must be multi-region
 deny[msg] {
@@ -9,7 +8,7 @@ deny[msg] {
     not resource.is_multi_region_trail
     msg := {
         "msg": sprintf("CloudTrail '%s' is not configured as multi-region", [name]),
-        "hipaa_ref": "164.312(b)",
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "HIGH",
         "resource": name,
     }
@@ -21,7 +20,7 @@ deny[msg] {
     not resource.enable_log_file_validation
     msg := {
         "msg": sprintf("CloudTrail '%s' does not have log file validation enabled — logs may be tampered", [name]),
-        "hipaa_ref": "164.312(b)",
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "HIGH",
         "resource": name,
     }
@@ -33,7 +32,7 @@ deny[msg] {
     not resource.kms_key_id
     msg := {
         "msg": sprintf("CloudTrail '%s' is not encrypted with KMS — audit logs should be encrypted at rest", [name]),
-        "hipaa_ref": "164.312(b)",
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -45,7 +44,7 @@ deny[msg] {
     not flow_log_exists(name)
     msg := {
         "msg": sprintf("VPC '%s' does not have flow logs enabled — network activity is not being recorded", [name]),
-        "hipaa_ref": "164.312(b)",
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "HIGH",
         "resource": name,
     }
@@ -61,8 +60,8 @@ deny[msg] {
     resource := input.resource.aws_cloudwatch_log_group[name]
     resource.retention_in_days < 365
     msg := {
-        "msg": sprintf("CloudWatch log group '%s' has retention of %d days — HIPAA requires >= 365 days", [name, resource.retention_in_days]),
-        "hipaa_ref": "164.312(b)",
+        "msg": sprintf("CloudWatch log group '%s' has retention of %d days — compliance requires >= 365 days", [name, resource.retention_in_days]),
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -73,8 +72,8 @@ deny[msg] {
     resource := input.resource.aws_cloudwatch_log_group[name]
     not resource.retention_in_days
     msg := {
-        "msg": sprintf("CloudWatch log group '%s' has no retention policy set — set to >= 365 days for HIPAA", [name]),
-        "hipaa_ref": "164.312(b)",
+        "msg": sprintf("CloudWatch log group '%s' has no retention policy set — set to >= 365 days", [name]),
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "LOW",
         "resource": name,
     }
@@ -87,8 +86,8 @@ deny[msg] {
     audit_log.log_type == "DATA_READ"
     count(audit_log.exempted_members) > 0
     msg := {
-        "msg": sprintf("GCP audit config '%s' exempts members from DATA_READ logging — all PHI access must be logged", [name]),
-        "hipaa_ref": "164.312(b)",
+        "msg": sprintf("GCP audit config '%s' exempts members from DATA_READ logging — all sensitive data access must be logged", [name]),
+        "check_id": "rego-cloudtrail-enabled",
         "severity": "HIGH",
         "resource": name,
     }
