@@ -1,8 +1,8 @@
 # em-dash
 
-[![Tests](https://img.shields.io/badge/tests-337%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-389%20passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-orange)]()
+[![Version](https://img.shields.io/badge/version-1.3.0-orange)]()
 [![Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet)]()
 
 I'm [Aanish](https://github.com/aanishs). I build [CoralEHR](https://coralehr.com), an EHR for behavioral therapists.
@@ -29,7 +29,7 @@ Originally for CoralEHR. Now open source.
 
 Because "pay $10k a year" and "guess" should not be the two main options.
 
-em-dash is Claude Code plus HIPAA compliance.
+em-dash is Claude Code plus compliance. HIPAA is the first framework — built from real-world experience. The architecture supports multiple frameworks, and early SOC 2 scaffolding is in place, but additional frameworks need domain expertise we don't have yet. Contributors who know SOC 2, GDPR, PCI-DSS, or ISO 27001 are especially welcome.
 
 Our core philosophy is simple: compliance should be human-in-the-loop.
 
@@ -136,6 +136,8 @@ Open Claude Code in any project that handles PHI.
 | Anytime | `/hipaa-breach` | Guided breach notification with 4-factor risk assessment. |
 | Start here | `/hipaa` | Compliance dashboard. Shows current state and recommends what to run next. |
 | Dashboard | `/em-dashboard` | Opens the visual compliance dashboard at localhost:3000. |
+| **SOC 2** | `/soc2` | SOC 2 router — early scaffolding, maps to Trust Service Criteria. *Needs domain expertise — contributions welcome.* |
+| **SOC 2** | `/soc2-scan` | Automated scanning with SOC 2 requirement mappings. Same checks as HIPAA, different framework lens. |
 
 ### Workflow
 
@@ -274,18 +276,24 @@ See [docs/ci-setup.md](docs/ci-setup.md) for full setup instructions.
 | **AI-powered** | Claude Code agent | Dashboard + integrations | Dashboard + integrations | AI agents |
 | **See every action** | Yes (terminal) | No (black box) | No (black box) | Partial |
 | **Code scanning** | 19 checks + Prowler/Trivy/Checkov | Via integrations | Via integrations | Via integrations |
-| **Policy generation** | 8 templates, auto-customized | Templates | Templates | Templates |
+| **Policy generation** | 9 templates, auto-customized | Templates | Templates | Templates |
 | **Evidence integrity** | SHA-256 hashed | Vendor-managed | Vendor-managed | Self-hosted |
 | **Remediation** | AI generates fixes + Terraform patches | Manual guidance | Manual guidance | AI suggestions |
-| **Multi-framework** | HIPAA (SOC 2, GDPR planned) | HIPAA, SOC 2, ISO, GDPR | HIPAA, SOC 2, ISO, GDPR | SOC 2, ISO, HIPAA, GDPR |
+| **Multi-framework** | HIPAA (SOC 2 scaffolding, GDPR/PCI-DSS planned) | HIPAA, SOC 2, ISO, GDPR | HIPAA, SOC 2, ISO, GDPR | SOC 2, ISO, HIPAA, GDPR |
 
 ## Roadmap
 
-HIPAA is shipped. We want to do everything Vanta and Delve claim to do — SOC 2, HITRUST, GDPR, ISO 27001 — and give it away for free.
+HIPAA is shipped and tested against real infrastructure. The multi-framework architecture is in place — a shared checks registry (~50 checks), framework-agnostic Rego policies, and a template engine that generates framework-specific skills from JSON definitions.
 
-The architecture already supports it. Each framework follows the same pattern: assess, scan, remediate, report, monitor. The template engine, evidence collection, Rego policies, and cloud scanning infrastructure are shared. Adding a new framework means writing skill templates and requirement mappings. The plumbing is built.
+SOC 2 scaffolding exists (`/soc2`, `/soc2-scan`) but needs domain expertise to become production-quality. We built the plumbing; the frameworks need people who know the requirements.
 
-Contributors welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) — "Adding a new compliance framework."
+**What we need help with:**
+- **SOC 2** — Trust Service Criteria mappings, assessment questions, checklist refinement
+- **GDPR** — Article 32 technical measures, data subject rights workflows, DPA tracking
+- **PCI-DSS** — Cardholder data environment scoping, SAQ mapping, network segmentation checks
+- **ISO 27001** — Annex A control mapping, ISMS documentation templates
+
+Adding a framework: write `frameworks/<id>.json` (~200 lines of requirement mappings), create skill directories, run `bun run gen:skill-docs`. See [CONTRIBUTING.md](CONTRIBUTING.md) — "Adding a new compliance framework."
 
 ## Disclaimer
 
