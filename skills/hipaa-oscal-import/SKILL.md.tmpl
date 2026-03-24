@@ -1,0 +1,76 @@
+---
+name: hipaa-oscal-import
+version: 0.1.0
+description: |
+  Import and manage OSCAL catalog data for em-dash. Shows mapping status,
+  lists controls with plain-English translations, and validates references.
+allowed-tools:
+  - Bash
+  - Read
+  - AskUserQuestion
+framework: hipaa
+hipaa_sections:
+  - "164.308(a)(1)(i)"
+  - "164.312(a)(1)"
+  - "164.312(b)"
+  - "164.312(d)"
+  - "164.312(e)(1)"
+risk_level: low
+requires_prior: []
+---
+
+{{PREAMBLE}}
+
+# /hipaa-oscal-import: OSCAL Catalog Management
+
+Manage the OSCAL HIPAA control mapping — the bridge between NIST 800-53 controls
+and em-dash's compliance checks.
+
+## Phase 1: Status Check
+
+Run the status command to see current OSCAL mapping state:
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/hipaa-oscal-import status
+```
+
+Report the output to the user. Explain:
+- How many controls are mapped (Phase 1 = 10 core controls)
+- How many have automated checks vs manual verification
+- What the mapping source is (SP 800-66r2)
+
+## Phase 2: Validation
+
+Validate that all check references in the mapping are valid:
+
+```bash
+"$_EMDASH_BIN"/hipaa-oscal-import validate
+```
+
+If validation fails, report the specific invalid references.
+
+## Phase 3: Control Listing
+
+If the user wants to see the mapped controls:
+
+```bash
+"$_EMDASH_BIN"/hipaa-oscal-import controls
+```
+
+Each control includes:
+- OSCAL ID (e.g., AC-2)
+- Title and family
+- HIPAA requirement references
+- Plain-English explanation
+- Automated check status
+
+## Phase 4: Export
+
+To export the mapping as human-readable markdown:
+
+```bash
+"$_EMDASH_BIN"/hipaa-oscal-import export > ~/.em-dash/projects/$SLUG/oscal-mapping.md
+```
+
+{{DASHBOARD_UPDATES}}
