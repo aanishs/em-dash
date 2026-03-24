@@ -40,6 +40,10 @@ function hasFlag(name: string): boolean {
 
 const FRAMEWORK = getFlag('framework') || 'hipaa';
 
+// Strip --framework and its value from args so the router doesn't see them
+const fwIdx = args.indexOf('--framework');
+if (fwIdx !== -1) args.splice(fwIdx, 2);
+
 // ─── Read/Write ─────────────────────────────────────────────
 
 function read(): any {
