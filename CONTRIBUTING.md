@@ -64,19 +64,20 @@ That's it. Each Rego rule is self-contained — you don't need to understand the
 
 Pick your level:
 
-| Level | Contribution | Time |
-|-------|-------------|------|
-| Beginner | Add a Rego policy rule | 15 min |
-| Beginner | Add a policy template | 30 min |
-| Intermediate | Add a new scanning check | 1 hour |
-| Intermediate | Add cloud provider checks | 2-3 hours |
-| Advanced | Add a new compliance framework | 1-2 days |
+| Level        | Contribution                   | Time      |
+| ------------ | ------------------------------ | --------- |
+| Beginner     | Add a Rego policy rule         | 15 min    |
+| Beginner     | Add a policy template          | 30 min    |
+| Intermediate | Add a new scanning check       | 1 hour    |
+| Intermediate | Add cloud provider checks      | 2-3 hours |
+| Advanced     | Add a new compliance framework | 1-2 days  |
 
 ### 1. Add a Rego policy rule (beginner)
 
 Add one `deny` rule to an existing file in `policies/`. Every rule must include `hipaa_ref`, `severity`, `resource`, and `msg`.
 
 Example — add a rule to `policies/hipaa-encryption-at-rest.rego`:
+
 ```rego
 deny[msg] {
     input.resource.aws_s3_bucket[name].versioning[_].enabled != true
@@ -91,9 +92,44 @@ deny[msg] {
 
 Then add the filename to `expectedPolicies` in `test/skill-validation.test.ts` and run `bun test`.
 
+<details>
+<summary>Example PR: Add a Rego policy rule</summary>
+
+File: `policies/hipaa-encryption-at-rest.rego`
+
+```diff
+diff --git a/policies/hipaa-encryption-at-rest.rego b/policies/hipaa-encryption-at-rest.rego
+index 1a2b3c4..5d6e7f8 100644
+--- a/policies/hipaa-encryption-at-rest.rego
++++ b/policies/hipaa-encryption-at-rest.rego
+@@ -45,3 +45,13 @@ deny[msg] {
+         "msg": sprintf("RDS instance '%s' does not have encryption enabled", [name])
+     }
+ }
++
++deny[msg] {
++    input.resource.aws_s3_bucket[name].versioning[_].enabled != true
++    msg := {
++        "hipaa_ref": "§164.312(c)(1)",
++        "severity": "HIGH",
++        "resource": name,
++        "msg": sprintf("S3 bucket '%s' does not have versioning enabled", [name])
++    }
++}
+```
+
+Then run:
+
+```bash
+bun test
+```
+
+</details>
+
 ### 2. Add a new scanning check (intermediate)
 
 Add a check to `PHI_PATTERNS` in `scripts/gen-skill-docs.ts`. Each check needs:
+
 - A grep/regex pattern that detects the problem
 - The HIPAA requirement it maps to
 - A severity level
@@ -101,17 +137,158 @@ Add a check to `PHI_PATTERNS` in `scripts/gen-skill-docs.ts`. Each check needs:
 
 Then run `bun run gen:skill-docs` and `bun test` to verify it appears in all the right places.
 
+<details>
+<summary>Example PR: Add a new scanning check</summary>
+
+File: `scripts/gen-skill-docs.ts`
+
+```diff
+diff --git a/scripts/gen-skill-docs.ts b/scripts/gen-skill-docs.ts
+index 3a4b5c6..7d8e9f0 100644
+--- a/scripts/gen-skill-docs.ts
++++ b/scripts/gen-skill-docs.ts
+@@ -156,6 +156,16 @@ const PHI_PATTERNS = [
+       severity: "HIGH",
+       description: "Log files containing unencrypted database credentials"
+     },
++    {
++      pattern: "process\\.env\\.\\w+",
++      requirement: "§164.312(a)(2)(i)",
++      severity: "HIGH",
++      description: "Credentials accessed from environment variables without encryption wrapper"
++    },
+     {
+       pattern: "TODO.*encrypt|FIXME.*HIPAA",
+       requirement: "§164.312(c)(1)",
+```
+
+Then run:
+
+```bash
+bun run gen:skill-docs
+bun test
+```
+
+</details>
+
 ### 3. Add a policy template (beginner)
 
 Write an organizational policy document in `templates/policies/`. Follow the existing pattern — Markdown with placeholder sections for organization-specific details. Reference the relevant HIPAA sections.
 
 Add the filename to `expectedTemplates` in `test/skill-validation.test.ts`.
 
+<details>
+<summary>Example PR: Add a policy template</summary>
+
+File: `templates/policies/data-retention-policy.md`
+
+```diff
+diff --git a/templates/policies/data-retention-policy.md b/templates/policies/data-retention-policy.md
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/templates/policies/data-retention-policy.md
+@@ -0,0 +1,45 @@
++# Data Retention and Disposal Policy
++
++**Organization:** [Organization Name]\
++**Effective Date:** [Date]\
++**HIPAA Reference:** § 164.316(b)(1)(i) — Policies and procedures for information security
++
++## Purpose
++
++This policy establishes data retention and secure disposal procedures for all Protected Health Information (PHI) and electronic Protected Health Information (ePHI) to ensure compliance with HIPAA requirements.
++
++## Scope
++
++This policy applies to all employees, contractors, and workforce members who handle PHI/ePHI.
++
++## Retention Schedule
++
++| Data Type | Minimum Retention Period | Justification |
++|-----------|--------------------------|---------------|
++| Patient Records | [7 years] | § 164.530(j)(1) |
++| Audit Logs | [6 months] | § 164.312(b) |
++| Incident Reports | [3 years] | § 164.404(b) |
++
++## Secure Disposal
++
++All PHI must be securely destroyed using:
++
++- [Your standard: e.g., NIST SP 800-88 Guidelines]
++- [Destruction method: e.g., encrypted-hard-drive incineration]
++- [Verification: Certificate of Destruction required]
+```
+
+File: `test/skill-validation.test.ts`
+
+```diff
+diff --git a/test/skill-validation.test.ts b/test/skill-validation.test.ts
+index 2a3b4c5..6d7e8f9 100644
+--- a/test/skill-validation.test.ts
++++ b/test/skill-validation.test.ts
+@@ -28,6 +28,7 @@ const expectedTemplates = [
+   "contingency-plan",
+   "encryption",
+   "workforce-security",
++  "data-retention-policy",
+ ];
+
+ test("all expected policy templates exist", () => {
+```
+
+Then run:
+
+```bash
+bun test
+```
+
+</details>
+
 ### 4. Add a new cloud provider or expand existing checks (intermediate)
 
 Add a new resolver function in `scripts/gen-skill-docs.ts` for the provider's CLI commands. Follow the AWS/GCP/Azure pattern: group commands by HIPAA requirement, include the CLI command and what to check in the output.
 
 Add a new `{{PROVIDER_CHECKS}}` placeholder, wire it into the scan skill template, and add test coverage.
+
+<details>
+<summary>Example PR: Add cloud provider checks</summary>
+
+Add a new resolver to `scripts/gen-skill-docs.ts`:
+
+````diff
+diff --git a/scripts/gen-skill-docs.ts b/scripts/gen-skill-docs.ts
+index 3a4b5c6..7d8e9f0 100644
+--- a/scripts/gen-skill-docs.ts
++++ b/scripts/gen-skill-docs.ts
+@@ -520,6 +520,18 @@ function resolveAzureChecks(): string {
+   return checks.join("\\n\\n");
+ }
+
++// Used via custom placeholder integration similar to AWS_CHECKS
++function resolveOciBucketEncryption(): string {
++  return `## Encryption — Oracle Cloud
++**§ 164.312(c)(1) — Encryption and decryption mechanisms**
++\`\`\`bash
++oci os bucket get --bucket-name my-bucket --query 'data.\"encryption-properties\"'
++# Check: kmsKeyId is set
++\`\`\``;
++}
++
+ module.exports = {
+   resolveSkillTemplates,
+   resolveAwsChecks,
+   resolveGcpChecks,
+   resolveAzureChecks,
++  resolveOciBucketEncryption,
+ };
+
+```bash
+bun run gen:skill-docs
+bun test
+````
+
+</details>
 
 ### 5. Add a new compliance framework (advanced)
 
@@ -125,22 +302,178 @@ This is the big one. em-dash is designed for it — the architecture supports SO
 6. **Update `scripts/gen-skill-docs.ts`** — the `findTemplates()` function already scans `skills/` automatically, but you may need new placeholders for framework-specific content.
 7. **Update the README** roadmap table and the router skill.
 
+<details>
+<summary>Example PR: Add a new compliance framework</summary>
+
+File: `skills/iso27001-assess/SKILL.md.tmpl`
+
+```diff
+diff --git a/skills/iso27001-assess/SKILL.md.tmpl b/skills/iso27001-assess/SKILL.md.tmpl
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/skills/iso27001-assess/SKILL.md.tmpl
+@@ -0,0 +1,95 @@
++{{PREAMBLE}}
++
++# ISO 27001 Information Security Assessment
++
++## Overview
++
++This skill guides you through a structured ISO 27001 compliance assessment for your organization. You'll document your current security controls, identify gaps against the 14 domains of ISO 27001, and receive a remediation roadmap.
++
++**Domains covered:**
++1. Information Security Policies
++2. Organization of Information Security
++3. Human Resource Security
++4. Asset Management
++5. Access Control
++6. Cryptography
++7. Physical and Environmental Security
++8. Operations Security
++9. Communications Security
++10. System Acquisition, Development, and Maintenance
++11. Supplier Relationships
++12. Information Security Incident Management
++13. Business Continuity Management
++14. Compliance
++
++**Duration:** ~45 minutes
++
++---
++
++## Domain 1: Information Security Policies (Clause A.5)
++
++### Question 1
++
++\`\`\`json
++{
++  "type": "AskUserQuestion",
++  "title": "Do you have documented information security policies?",
++  "options": ["Fully documented and approved", "Partially documented", "Under development", "Not in place"],
++  "followUp": "Provide a brief summary of your policy documentation scope."
++}
++\`\`\`
++
++---
++
++## Automated Scanning
++
++Run the companion \`iso27001-scan\` skill to:
++
++- Detect security tools (SIEM, DLP, encryption, access management)
++- Scan for common configuration weaknesses
++- Test cloud compliance posture
++- Verify asset inventory practices
++- Check incident response capabilities
++
++{{TOOL_DETECTION}}
++
++{{EVIDENCE_COLLECTION}}
++
++---
++
++## Next Steps
++
++1. Complete all assessment questions
++2. Run \`iso27001-scan\` to collect automated evidence
++3. Review findings in the compliance dashboard
++4. Use \`iso27001-remediate\` to plan remediation
++5. Track progress with \`iso27001-monitor\`
+```
+
+File: `policies/iso27001-access-control.rego`
+
+```diff
+diff --git a/policies/iso27001-access-control.rego b/policies/iso27001-access-control.rego
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/policies/iso27001-access-control.rego
+@@ -0,0 +1,28 @@
++package iso27001.access_control
++
++import rego.v1
++
++deny[msg] {
++    input.resource.aws_iam_policy[name].Statement[_].Effect == "Allow"
++    input.resource.aws_iam_policy[name].Statement[_].Action == "*"
++    input.resource.aws_iam_policy[name].Statement[_].Resource == "*"
++    msg := {
++        "iso27001_ref": "A.9.2.1 User registration and de-registration",
++        "severity": "CRITICAL",
++        "resource": name,
++        "msg": sprintf("IAM policy '%s' grants overly broad permissions (*)", [name])
++    }
++}
++
++deny[msg] {
++    input.resource.aws_security_group[name].ingress[_].cidr_blocks[_] == "0.0.0.0/0"
++    input.resource.aws_security_group[name].ingress[_].from_port == 3306
++    msg := {
++        "iso27001_ref": "A.9.4.3 Password management",
++        "severity": "HIGH",
++        "resource": name,
++        "msg": sprintf("Security group '%s' allows public access to database port 3306", [name])
++    }
++}
+```
+
+File: `test/skill-validation.test.ts`
+
+```diff
+diff --git a/test/skill-validation.test.ts b/test/skill-validation.test.ts
+index 2a3b4c5..6d7e8f9 100644
+--- a/test/skill-validation.test.ts
++++ b/test/skill-validation.test.ts
+@@ -8,11 +8,13 @@ const expectedSkills = [
+   "hipaa-assess",
+   "hipaa-remediate",
+   "hipaa-report",
+   "hipaa-monitor",
+   "hipaa-breach",
+   "hipaa-vendor",
+   "hipaa-risk",
++  "iso27001-assess",
++  "iso27001-scan",
+ ];
+
+ const expectedPolicies = [
+@@ -22,6 +24,7 @@ const expectedPolicies = [
+   "hipaa-secrets",
+   "hipaa-transmission-security",
+   "hipaa-k8s-security",
++  "iso27001-access-control",
+ ];
+
+ test("all expected skills exist", () => {
+```
+
+Then run:
+
+```bash
+bun run gen:skill-docs
+bun test
+```
+
+</details>
+
 ## Template placeholders
 
 These are resolved by `scripts/gen-skill-docs.ts`:
 
-| Placeholder | What it generates |
-|-------------|------------------|
-| `{{PREAMBLE}}` | Session tracking, update check, disclaimer, AskUserQuestion format, compliance completeness principle, contributor mode, completion status, evidence collection, review logging |
-| `{{COMPLIANCE_DASHBOARD}}` | Compliance status dashboard |
-| `{{TOOL_DETECTION}}` | Scanning tool and cloud CLI detection |
-| `{{PHI_PATTERNS}}` | 19 code-level security checks |
-| `{{EVIDENCE_COLLECTION}}` | Evidence hashing and storage |
-| `{{AWS_CHECKS}}` | ~65 AWS CLI commands for HIPAA scanning |
-| `{{GCP_CHECKS}}` | ~40 gcloud commands for HIPAA scanning |
-| `{{AZURE_CHECKS}}` | ~28 az CLI commands for HIPAA scanning |
-| `{{IAC_POLICY_ENGINE}}` | Checkov + Conftest/Rego policy scanning |
-| `{{DASHBOARD_UPDATES}}` | Per-skill dashboard.json update instructions (checklist, findings, vendors, risks) |
+| Placeholder                | What it generates                                                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{{PREAMBLE}}`             | Session tracking, update check, disclaimer, AskUserQuestion format, compliance completeness principle, contributor mode, completion status, evidence collection, review logging |
+| `{{COMPLIANCE_DASHBOARD}}` | Compliance status dashboard                                                                                                                                                     |
+| `{{TOOL_DETECTION}}`       | Scanning tool and cloud CLI detection                                                                                                                                           |
+| `{{PHI_PATTERNS}}`         | 19 code-level security checks                                                                                                                                                   |
+| `{{EVIDENCE_COLLECTION}}`  | Evidence hashing and storage                                                                                                                                                    |
+| `{{AWS_CHECKS}}`           | ~65 AWS CLI commands for HIPAA scanning                                                                                                                                         |
+| `{{GCP_CHECKS}}`           | ~40 gcloud commands for HIPAA scanning                                                                                                                                          |
+| `{{AZURE_CHECKS}}`         | ~28 az CLI commands for HIPAA scanning                                                                                                                                          |
+| `{{IAC_POLICY_ENGINE}}`    | Checkov + Conftest/Rego policy scanning                                                                                                                                         |
+| `{{DASHBOARD_UPDATES}}`    | Per-skill dashboard.json update instructions (checklist, findings, vendors, risks)                                                                                              |
 
 ## Testing
 
@@ -152,13 +485,13 @@ bun run dev:skill         # watch mode: auto-regen + validate on change
 
 ### Test files
 
-| File | Tests | What it validates |
-|------|-------|------------------|
-| `test/skill-validation.test.ts` | ~250 | 10 skill templates, generated files, frontmatter, PHI checks, cloud coverage, bin utilities, path hygiene, preamble sections |
-| `test/rego-policy.test.ts` | ~22 | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s) |
-| `test/bin-smoke.test.ts` | ~20 | Actually executes bin utilities and validates output format |
-| `test/touchfiles.test.ts` | ~11 | Diff-based test selection logic (glob matching, touchfile maps) |
-| `test/skill-e2e.test.ts` | (stub) | E2E skill tests — gated behind EVALS=1 |
+| File                            | Tests  | What it validates                                                                                                            |
+| ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `test/skill-validation.test.ts` | ~250   | 10 skill templates, generated files, frontmatter, PHI checks, cloud coverage, bin utilities, path hygiene, preamble sections |
+| `test/rego-policy.test.ts`      | ~22    | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s)                                                                    |
+| `test/bin-smoke.test.ts`        | ~20    | Actually executes bin utilities and validates output format                                                                  |
+| `test/touchfiles.test.ts`       | ~11    | Diff-based test selection logic (glob matching, touchfile maps)                                                              |
+| `test/skill-e2e.test.ts`        | (stub) | E2E skill tests — gated behind EVALS=1                                                                                       |
 
 ### Eval infrastructure (for paid E2E tests)
 
@@ -172,6 +505,7 @@ bun run eval:summary      # aggregate stats across all runs
 ```
 
 Test helpers in `test/helpers/`:
+
 - **touchfiles.ts** — diff-based test selection (only run tests whose files changed)
 - **session-runner.ts** — spawns `claude -p` with NDJSON streaming
 - **eval-store.ts** — persists results to `~/.em-dash-dev/evals/` with auto-comparison
