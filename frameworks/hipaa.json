@@ -23,126 +23,162 @@
       "section": "Administrative Safeguards",
       "name": "Security Management Process",
       "description": "Policies to prevent, detect, contain, and correct security violations",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "required",
+      "oscal_refs": ["PL-1", "PM-1"]
     },
     {
       "id": "164.308(a)(1)(ii)(A)",
       "section": "Administrative Safeguards",
       "name": "Risk Analysis",
       "description": "Accurate and thorough assessment of potential risks to ePHI",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "required",
+      "oscal_refs": ["RA-3"]
     },
     {
       "id": "164.308(a)(2)",
       "section": "Administrative Safeguards",
       "name": "Assigned Security Responsibility",
       "description": "Designate a HIPAA Security Officer",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "required",
+      "oscal_refs": ["PM-2"]
     },
     {
       "id": "164.308(a)(3)(ii)(C)",
       "section": "Administrative Safeguards",
       "name": "Termination Procedures",
       "description": "Revoke access when employment ends",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "addressable",
+      "oscal_refs": ["PS-4"]
     },
     {
       "id": "164.308(a)(4)",
       "section": "Administrative Safeguards",
       "name": "Information Access Management",
       "description": "Authorize access consistent with Privacy Rule",
-      "check_ids": ["iam-least-privilege-code", "aws-iam-wildcard", "rego-iam-wildcard", "rego-k8s-rbac-wildcard"]
+      "check_ids": ["iam-least-privilege-code", "aws-iam-wildcard", "rego-iam-wildcard", "rego-k8s-rbac-wildcard"],
+      "applicability": "required",
+      "oscal_refs": ["AC-1", "AC-2", "AC-3"]
     },
     {
       "id": "164.308(a)(5)(i)",
       "section": "Administrative Safeguards",
       "name": "Security Awareness and Training",
       "description": "Security awareness training program",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "addressable",
+      "oscal_refs": ["AT-1", "AT-2"]
     },
     {
       "id": "164.308(a)(6)(i)",
       "section": "Administrative Safeguards",
       "name": "Security Incident Procedures",
       "description": "Identify and respond to security incidents",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "required",
+      "oscal_refs": ["IR-1", "IR-6"]
     },
     {
       "id": "164.308(a)(7)(i)",
       "section": "Administrative Safeguards",
       "name": "Contingency Plan",
       "description": "Policies for responding to emergencies",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "required",
+      "oscal_refs": ["CP-1", "CP-2"]
     },
     {
       "id": "164.312(a)(1)",
       "section": "Technical Safeguards",
       "name": "Access Control",
       "description": "Technical policies to allow access only to authorized persons",
-      "check_ids": ["rbac-existence", "sensitive-data-in-browser", "sensitive-data-in-errors", "db-access-grants", "sensitive-data-in-notifications", "secrets-in-config", "aws-s3-public-access", "aws-iam-wildcard", "rego-rds-public"]
+      "check_ids": ["rbac-existence", "sensitive-data-in-browser", "sensitive-data-in-errors", "db-access-grants", "sensitive-data-in-notifications", "secrets-in-config", "aws-s3-public-access", "aws-iam-wildcard", "rego-rds-public"],
+      "applicability": "required",
+      "oscal_refs": ["AC-1", "AC-2", "AC-3", "AC-6"]
     },
     {
       "id": "164.312(a)(2)(iii)",
       "section": "Technical Safeguards",
       "name": "Automatic Logoff",
       "description": "Terminate session after period of inactivity",
-      "check_ids": ["session-timeout"]
+      "check_ids": ["session-timeout"],
+      "applicability": "addressable",
+      "oscal_refs": ["AC-11"]
     },
     {
       "id": "164.312(a)(2)(iv)",
       "section": "Technical Safeguards",
       "name": "Encryption and Decryption",
       "description": "Encrypt and decrypt ePHI at rest",
-      "check_ids": ["encryption-at-rest-code", "db-encryption", "aws-s3-encryption", "aws-rds-encryption", "aws-kms-rotation", "aws-lambda-kms", "aws-dynamodb-encryption", "rego-s3-encryption", "rego-rds-encryption", "rego-kms-rotation"]
+      "check_ids": ["encryption-at-rest-code", "db-encryption", "aws-s3-encryption", "aws-rds-encryption", "aws-kms-rotation", "aws-lambda-kms", "aws-dynamodb-encryption", "rego-s3-encryption", "rego-rds-encryption", "rego-kms-rotation"],
+      "applicability": "addressable",
+      "oscal_refs": ["SC-28"]
     },
     {
       "id": "164.312(b)",
       "section": "Technical Safeguards",
       "name": "Audit Controls",
       "description": "Record and examine system activity",
-      "check_ids": ["sensitive-data-in-logs", "audit-logging-code", "db-audit-logging", "aws-cloudtrail", "aws-vpc-flow-logs", "aws-cloudwatch-retention", "aws-api-gateway-logging", "aws-config-enabled", "rego-cloudtrail-enabled"]
+      "check_ids": ["sensitive-data-in-logs", "audit-logging-code", "db-audit-logging", "aws-cloudtrail", "aws-vpc-flow-logs", "aws-cloudwatch-retention", "aws-api-gateway-logging", "aws-config-enabled", "rego-cloudtrail-enabled"],
+      "applicability": "required",
+      "oscal_refs": ["AU-1", "AU-2", "AU-3", "AU-6"]
     },
     {
       "id": "164.312(c)(1)",
       "section": "Technical Safeguards",
       "name": "Integrity",
       "description": "Protect ePHI from improper alteration or destruction",
-      "check_ids": ["aws-s3-versioning"]
+      "check_ids": ["aws-s3-versioning"],
+      "applicability": "required",
+      "oscal_refs": ["SI-7"]
     },
     {
       "id": "164.312(d)",
       "section": "Technical Safeguards",
       "name": "Person or Entity Authentication",
       "description": "Verify identity of person seeking access",
-      "check_ids": ["password-hashing", "aws-iam-password-policy", "aws-iam-mfa", "rego-mfa-required"]
+      "check_ids": ["password-hashing", "aws-iam-password-policy", "aws-iam-mfa", "rego-mfa-required"],
+      "applicability": "required",
+      "oscal_refs": ["IA-1", "IA-2", "IA-5"]
     },
     {
       "id": "164.312(e)(1)",
       "section": "Technical Safeguards",
       "name": "Transmission Security",
       "description": "Guard against unauthorized access during transmission",
-      "check_ids": ["db-connection-ssl", "aws-security-groups", "aws-lambda-vpc", "rego-security-group-open"]
+      "check_ids": ["db-connection-ssl", "aws-security-groups", "aws-lambda-vpc", "rego-security-group-open"],
+      "applicability": "required",
+      "oscal_refs": ["SC-8", "SC-13"]
     },
     {
       "id": "164.314(a)(1)",
       "section": "Organizational Requirements",
       "name": "Business Associate Contracts",
       "description": "Document satisfactory assurances from business associates",
-      "check_ids": []
+      "check_ids": [],
+      "applicability": "required",
+      "oscal_refs": ["SA-9"]
     },
     {
       "id": "164.502",
       "section": "Privacy Rule",
       "name": "Uses and Disclosures",
       "description": "Permitted uses and disclosures of PHI",
-      "check_ids": ["phi-identifiers", "health-data-fields", "sensitive-data-in-tests", "db-sensitive-columns"]
+      "check_ids": ["phi-identifiers", "health-data-fields", "sensitive-data-in-tests", "db-sensitive-columns"],
+      "applicability": "required",
+      "oscal_refs": ["AC-3", "MP-1"]
     },
     {
       "id": "164.514",
       "section": "Privacy Rule",
       "name": "Safe Harbor De-identification",
       "description": "18 HIPAA Safe Harbor identifiers",
-      "check_ids": ["phi-identifiers"]
+      "check_ids": ["phi-identifiers"],
+      "applicability": "required",
+      "oscal_refs": ["SI-12"]
     }
   ],
   "checklist": [

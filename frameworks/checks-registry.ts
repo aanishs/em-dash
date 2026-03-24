@@ -52,6 +52,8 @@ export interface Check {
   severity_default: Severity;
   /** Per-framework requirement mappings */
   frameworks: Record<string, FrameworkMapping>;
+  /** NIST 800-53 OSCAL control references (e.g., ["AC-2", "IA-2"]) */
+  oscal_refs?: string[];
 }
 
 // ─── Code-Level Checks (19 checks) ─────────────────────────────
