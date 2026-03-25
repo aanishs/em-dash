@@ -1,5 +1,37 @@
 # Changelog
 
+## v2.0.0 — NIST-first architecture: the LLM reads the actual law (2026-03-24)
+
+**Complete architecture rebuild.** em-dash v2 ships the official NIST 800-53 OSCAL catalog (1,196 controls) unmodified in the repo. The LLM reads the actual NIST control text at runtime — not our interpretation. Three files drive everything: `hipaa-filter.json` (52 HIPAA specs → 50 controls), `tool-bindings.json` (50 controls → em-dash/Prowler/Checkov checks), and `checks-registry.ts` (50 checks, pure execution).
+
+**SQLite evidence store.** All compliance state lives in one SQLite database per project (`~/.em-dash/projects/{slug}/compliance.db`). Controls imported from NIST catalog, check results, evidence, and signatures — all queryable. Replaces: control-state.json, dashboard.json evidence, attestations/*.json, evidence-index.jsonl.
+
+**8 skills from 14.** `/hipaa` (status), `/comply-auto` (autopilot), `/comply-assess` (interview), `/comply-scan` (scan), `/comply-fix` (remediate), `/comply-report` (audit packet), `/comply-breach` (incident response), `/em-dashboard` (visual dashboard). Every skill processes one NIST control at a time. Vendors absorbed into assess (SA-9), risk into assess (RA-3).
+
+**50 controls fully mapped.** 21 with automated checks (em-dash + Prowler + Checkov), 29 interview-only. All 50 em-dash checks, 27 Prowler checks, and 20 Checkov checks mapped to specific 800-53 controls.
+
+**Multi-framework ready.** Adding SOC 2 = write `soc2-filter.json` (50 lines). Same catalog, same tools, zero code changes. `bin/comply-db` accepts `--framework` flag.
+
+**Dashboard SQLite API.** New `/api/compliance` endpoint serves control status, check results, evidence, and signatures from SQLite. Legacy JSON API preserved for backward compatibility.
+
+## v1.4.0 — OSCAL Bridge: signed attestations + machine-readable compliance law (2026-03-24)
+
+**OSCAL integration.** em-dash now bridges NIST's OSCAL standard with its compliance scanning infrastructure. 10 core HIPAA controls mapped to NIST 800-53 via SP 800-66r2, each with plain-English translations, automated check bindings, and legal citations. `bin/hipaa-oscal-import` manages the mapping — status, validation, control listing, and markdown export.
+
+**Ed25519 signed attestations.** Scan results are now cryptographically signed using Ed25519 with RFC 8785 (JCS) JSON canonicalization. Two-level attestation model: session attestations wrap per-check attestations with scope, environment, tool version, and completeness metadata. `bin/comply-attest` handles key generation, signing, and single-file verification.
+
+**Attestation verification.** `bin/comply-verify` validates attestation integrity at both session and check levels — signature verification, evidence hash matching, and session completeness checking. Tamper detection catches any modification to signed attestations.
+
+**Audit packet generation.** `bin/comply-audit-packet` produces signed ZIP archives containing attestations, a human-readable HTML summary (with pass/fail/addressable status), the public key, and verification instructions. Evidence hashes included by default; full evidence files opt-in via `--include-evidence`.
+
+**HIPAA applicability model.** Each HIPAA requirement now has `applicability` (required vs addressable) and `oscal_refs` (NIST 800-53 control references). 14 requirements are required, 4 are addressable. Addressable controls show "NEEDS DOCUMENTATION" instead of a flat "FAIL" — matching how HIPAA actually works.
+
+**New skills.** `/hipaa-oscal-import` for OSCAL catalog management. `/hipaa-verify` for attestation integrity verification. Both follow existing skill template conventions.
+
+**44 new tests.** OSCAL parser (10), HIPAA schema (8), Ed25519 signer (12), verifier (6), audit packet (8). Total test count: 465.
+
+**4 new CLI utilities.** `bin/comply-attest`, `bin/comply-verify`, `bin/hipaa-oscal-import`, `bin/comply-audit-packet`. All Bun/TypeScript, following existing bin/ patterns.
+
 ## v1.3.0 — Multi-framework architecture + launch kit
 
 **Framework abstraction layer.** em-dash is no longer HIPAA-only. A new `frameworks/` directory defines compliance frameworks as JSON files with requirements, checklists, thresholds, terminology, and assessment questions. A shared checks registry (~50 checks) maps each check to requirements across multiple frameworks. Adding a new framework means writing a JSON definition — not duplicating the skill set.
@@ -81,7 +113,7 @@
 
 em-dash: a HIPAA compliance platform for Claude Code. Built for teams handling PHI.
 
-**Seven skills that chain together.** `/hipaa-assess` interviews you about organizational controls, `/hipaa-scan` checks your code and infrastructure, `/hipaa-remediate` fixes findings and generates policy documents, `/hipaa-report` produces auditor-ready reports, `/hipaa-monitor` detects drift, and `/hipaa-breach` guides breach notification. `/hipaa` is the router that shows your dashboard and tells you what to do next.
+**Seven skills that chain together.** `/comply-assess` interviews you about organizational controls, `/comply-scan` checks your code and infrastructure, `/hipaa-remediate` fixes findings and generates policy documents, `/comply-report` produces auditor-ready reports, `/hipaa-monitor` detects drift, and `/comply-breach` guides breach notification. `/hipaa` is the router that shows your dashboard and tells you what to do next.
 
 **Cloud infrastructure scanning.** ~65 AWS CLI commands, ~40 gcloud commands, and ~28 Azure CLI commands — all read-only — covering encryption, IAM, logging, network security, and more. Each finding maps to a specific HIPAA requirement.
 

@@ -6,42 +6,47 @@
 git clone https://github.com/aanishs/em-dash.git
 cd em-dash
 bun install
-bun test          # ~340 tests, all free, under 3 seconds
+bun test          # ~103 tests, all free, under 3 seconds
 ```
 
-## Project architecture
+## Architecture (v2 — NIST-first)
 
-em-dash is a collection of Claude Code skills that chain together. Here's the mental model:
+em-dash v2 ships the official NIST 800-53 catalog (1,196 controls). The LLM reads the actual law at runtime. Three files drive everything:
 
 ```
-skills/           10 skills (7 HIPAA + vendor + risk + dashboard), each with a SKILL.md.tmpl template
-    ↓
-scripts/          gen-skill-docs.ts resolves {{PLACEHOLDERS}} → SKILL.md
-    ↓
-SKILL.md          Generated files — Claude reads these at runtime
-    ↓
-dashboard/        Static site (HTML/CSS/JS) + Bun server for visual compliance dashboard
-policies/         6 Rego/OPA rules for IaC policy scanning
-templates/        8 policy document templates (Markdown)
-bin/              7 CLI utilities (config, slug, tool-detect, evidence-hash, review-log, update-check, dashboard-update)
-test/             ~340 tests across 5 test files + helpers
+nist/
+├── NIST_SP-800-53_rev5_catalog.json  # official NIST catalog (NEVER modify)
+├── hipaa-filter.json                  # HIPAA → 800-53 control IDs (52 specs → 50 controls)
+├── soc2-filter.json                   # SOC 2 → 800-53 (38 specs → 40 controls)
+├── gdpr-filter.json                   # GDPR → 800-53 (19 articles → 22 controls)
+├── pci-dss-filter.json                # PCI-DSS → 800-53 (20 reqs → 16 controls)
+└── tool-bindings.json                 # 800-53 control → verification tools
+
+frameworks/checks-registry.ts          # 50 em-dash checks — HOW to execute (pure execution)
+bin/comply-db                           # SQLite compliance database engine
+skills/                                # 7 skills (each processes one NIST control at a time)
+policies/                              # 6 Rego/OPA rules for IaC scanning
+templates/policies/                    # Policy document templates
 ```
 
-**Skills** are prompt templates. They tell Claude what to do — run commands, ask questions, generate reports. The template engine (`scripts/gen-skill-docs.ts`) injects shared blocks like PHI scanning patterns, cloud CLI commands, and evidence collection logic.
+**NIST catalog** is the source of truth. Never modify it.
+**Filter files** map framework requirements to 800-53 control IDs. This is where domain knowledge lives.
+**Tool bindings** map control IDs to em-dash/Prowler/Checkov check IDs. This is our value-add.
+**Checks registry** defines HOW to execute each check (command, pattern). No compliance mappings.
+**SQLite** stores all evidence per project: `~/.em-dash/projects/{slug}/compliance.db`
 
-**Policies** are Rego rules that Conftest runs against your IaC files. Each `deny` rule maps to a HIPAA requirement.
-
-**Templates** are Markdown policy documents (Access Control Policy, Incident Response Plan, etc.) that `/hipaa-remediate` customizes for the user's organization.
+**Policies** are Rego rules that Conftest runs against IaC files.
+**Templates** are Markdown policy documents that `/comply-fix` customizes for the user.
 
 ## SKILL.md workflow
 
 SKILL.md files are **generated** — don't edit them directly. They'd be overwritten on the next build.
 
-1. Edit the `.tmpl` file (e.g., `skills/hipaa-assess/SKILL.md.tmpl`)
+1. Edit the `.tmpl` file (e.g., `skills/comply-assess/SKILL.md.tmpl`)
 2. Run `bun run gen:skill-docs`
 3. Commit both the `.tmpl` and generated `.md` files
 
-**Why generated files?** The 10 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
+**Why generated files?** The 7 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
 
 **Watch mode:** Run `bun run dev:skill` to auto-regenerate and validate on every template save.
 
@@ -428,12 +433,12 @@ index 2a3b4c5..6d7e8f9 100644
 +++ b/test/skill-validation.test.ts
 @@ -8,11 +8,13 @@ const expectedSkills = [
    "hipaa-assess",
-   "hipaa-remediate",
+   "hipaa-fix",
    "hipaa-report",
-   "hipaa-monitor",
+   "hipaa-auto",
    "hipaa-breach",
-   "hipaa-vendor",
-   "hipaa-risk",
+   "hipaa-assess",
+   "hipaa-scan",
 +  "iso27001-assess",
 +  "iso27001-scan",
  ];
@@ -478,7 +483,7 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 ## Testing
 
 ```bash
-bun test                  # ~340 tests, free, <3s
+bun test                  # ~103 tests, free, <3s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
 ```
@@ -487,7 +492,7 @@ bun run dev:skill         # watch mode: auto-regen + validate on change
 
 | File                            | Tests  | What it validates                                                                                                            |
 | ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `test/skill-validation.test.ts` | ~250   | 10 skill templates, generated files, frontmatter, PHI checks, cloud coverage, bin utilities, path hygiene, preamble sections |
+| `test/skill-validation.test.ts` | ~40    | 7 skill templates, generated files, frontmatter, bin utilities, Rego policies |
 | `test/rego-policy.test.ts`      | ~22    | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s)                                                                    |
 | `test/bin-smoke.test.ts`        | ~20    | Actually executes bin utilities and validates output format                                                                  |
 | `test/touchfiles.test.ts`       | ~11    | Diff-based test selection logic (glob matching, touchfile maps)                                                              |
@@ -518,7 +523,7 @@ Tests live in `test/skill-validation.test.ts`. To add a test for your change:
 
 ```typescript
 test("my new check appears in generated scan skill", () => {
-  const scanSkill = fs.readFileSync("skills/hipaa-scan/SKILL.md", "utf-8");
+  const scanSkill = fs.readFileSync("skills/comply-scan/SKILL.md", "utf-8");
   expect(scanSkill).toContain("my-new-pattern");
 });
 ```
@@ -534,7 +539,7 @@ test("my new check appears in generated scan skill", () => {
 
 Before submitting:
 
-- [ ] `bun test` passes (~340 tests)
+- [ ] `bun test` passes (~103 tests)
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
 - [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)

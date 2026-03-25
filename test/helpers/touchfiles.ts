@@ -32,26 +32,26 @@ export function matchGlob(file: string, pattern: string): boolean {
  * Each test lists the file patterns that, if changed, require the test to run.
  */
 export const E2E_TOUCHFILES: Record<string, string[]> = {
-  'hipaa-scan-basic':     ['skills/hipaa-scan/**', 'scripts/gen-skill-docs.ts', 'policies/**'],
-  'hipaa-assess-basic':   ['skills/hipaa-assess/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-remediate':      ['skills/hipaa-remediate/**', 'policies/**', 'templates/**'],
-  'hipaa-report':         ['skills/hipaa-report/**'],
-  'hipaa-router':         ['skills/hipaa/**'],
-  'hipaa-monitor':        ['skills/hipaa-monitor/**'],
-  'hipaa-breach':         ['skills/hipaa-breach/**'],
+  'comply-scan-basic':    ['skills/comply-scan/**', 'scripts/gen-skill-docs.ts', 'policies/**', 'nist/**'],
+  'comply-assess-basic':  ['skills/comply-assess/**', 'scripts/gen-skill-docs.ts', 'nist/**'],
+  'comply-auto':          ['skills/comply-auto/**', 'nist/**', 'bin/comply-db'],
+  'comply-fix':           ['skills/comply-fix/**', 'policies/**', 'templates/**'],
+  'comply-report':        ['skills/comply-report/**', 'bin/comply-audit-packet', 'bin/comply-attest'],
+  'comply-router':        ['skills/comply/**', 'bin/comply-db'],
+  'comply-breach':        ['skills/comply-breach/**'],
 };
 
 /**
  * LLM-judge test touchfiles — keyed by test description string.
  */
 export const LLM_JUDGE_TOUCHFILES: Record<string, string[]> = {
-  'hipaa-scan report quality':     ['skills/hipaa-scan/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-assess interview flow':   ['skills/hipaa-assess/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-remediate fix quality':   ['skills/hipaa-remediate/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-report completeness':     ['skills/hipaa-report/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-monitor drift detection': ['skills/hipaa-monitor/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-breach response flow':    ['skills/hipaa-breach/**', 'scripts/gen-skill-docs.ts'],
-  'hipaa-router dispatch':         ['skills/hipaa/**', 'scripts/gen-skill-docs.ts'],
+  'comply-scan report quality':     ['skills/comply-scan/**', 'nist/**', 'scripts/gen-skill-docs.ts'],
+  'comply-assess interview flow':   ['skills/comply-assess/**', 'nist/**', 'scripts/gen-skill-docs.ts'],
+  'comply-auto full pipeline':      ['skills/comply-auto/**', 'nist/**', 'bin/comply-db'],
+  'comply-fix remediation quality': ['skills/comply-fix/**', 'scripts/gen-skill-docs.ts'],
+  'comply-report completeness':     ['skills/comply-report/**', 'bin/comply-audit-packet'],
+  'comply-breach response flow':    ['skills/comply-breach/**', 'scripts/gen-skill-docs.ts'],
+  'comply-router dispatch':         ['skills/comply/**', 'bin/comply-db'],
 };
 
 /**

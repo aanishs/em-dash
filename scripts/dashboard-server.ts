@@ -89,7 +89,12 @@ try {
       return new Response('WebSocket upgrade failed', { status: 400 });
     }
 
-    // API: read dashboard config
+    // API: compliance data from SQLite (v2 architecture)
+    if (url.pathname === '/api/compliance' && req.method === 'GET') {
+      return handleComplianceQuery(url);
+    }
+
+    // API: read dashboard config (legacy)
     if (url.pathname === '/api/dashboard' && req.method === 'GET') {
       const data = readDashboard();
       return Response.json(data);
@@ -556,6 +561,68 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ─── SQLite compliance API (v2) ─────────────────────────────
+
+function handleComplianceQuery(url: URL): Response {
+  try {
+    const { Database } = require('bun:sqlite');
+    const slug = getProjectSlug();
+    const dbPath = path.join(process.env.HOME ?? '', '.em-dash', 'projects', slug, 'compliance.db');
+
+    if (!fs.existsSync(dbPath)) {
+      return Response.json({ error: 'No compliance database. Run: bin/hipaa-db init', controls: [], summary: null }, { status: 404 });
+    }
+
+    const db = new Database(dbPath, { readonly: true });
+    const view = url.searchParams.get('view') || 'summary';
+
+    if (view === 'summary') {
+      const controls = db.prepare('SELECT oscal_id, title, family, status, hipaa_refs FROM controls ORDER BY family, oscal_id').all();
+      const total = controls.length;
+      const complete = controls.filter((c: any) => c.status === 'complete').length;
+      const partial = controls.filter((c: any) => c.status === 'partial').length;
+      const pending = controls.filter((c: any) => c.status === 'pending').length;
+      const checks = db.prepare('SELECT result, COUNT(*) as cnt FROM check_results GROUP BY result').all();
+      const evidenceCount = (db.prepare('SELECT COUNT(*) as cnt FROM evidence').get() as any)?.cnt || 0;
+      const sigCount = (db.prepare('SELECT COUNT(*) as cnt FROM signatures').get() as any)?.cnt || 0;
+
+      db.close();
+      return Response.json({
+        controls,
+        summary: { total, complete, partial, pending, pct: Math.round((complete / total) * 100) },
+        checks,
+        evidence_count: evidenceCount,
+        signature_count: sigCount,
+      });
+    }
+
+    if (view === 'control') {
+      const controlId = url.searchParams.get('id');
+      if (!controlId) { db.close(); return Response.json({ error: 'Missing ?id= parameter' }, { status: 400 }); }
+      const ctrl = db.prepare('SELECT * FROM controls WHERE oscal_id = ?').get(controlId);
+      const checks = db.prepare('SELECT * FROM check_results WHERE control_id = ? ORDER BY created_at DESC').all(controlId);
+      const evidence = db.prepare('SELECT * FROM evidence WHERE control_id = ? ORDER BY created_at DESC').all(controlId);
+      const sigs = db.prepare('SELECT * FROM signatures WHERE control_id = ? ORDER BY created_at DESC').all(controlId);
+      db.close();
+      return Response.json({ control: ctrl, checks, evidence, signatures: sigs });
+    }
+
+    db.close();
+    return Response.json({ error: 'Unknown view. Use ?view=summary or ?view=control&id=AC-2' }, { status: 400 });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+function getProjectSlug(): string {
+  try {
+    const proc = spawnSync(path.join(ROOT, 'bin', 'hipaa-slug'), { cwd: PROJECT_DIR });
+    const match = proc.stdout?.toString().match(/SLUG=(\S+)/);
+    if (match) return match[1];
+  } catch {}
+  return path.basename(PROJECT_DIR);
+}
+
 // ─── Helpers ────────────────────────────────────────────────
 
 function readDashboard(): any {
@@ -580,7 +647,10 @@ function migrateDashboard(data: any): any {
 }
 
 function writeDashboard(data: any) {
-  fs.writeFileSync(DASHBOARD_JSON, JSON.stringify(data, null, 2) + '\n');
+  // Atomic write: temp file → rename (prevents corruption from concurrent writes)
+  const tmpPath = DASHBOARD_JSON + '.tmp';
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n');
+  fs.renameSync(tmpPath, DASHBOARD_JSON);
 }
 
 // ─── Startup ────────────────────────────────────────────────

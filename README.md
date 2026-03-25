@@ -1,8 +1,9 @@
 # em-dash
 
-[![Tests](https://img.shields.io/badge/tests-389%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-102%20passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-orange)]()
+[![Version](https://img.shields.io/badge/version-2.0.0-orange)]()
+[![NIST 800-53](https://img.shields.io/badge/NIST%20800--53-1196%20controls-blue)]()
 [![Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet)]()
 
 I'm [Aanish](https://github.com/aanishs). I build [CoralEHR](https://coralehr.com), an EHR for behavioral therapists.
@@ -79,81 +80,82 @@ em-dash works without any of these. The 19 code-level checks only need grep. Clo
 ## Demo
 
 ```
-You:    /hipaa
-Claude: No assessment yet. Run /hipaa-assess first.
+You:    /comply
+Claude: Imported 50 NIST 800-53 controls for HIPAA.
+        0% complete. 50 controls pending.
+        Run /comply-auto to start.
 
-You:    /hipaa-assess
-Claude: Question 1/20: Has your organization designated a HIPAA Security Officer?
+You:    /comply-auto
+Claude: Working on AC-2: Account Management...
+        NIST says: "Define and document the types of accounts allowed..."
+        Running checks: aws-iam-wildcard ✓ rego-iam-wildcard ✓
+        All checks PASS.
 
-You:    Yeah, me. I'm the CTO.
+        Working on AC-3: Access Enforcement...
+        Running checks: rbac-existence... FAIL — no RBAC found
+        Fixing: [generates RBAC middleware]
+        Re-scan: rbac-existence ✓ PASS
 
-Claude: Question 2/20: Formal risk analysis in the last 12 months?
-        [... 18 more questions ...]
+        Working on RA-3: Risk Assessment...
+        No automated checks. Interview needed:
+        "Have you conducted a formal risk analysis?"
 
-        Done. 3 CRITICAL gaps. Report saved.
-        → ~/.em-dash/projects/myapp/assessment-report.md
+You:    Not yet, it's on our list.
 
-You:    /hipaa-scan
-Claude: prowler ✓ trivy ✓ checkov ✓
-        19 code checks... cloud scan... IaC policies...
+Claude: Recorded. Moving to next control...
+        [... continues through all 50 controls ...]
 
-        7 findings:
-        CRITICAL  PHI in console.log — src/api/patients.ts:47
-        HIGH      No audit logging on PHI endpoints
-        HIGH      S3 bucket unencrypted — patient-records-prod
-        MEDIUM    No session timeout
-        → ~/.em-dash/projects/myapp/scan-report.md
+        Session complete: 21 scanned, 12 passed, 5 fixed, 29 need interviews.
 
-You:    /hipaa-remediate
-Claude: 12 findings. Starting with CRITICAL.
-        [patches patients.ts — removes PHI from logs]
-        [generates audit-log middleware]
-        [writes terraform patch for S3 encryption]
-        [generates Access Control Policy from template]
-        10/12 fixed. 2 need manual action.
-
-You:    /hipaa-report
-Claude: → Full Compliance Report (47 pages)
-        → Executive Summary (1 page, 78% maturity)
-        → Evidence Index (SHA-256 hashed)
+You:    /comply-report
+Claude: → Signed audit packet: audit-packet.zip
+        → 50 controls, 42% complete
+        → Ed25519 signed, RFC 8785 canonicalized
 ```
-
-Four commands. Assess, scan, fix, report.
 
 ## Usage
 
 Open Claude Code in any project that handles PHI.
 
-| Step | Command | What it does |
-|------|---------|-------------|
-| 1 | `/hipaa-assess` | 20-minute organizational interview. Security Rule, Privacy Rule, Breach Notification, BAAs. |
-| 2 | `/hipaa-scan` | Automated scanning. Code (19 checks), cloud infrastructure (AWS/GCP/Azure), IaC (Checkov + Rego). |
-| 3 | `/hipaa-remediate` | Fix findings. Code patches, Terraform fixes, policy document generation, evidence collection. |
-| 4 | `/hipaa-report` | Generate compliance reports. Full report, executive summary, or trust report. |
-| Ongoing | `/hipaa-monitor` | Detect compliance drift since last audit. |
-| Ongoing | `/hipaa-vendor` | Vendor/BA management. Auto-detects services, tracks BAA status and risk tiers. |
-| Ongoing | `/hipaa-risk` | NIST SP 800-30 risk assessment. Threat identification, scoring, treatment planning. |
-| Anytime | `/hipaa-breach` | Guided breach notification with 4-factor risk assessment. |
-| Start here | `/hipaa` | Compliance dashboard. Shows current state and recommends what to run next. |
-| Dashboard | `/em-dashboard` | Opens the visual compliance dashboard at localhost:3000. |
-| **SOC 2** | `/soc2` | SOC 2 router — early scaffolding, maps to Trust Service Criteria. *Needs domain expertise — contributions welcome.* |
-| **SOC 2** | `/soc2-scan` | Automated scanning with SOC 2 requirement mappings. Same checks as HIPAA, different framework lens. |
+| Command | What it does |
+|---------|-------------|
+| `/comply` | Status dashboard. Shows compliance score per NIST control, recommends next step. |
+| `/comply-auto` | **Autopilot.** Loops through all controls: scans, fixes what it can, asks questions for the rest. |
+| `/comply-assess` | Focused interview. One NIST control at a time. Covers vendors, risk, training — all from NIST text. |
+| `/comply-scan` | Focused scan. One NIST control at a time. Runs em-dash + Prowler + Checkov. |
+| `/comply-fix` | Focused remediation. Picks failed controls, generates fixes, re-scans to verify. |
+| `/comply-report` | Compile evidence from SQLite. Generate compliance report + signed audit packet. |
+| `/comply-breach` | Incident response. Guided breach notification with 4-factor risk assessment. |
+
+### Architecture
+
+The LLM reads the actual NIST 800-53 control text at runtime — not our interpretation.
+
+```bash
+bin/comply-db init                  # import 50 HIPAA controls from NIST 800-53
+bin/comply-db status                # compliance status per control
+bin/comply-db control AC-2          # show full NIST prose + evidence for one control
+bin/comply-attest init-keys         # generate Ed25519 signing keypair
+bin/comply-audit-packet \           # generate signed audit packet
+  --attestation-dir ~/.em-dash/projects/$SLUG/attestations \
+  --output audit-packet.zip
+```
+
+**4 frameworks supported:** HIPAA (50 controls), SOC 2 (40), GDPR (22), PCI-DSS (16). Adding a framework = one filter file mapping requirements to 800-53 controls. Zero code changes.
 
 ### Workflow
 
 ```
-/hipaa           ──> init dashboard + route to next step
-/hipaa-assess    ──> Assessment Report ──┐
-/hipaa-vendor    ──> Vendor/BAA Registry  ├──> /hipaa-remediate ──> /hipaa-report
-/hipaa-scan      ──> Scan Findings ──────┘           │
-/hipaa-risk      ──> Risk Register                   v
-                                           /hipaa-monitor (ongoing)
-
-/hipaa-breach (standalone — use when things go wrong)
-/em-dashboard (opens visual dashboard at localhost:3000)
+/comply           ──> status + recommend next step
+/comply-auto      ──> scan → fix → assess → next control (autopilot)
+/comply-assess    ──> interview (vendors, risk, training — all NIST-driven)
+/comply-scan      ──> automated checks ──┐
+/comply-fix       ──> remediate failures ├──> /comply-report ──> audit packet
+                                        │
+/comply-breach (standalone — use when things go wrong)
 ```
 
-All skills auto-update `.em-dash/dashboard.json` as they run. The visual dashboard (`bun run dashboard` or `/em-dashboard`) shows checklists, findings, risks, vendors, evidence, and activity in real time.
+All evidence lives in SQLite: `~/.em-dash/projects/{slug}/compliance.db`
 
 ![em-dash compliance dashboard](docs/screenshots/overview.png)
 
@@ -214,7 +216,7 @@ All optional. em-dash works with just grep.
 
 ### Dashboard
 
-Run `bun run dashboard` or `/em-dashboard` to open the compliance dashboard at localhost:3000.
+Run `bun run dashboard` to open the compliance dashboard at localhost:3000.
 
 <!-- TODO: Add dashboard screenshot here -->
 <!-- ![Dashboard](docs/images/dashboard.png) -->
@@ -240,7 +242,7 @@ Run `bun run dashboard` or `/em-dashboard` to open the compliance dashboard at l
 
 ### Policy documents
 
-`/hipaa-remediate` generates these from audited templates, customized for your organization:
+`/comply-fix` generates these from audited templates, customized for your organization:
 
 | Policy |
 |--------|
@@ -260,7 +262,7 @@ Based on [Datica's open-source HIPAA policies](https://github.com/Jowin/policies
 Scan every PR automatically. Add the `hipaa-scan` label to trigger a compliance check via GitHub Actions.
 
 ```yaml
-# .github/workflows/hipaa-scan.yml is included — just add your API key:
+# .github/workflows/comply-scan.yml is included — just add your API key:
 # Settings → Secrets → ANTHROPIC_API_KEY
 ```
 
@@ -285,7 +287,7 @@ See [docs/ci-setup.md](docs/ci-setup.md) for full setup instructions.
 
 HIPAA is shipped and tested against real infrastructure. The multi-framework architecture is in place — a shared checks registry (~50 checks), framework-agnostic Rego policies, and a template engine that generates framework-specific skills from JSON definitions.
 
-SOC 2 scaffolding exists (`/soc2`, `/soc2-scan`) but needs domain expertise to become production-quality. We built the plumbing; the frameworks need people who know the requirements.
+**Multi-framework support:** HIPAA, SOC 2, GDPR, and PCI-DSS filter files exist (`nist/*-filter.json`). Adding a new framework = writing a ~50-line JSON file mapping requirements to 800-53 controls. Same NIST catalog, same tools, zero code changes. Contributors who know SOC 2, GDPR, PCI-DSS, or ISO 27001 can improve the filter accuracy.
 
 **What we need help with:**
 - **SOC 2** — Trust Service Criteria mappings, assessment questions, checklist refinement
