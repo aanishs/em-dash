@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# hipaa-slug — output project slug and sanitized branch name
-# Usage: source <(hipaa-slug)  → sets SLUG and BRANCH variables
-# Or:    hipaa-slug           → prints SLUG=... and BRANCH=... lines
+# comply-slug — output project slug and sanitized branch name
+# Usage: source <(comply-slug)  → sets SLUG and BRANCH variables
+# Or:    comply-slug           → prints SLUG=... and BRANCH=... lines
 set -euo pipefail
 _REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
 if [ -n "$_REMOTE" ]; then

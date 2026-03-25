@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * hipaa-attest — Ed25519 attestation signer for em-dash compliance checks.
+ * comply-attest — Ed25519 attestation signer for em-dash compliance checks.
  *
  * Subcommands:
  *   init-keys                    Generate Ed25519 keypair at ~/.em-dash/keys/
@@ -36,7 +36,7 @@ const args = process.argv.slice(2);
 const subcommand = args[0];
 
 if (!subcommand) {
-  console.error('Usage: hipaa-attest <init-keys|check|session|verify> [args]');
+  console.error('Usage: comply-attest <init-keys|check|session|verify> [args]');
   process.exit(1);
 }
 
@@ -81,7 +81,7 @@ function verifySignature(
 function loadPrivateKey(): crypto.KeyObject {
   if (!fs.existsSync(PRIVATE_KEY_PATH)) {
     console.error(`No signing key found at ${PRIVATE_KEY_PATH}`);
-    console.error('Run: hipaa-attest init-keys');
+    console.error('Run: comply-attest init-keys');
     process.exit(1);
   }
   checkKeyPermissions(PRIVATE_KEY_PATH);
@@ -163,7 +163,7 @@ function attestCheck(): void {
   const applicability = getFlag('applicability') || 'required';
 
   if (!checkId || !requirementId || !result || !output) {
-    console.error('Usage: hipaa-attest check --check-id ID --requirement-id ID --result PASS|FAIL --evidence-hash HASH --output PATH');
+    console.error('Usage: comply-attest check --check-id ID --requirement-id ID --result PASS|FAIL --evidence-hash HASH --output PATH');
     process.exit(1);
   }
 
@@ -209,7 +209,7 @@ function attestSession(): void {
   const output = getFlag('output');
 
   if (!attestationDir || !output) {
-    console.error('Usage: hipaa-attest session --attestation-dir DIR --framework hipaa --controls-in-scope N --output PATH');
+    console.error('Usage: comply-attest session --attestation-dir DIR --framework hipaa --controls-in-scope N --output PATH');
     process.exit(1);
   }
 
@@ -285,7 +285,7 @@ function verifyAttestation(): void {
   const publicKeyPath = getFlag('public-key') || '';
 
   if (!attestationPath) {
-    console.error('Usage: hipaa-attest verify --attestation PATH [--public-key PATH]');
+    console.error('Usage: comply-attest verify --attestation PATH [--public-key PATH]');
     process.exit(1);
   }
 
@@ -340,6 +340,6 @@ switch (subcommand) {
     break;
   default:
     console.error(`Unknown subcommand: ${subcommand}`);
-    console.error('Usage: hipaa-attest <init-keys|check|session|verify> [args]');
+    console.error('Usage: comply-attest <init-keys|check|session|verify> [args]');
     process.exit(1);
 }

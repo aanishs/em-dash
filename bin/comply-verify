@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 /**
- * hipaa-verify — Verify em-dash attestation integrity.
+ * comply-verify — Verify em-dash attestation integrity.
  *
  * Verifies both session-level and check-level attestations. For session
  * attestations, validates that all referenced check attestations exist
  * and their hashes match.
  *
  * Usage:
- *   hipaa-verify --attestation-dir DIR   Verify all attestations in a directory
- *   hipaa-verify --file PATH             Verify a single attestation file
+ *   comply-verify --attestation-dir DIR   Verify all attestations in a directory
+ *   comply-verify --file PATH             Verify a single attestation file
  *   [--public-key PATH]                  Custom public key (default: ~/.em-dash/keys/default.pub)
  */
 
@@ -173,7 +173,7 @@ const singleFile = getFlag('file');
 const publicKeyPath = getFlag('public-key') || '';
 
 if (!attestationDir && !singleFile) {
-  console.error('Usage: hipaa-verify --attestation-dir DIR | --file PATH [--public-key PATH]');
+  console.error('Usage: comply-verify --attestation-dir DIR | --file PATH [--public-key PATH]');
   process.exit(1);
 }
 

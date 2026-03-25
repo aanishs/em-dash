@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# hipaa-evidence-hash — SHA-256 hash evidence files for tamper detection
-# Usage: hipaa-evidence-hash <file>           → print hash
-#        hipaa-evidence-hash <directory>      → hash all files, write manifest
-#        hipaa-evidence-hash verify <manifest> → verify integrity
+# comply-evidence-hash — SHA-256 hash evidence files for tamper detection
+# Usage: comply-evidence-hash <file>           → print hash
+#        comply-evidence-hash <directory>      → hash all files, write manifest
+#        comply-evidence-hash verify <manifest> → verify integrity
 set -euo pipefail
 
 hash_file() {
@@ -17,7 +17,7 @@ hash_file() {
 
 case "${1:-}" in
   verify)
-    MANIFEST="${2:?Usage: hipaa-evidence-hash verify <manifest>}"
+    MANIFEST="${2:?Usage: comply-evidence-hash verify <manifest>}"
     if command -v sha256sum >/dev/null 2>&1; then
       sha256sum -c "$MANIFEST"
     elif command -v shasum >/dev/null 2>&1; then
@@ -28,7 +28,7 @@ case "${1:-}" in
     fi
     ;;
   *)
-    TARGET="${1:?Usage: hipaa-evidence-hash <file|directory>}"
+    TARGET="${1:?Usage: comply-evidence-hash <file|directory>}"
     if [ -f "$TARGET" ]; then
       hash_file "$TARGET"
     elif [ -d "$TARGET" ]; then
