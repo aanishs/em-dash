@@ -1,7 +1,7 @@
 {
   "id": "hipaa",
   "name": "HIPAA Security Rule",
-  "version": "1.0",
+  "version": "2.0",
   "disclaimer": "This provides technical guidance for implementing HIPAA compliance controls. It is NOT legal advice and does not constitute HIPAA certification. Consult qualified legal counsel and consider engaging a certified HIPAA auditor for formal compliance verification.",
   "terminology": {
     "sensitive_data": "Protected Health Information (PHI)",
@@ -17,169 +17,33 @@
     "password_min_length": 14,
     "credential_max_age_days": 90
   },
+  "oscal_profile": "hipaa-sp800-66r2-v1",
   "requirements": [
-    {
-      "id": "164.308(a)(1)(i)",
-      "section": "Administrative Safeguards",
-      "name": "Security Management Process",
-      "description": "Policies to prevent, detect, contain, and correct security violations",
-      "check_ids": [],
-      "applicability": "required",
-      "oscal_refs": ["PL-1", "PM-1"]
-    },
-    {
-      "id": "164.308(a)(1)(ii)(A)",
-      "section": "Administrative Safeguards",
-      "name": "Risk Analysis",
-      "description": "Accurate and thorough assessment of potential risks to ePHI",
-      "check_ids": [],
-      "applicability": "required",
-      "oscal_refs": ["RA-3"]
-    },
-    {
-      "id": "164.308(a)(2)",
-      "section": "Administrative Safeguards",
-      "name": "Assigned Security Responsibility",
-      "description": "Designate a HIPAA Security Officer",
-      "check_ids": [],
-      "applicability": "required",
-      "oscal_refs": ["PM-2"]
-    },
-    {
-      "id": "164.308(a)(3)(ii)(C)",
-      "section": "Administrative Safeguards",
-      "name": "Termination Procedures",
-      "description": "Revoke access when employment ends",
-      "check_ids": [],
-      "applicability": "addressable",
-      "oscal_refs": ["PS-4"]
-    },
-    {
-      "id": "164.308(a)(4)",
-      "section": "Administrative Safeguards",
-      "name": "Information Access Management",
-      "description": "Authorize access consistent with Privacy Rule",
-      "check_ids": ["iam-least-privilege-code", "aws-iam-wildcard", "rego-iam-wildcard", "rego-k8s-rbac-wildcard"],
-      "applicability": "required",
-      "oscal_refs": ["AC-1", "AC-2", "AC-3"]
-    },
-    {
-      "id": "164.308(a)(5)(i)",
-      "section": "Administrative Safeguards",
-      "name": "Security Awareness and Training",
-      "description": "Security awareness training program",
-      "check_ids": [],
-      "applicability": "addressable",
-      "oscal_refs": ["AT-1", "AT-2"]
-    },
-    {
-      "id": "164.308(a)(6)(i)",
-      "section": "Administrative Safeguards",
-      "name": "Security Incident Procedures",
-      "description": "Identify and respond to security incidents",
-      "check_ids": [],
-      "applicability": "required",
-      "oscal_refs": ["IR-1", "IR-6"]
-    },
-    {
-      "id": "164.308(a)(7)(i)",
-      "section": "Administrative Safeguards",
-      "name": "Contingency Plan",
-      "description": "Policies for responding to emergencies",
-      "check_ids": [],
-      "applicability": "required",
-      "oscal_refs": ["CP-1", "CP-2"]
-    },
-    {
-      "id": "164.312(a)(1)",
-      "section": "Technical Safeguards",
-      "name": "Access Control",
-      "description": "Technical policies to allow access only to authorized persons",
-      "check_ids": ["rbac-existence", "sensitive-data-in-browser", "sensitive-data-in-errors", "db-access-grants", "sensitive-data-in-notifications", "secrets-in-config", "aws-s3-public-access", "aws-iam-wildcard", "rego-rds-public"],
-      "applicability": "required",
-      "oscal_refs": ["AC-1", "AC-2", "AC-3", "AC-6"]
-    },
-    {
-      "id": "164.312(a)(2)(iii)",
-      "section": "Technical Safeguards",
-      "name": "Automatic Logoff",
-      "description": "Terminate session after period of inactivity",
-      "check_ids": ["session-timeout"],
-      "applicability": "addressable",
-      "oscal_refs": ["AC-11"]
-    },
-    {
-      "id": "164.312(a)(2)(iv)",
-      "section": "Technical Safeguards",
-      "name": "Encryption and Decryption",
-      "description": "Encrypt and decrypt ePHI at rest",
-      "check_ids": ["encryption-at-rest-code", "db-encryption", "aws-s3-encryption", "aws-rds-encryption", "aws-kms-rotation", "aws-lambda-kms", "aws-dynamodb-encryption", "rego-s3-encryption", "rego-rds-encryption", "rego-kms-rotation"],
-      "applicability": "addressable",
-      "oscal_refs": ["SC-28"]
-    },
-    {
-      "id": "164.312(b)",
-      "section": "Technical Safeguards",
-      "name": "Audit Controls",
-      "description": "Record and examine system activity",
-      "check_ids": ["sensitive-data-in-logs", "audit-logging-code", "db-audit-logging", "aws-cloudtrail", "aws-vpc-flow-logs", "aws-cloudwatch-retention", "aws-api-gateway-logging", "aws-config-enabled", "rego-cloudtrail-enabled"],
-      "applicability": "required",
-      "oscal_refs": ["AU-1", "AU-2", "AU-3", "AU-6"]
-    },
-    {
-      "id": "164.312(c)(1)",
-      "section": "Technical Safeguards",
-      "name": "Integrity",
-      "description": "Protect ePHI from improper alteration or destruction",
-      "check_ids": ["aws-s3-versioning"],
-      "applicability": "required",
-      "oscal_refs": ["SI-7"]
-    },
-    {
-      "id": "164.312(d)",
-      "section": "Technical Safeguards",
-      "name": "Person or Entity Authentication",
-      "description": "Verify identity of person seeking access",
-      "check_ids": ["password-hashing", "aws-iam-password-policy", "aws-iam-mfa", "rego-mfa-required"],
-      "applicability": "required",
-      "oscal_refs": ["IA-1", "IA-2", "IA-5"]
-    },
-    {
-      "id": "164.312(e)(1)",
-      "section": "Technical Safeguards",
-      "name": "Transmission Security",
-      "description": "Guard against unauthorized access during transmission",
-      "check_ids": ["db-connection-ssl", "aws-security-groups", "aws-lambda-vpc", "rego-security-group-open"],
-      "applicability": "required",
-      "oscal_refs": ["SC-8", "SC-13"]
-    },
-    {
-      "id": "164.314(a)(1)",
-      "section": "Organizational Requirements",
-      "name": "Business Associate Contracts",
-      "description": "Document satisfactory assurances from business associates",
-      "check_ids": [],
-      "applicability": "required",
-      "oscal_refs": ["SA-9"]
-    },
-    {
-      "id": "164.502",
-      "section": "Privacy Rule",
-      "name": "Uses and Disclosures",
-      "description": "Permitted uses and disclosures of PHI",
-      "check_ids": ["phi-identifiers", "health-data-fields", "sensitive-data-in-tests", "db-sensitive-columns"],
-      "applicability": "required",
-      "oscal_refs": ["AC-3", "MP-1"]
-    },
-    {
-      "id": "164.514",
-      "section": "Privacy Rule",
-      "name": "Safe Harbor De-identification",
-      "description": "18 HIPAA Safe Harbor identifiers",
-      "check_ids": ["phi-identifiers"],
-      "applicability": "required",
-      "oscal_refs": ["SI-12"]
-    }
+    { "id": "164.308(a)(1)(i)", "section": "Administrative Safeguards", "name": "Security Management Process", "description": "Policies to prevent, detect, contain, and correct security violations" },
+    { "id": "164.308(a)(1)(ii)(A)", "section": "Administrative Safeguards", "name": "Risk Analysis", "description": "Accurate and thorough assessment of potential risks to ePHI" },
+    { "id": "164.308(a)(1)(ii)(D)", "section": "Administrative Safeguards", "name": "Information System Activity Review", "description": "Regular review of audit logs, access reports, and security incident tracking" },
+    { "id": "164.308(a)(2)", "section": "Administrative Safeguards", "name": "Assigned Security Responsibility", "description": "Designate a HIPAA Security Officer" },
+    { "id": "164.308(a)(3)(ii)(C)", "section": "Administrative Safeguards", "name": "Termination Procedures", "description": "Revoke access when employment ends" },
+    { "id": "164.308(a)(4)", "section": "Administrative Safeguards", "name": "Information Access Management", "description": "Authorize access consistent with Privacy Rule" },
+    { "id": "164.308(a)(5)(i)", "section": "Administrative Safeguards", "name": "Security Awareness and Training", "description": "Security awareness training program" },
+    { "id": "164.308(a)(6)(i)", "section": "Administrative Safeguards", "name": "Security Incident Procedures", "description": "Identify and respond to security incidents" },
+    { "id": "164.308(a)(7)(i)", "section": "Administrative Safeguards", "name": "Contingency Plan", "description": "Policies for responding to emergencies" },
+    { "id": "164.308(b)(1)", "section": "Administrative Safeguards", "name": "Business Associate Contracts", "description": "Satisfactory assurances from business associates" },
+    { "id": "164.310(a)(1)", "section": "Physical Safeguards", "name": "Facility Access Controls", "description": "Limit physical access to electronic information systems" },
+    { "id": "164.310(b)", "section": "Physical Safeguards", "name": "Workstation Use", "description": "Specify proper functions and physical attributes of workstations" },
+    { "id": "164.310(c)", "section": "Physical Safeguards", "name": "Workstation Security", "description": "Physical safeguards restricting access to authorized users" },
+    { "id": "164.312(a)(1)", "section": "Technical Safeguards", "name": "Access Control", "description": "Technical policies to allow access only to authorized persons" },
+    { "id": "164.312(a)(2)(iii)", "section": "Technical Safeguards", "name": "Automatic Logoff", "description": "Terminate session after period of inactivity" },
+    { "id": "164.312(a)(2)(iv)", "section": "Technical Safeguards", "name": "Encryption and Decryption", "description": "Encrypt and decrypt ePHI at rest" },
+    { "id": "164.312(b)", "section": "Technical Safeguards", "name": "Audit Controls", "description": "Record and examine system activity" },
+    { "id": "164.312(c)(1)", "section": "Technical Safeguards", "name": "Integrity", "description": "Protect ePHI from improper alteration or destruction" },
+    { "id": "164.312(d)", "section": "Technical Safeguards", "name": "Person or Entity Authentication", "description": "Verify identity of person seeking access" },
+    { "id": "164.312(e)(1)", "section": "Technical Safeguards", "name": "Transmission Security", "description": "Guard against unauthorized access during transmission" },
+    { "id": "164.314(a)(1)", "section": "Organizational Requirements", "name": "Business Associate Contracts", "description": "Document satisfactory assurances from business associates" },
+    { "id": "164.316(a)", "section": "Policies and Documentation", "name": "Policies and Procedures", "description": "Implement reasonable and appropriate policies" },
+    { "id": "164.316(b)(1)", "section": "Policies and Documentation", "name": "Documentation", "description": "Maintain written policies and records of required actions" },
+    { "id": "164.502", "section": "Privacy Rule", "name": "Uses and Disclosures", "description": "Permitted uses and disclosures of PHI" },
+    { "id": "164.514", "section": "Privacy Rule", "name": "Safe Harbor De-identification", "description": "18 HIPAA Safe Harbor identifiers" }
   ],
   "checklist": [
     { "id": "164.308(a)(1)(i)", "section": "Administrative Safeguards", "text": "Security Management Process — policies to prevent, detect, contain, and correct security violations" },
@@ -232,79 +96,5 @@
     { "id": "164.316(a)", "section": "Policies and Documentation", "text": "Policies and Procedures — implement reasonable and appropriate policies" },
     { "id": "164.316(b)(1)", "section": "Policies and Documentation", "text": "Documentation — maintain written policies and records of required actions" },
     { "id": "164.316(b)(2)(i)", "section": "Policies and Documentation", "text": "Time Limit — retain documentation for 6 years" }
-  ],
-  "assessment_phases": [
-    {
-      "name": "Organization Profile",
-      "questions": [
-        {
-          "id": "Q1",
-          "question": "What types of {terminology.sensitive_data} does your application handle?",
-          "examples": "patient names, SSNs, MRNs, diagnoses, lab results, insurance IDs, billing records",
-          "requirement_id": "164.502"
-        },
-        {
-          "id": "Q2",
-          "question": "Are you a {terminology.covered_entity} or a {terminology.processor} under HIPAA?",
-          "requirement_id": "164.308(a)(1)(i)"
-        },
-        {
-          "id": "Q3",
-          "question": "What is your current HIPAA compliance maturity level?",
-          "requirement_id": "164.308(a)(8)"
-        },
-        {
-          "id": "Q4",
-          "question": "How many people are on the team? Do you have a designated Security Officer? Privacy Officer?",
-          "requirement_id": "164.308(a)(2)"
-        },
-        {
-          "id": "Q5",
-          "question": "What third-party services or vendors touch {terminology.sensitive_data}? For each, do you have a signed {terminology.processor_agreement}?",
-          "requirement_id": "164.314(a)(1)"
-        }
-      ]
-    },
-    {
-      "name": "Security Rule",
-      "questions": [
-        {
-          "id": "SR1",
-          "question": "How do users authenticate? Is MFA enforced for all users who access {terminology.sensitive_data}?",
-          "completion_criteria": "MFA enforced for all users with data access, documented offboarding process exists",
-          "requirement_id": "164.312(a)(1)"
-        },
-        {
-          "id": "SR2",
-          "question": "How do you track who accesses {terminology.sensitive_data} and what they do with it?",
-          "completion_criteria": "Audit logging for data access exists, logs retained and tamper-proof",
-          "requirement_id": "164.312(b)"
-        },
-        {
-          "id": "SR3",
-          "question": "Have you conducted a formal risk analysis?",
-          "completion_criteria": "Comprehensive risk assessment conducted covering all systems",
-          "requirement_id": "164.308(a)(1)(ii)(A)"
-        },
-        {
-          "id": "SR4",
-          "question": "Do all employees who may access {terminology.sensitive_data} receive security training?",
-          "completion_criteria": "Training program exists with records",
-          "requirement_id": "164.308(a)(5)(i)"
-        },
-        {
-          "id": "SR5",
-          "question": "Do you have a documented security incident response plan?",
-          "completion_criteria": "Documented procedure exists, has been tested",
-          "requirement_id": "164.308(a)(6)(i)"
-        },
-        {
-          "id": "SR6",
-          "question": "What are your plans for data backup, disaster recovery, and business continuity?",
-          "completion_criteria": "Backup plan documented, recovery tested, RPO/RTO defined",
-          "requirement_id": "164.308(a)(7)(i)"
-        }
-      ]
-    }
   ]
 }

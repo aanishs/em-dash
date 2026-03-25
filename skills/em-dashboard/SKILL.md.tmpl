@@ -1,67 +1,62 @@
 ---
 name: em-dashboard
-version: 0.1.0
+version: 2.0.0
 description: |
   Opens the em-dash compliance dashboard in your browser.
   Visual evidence management, checklists, and compliance tracking.
-
-  Run /em-dashboard to start the dashboard server on localhost.
 allowed-tools:
   - Bash
   - AskUserQuestion
-hipaa_sections: []
-risk_level: low
-requires_prior: []
 ---
 
-{{PREAMBLE}}
+# /em-dashboard — Visual Compliance Dashboard
 
-# em-dash Compliance Dashboard
+Open the em-dash compliance dashboard in the browser.
 
-You are running the `/em-dashboard` skill. Your only job is to start the dashboard server so the user can view their compliance state in the browser.
-
----
-
-## Step 1: Check Prerequisites
-
-Verify that `.em-dash/dashboard.json` exists in the project root:
+## Step 1: Check port availability
 
 ```bash
-if [ -f .em-dash/dashboard.json ]; then
-  echo "DASHBOARD_READY"
-  cat .em-dash/dashboard.json | head -5
+_EMDASH_DIR=$([ -d ~/.claude/skills/em-dash ] && echo ~/.claude/skills/em-dash || echo .claude/skills/em-dash)
+_PORT=${PORT:-3000}
+# Check if port is in use
+if lsof -i :$_PORT -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "PORT_IN_USE: $_PORT"
+  # Find next available port
+  for _P in 3001 3002 3003 3004 3005; do
+    if ! lsof -i :$_P -sTCP:LISTEN >/dev/null 2>&1; then
+      echo "NEXT_AVAILABLE: $_P"
+      break
+    fi
+  done
 else
-  echo "NO_DASHBOARD"
+  echo "PORT_FREE: $_PORT"
 fi
 ```
 
-If `NO_DASHBOARD`: tell the user "No dashboard config found. Run `/hipaa` first to initialize your HIPAA compliance dashboard, then come back here."
+If `PORT_IN_USE`:
+- Use AskUserQuestion: "Port [PORT] is occupied. Use port [NEXT_AVAILABLE] instead?"
+  - A) Yes, use [NEXT_AVAILABLE]
+  - B) I'll free up port [PORT] first
+- If A: set `_PORT` to the next available port
 
----
-
-## Step 2: Start Dashboard Server
+## Step 2: Start the server
 
 ```bash
-_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash ] && echo ~/.claude/skills/em-dash || echo .claude/skills/em-dash)
-cd "$_EMDASH_BIN" 2>/dev/null || true
-bun run scripts/dashboard-server.ts --project-dir "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" &
-echo "Dashboard running at http://localhost:3000"
+cd "$_EMDASH_DIR" && PORT=$_PORT bun run dashboard &
+sleep 1
+open http://localhost:$_PORT
 ```
 
-Tell the user:
+## Step 3: Confirm
 
-> Dashboard is running at **http://localhost:3000**
->
-> - View your compliance checklist and progress
-> - Drag and drop evidence files (BAAs, screenshots, policies)
-> - Track evidence gaps
->
-> The dashboard live-reloads when you run `/hipaa-scan`, `/hipaa-remediate`, or other skills.
->
-> Press Ctrl+C to stop the server.
+Tell the user: "Dashboard running at http://localhost:[PORT]"
 
----
-
-## Completion
-
-Report status: **DONE**
+The dashboard shows:
+- **Overview** — compliance summary and next-step recommendations
+- **NIST Controls** — per-control status from SQLite (scan, interview, docs, signed)
+- **Findings** — issues found during scans
+- **Checklist** — HIPAA checklist with completion status
+- **Evidence** — uploaded evidence files with SHA-256 hashes
+- **Risks** — risk register
+- **Vendors** — vendor/BAA tracking
+- **Activity** — timeline of all compliance actions

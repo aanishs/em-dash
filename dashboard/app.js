@@ -222,6 +222,7 @@
     renderVendors();
     renderGaps();
     renderActivity();
+    renderNistControls();
     updateNavBadges();
   }
 
@@ -1201,6 +1202,86 @@
       `).join('');
     } catch {
       el.innerHTML = '<div class="empty-state">Could not load activity.</div>';
+    }
+  }
+
+  // ─── NIST Controls (SQLite) ─────────────────────────────────
+
+  async function renderNistControls() {
+    const container = document.querySelector('[data-section="nist-controls"]');
+    if (!container) return;
+
+    // Find or create the content area
+    let el = document.getElementById('nist-controls-content');
+    if (!el) {
+      // Create section content on first render
+      const main = document.getElementById('main-content');
+      if (!main) return;
+      const section = document.createElement('div');
+      section.className = 'content-section';
+      section.dataset.section = 'nist-controls';
+      section.style.display = 'none';
+      section.innerHTML = '<div class="section-header"><h2>NIST 800-53 Controls</h2></div><div id="nist-controls-content"></div>';
+      main.appendChild(section);
+      el = document.getElementById('nist-controls-content');
+    }
+
+    try {
+      const res = await fetch('/api/compliance?view=summary');
+      if (!res.ok) {
+        el.innerHTML = '<div class="empty-state">No compliance database found. Run: <code>bin/hipaa-db init</code></div>';
+        return;
+      }
+      const data = await res.json();
+
+      if (!data.controls || data.controls.length === 0) {
+        el.innerHTML = '<div class="empty-state">No controls imported. Run: <code>bin/hipaa-db init</code></div>';
+        return;
+      }
+
+      const s = data.summary;
+      const pct = s.pct || 0;
+      const barColor = pct >= 80 ? '#16a34a' : pct >= 40 ? '#eab308' : '#dc2626';
+
+      let html = `
+        <div style="margin-bottom: 1.5rem;">
+          <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
+            <div><strong>${s.total}</strong> controls</div>
+            <div style="color: #16a34a;"><strong>${s.complete}</strong> complete</div>
+            <div style="color: #eab308;"><strong>${s.partial}</strong> partial</div>
+            <div style="color: #9ca3af;"><strong>${s.pending}</strong> pending</div>
+          </div>
+          <div style="background: var(--bg-tertiary, #e5e7eb); border-radius: 4px; height: 8px; overflow: hidden;">
+            <div style="background: ${barColor}; height: 100%; width: ${pct}%; transition: width 0.3s;"></div>
+          </div>
+          <div style="margin-top: 0.25rem; font-size: 0.85rem; color: var(--text-secondary, #6b7280);">${pct}% complete</div>
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border, #e5e7eb);">
+              <th style="text-align: left; padding: 0.5rem;">Control</th>
+              <th style="text-align: left; padding: 0.5rem;">Title</th>
+              <th style="text-align: left; padding: 0.5rem;">Family</th>
+              <th style="text-align: left; padding: 0.5rem;">Status</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      for (const c of data.controls) {
+        const statusColor = c.status === 'complete' ? '#16a34a' : c.status === 'partial' ? '#eab308' : '#9ca3af';
+        html += `
+          <tr style="border-bottom: 1px solid var(--border, #f3f4f6);">
+            <td style="padding: 0.5rem; font-weight: 600;">${escapeHtml(c.oscal_id)}</td>
+            <td style="padding: 0.5rem;">${escapeHtml(c.title)}</td>
+            <td style="padding: 0.5rem; font-size: 0.85rem;">${escapeHtml(c.family)}</td>
+            <td style="padding: 0.5rem;"><span style="color: ${statusColor}; font-weight: 600;">${c.status}</span></td>
+          </tr>`;
+      }
+
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = '<div class="empty-state">Could not load compliance data.</div>';
     }
   }
 

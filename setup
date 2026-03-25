@@ -52,7 +52,7 @@ if [ "$SKILLS_BASENAME" = "skills" ]; then
     fi
   done
 
-  # Also link the root (em-dash itself) so /hipaa works
+  # Also link the root (em-dash itself) so /comply works
   target="$SKILLS_DIR/em-dash"
   if [ -L "$target" ] || [ ! -e "$target" ]; then
     ln -snf "em-dash" "$SKILLS_DIR/em-dash" 2>/dev/null || true
@@ -78,17 +78,19 @@ if command -v bun >/dev/null 2>&1; then
 fi
 
 echo ""
-echo "Available skills:"
-echo "  /hipaa              — compliance dashboard + router"
-echo "  /hipaa-assess       — organizational assessment interview"
-echo "  /hipaa-scan         — automated technical scanning"
-echo "  /hipaa-remediate    — fix findings + generate policies"
-echo "  /hipaa-report       — compliance report generation"
-echo "  /hipaa-monitor      — compliance drift detection"
-echo "  /hipaa-breach       — breach notification workflow"
+echo "Skills (7):"
+echo "  /comply          — compliance status + router"
+echo "  /comply-auto     — autopilot: scan → fix → assess → next control"
+echo "  /comply-assess   — focused interview, one NIST control at a time"
+echo "  /comply-scan     — focused scan, one NIST control at a time"
+echo "  /comply-fix      — remediate failed controls"
+echo "  /comply-report   — compliance report + signed audit packet"
+echo "  /comply-breach   — incident response workflow"
 echo ""
-echo "OSCAL Bridge utilities:"
-echo "  bin/hipaa-oscal-import  — OSCAL catalog management"
-echo "  bin/hipaa-attest        — Ed25519 attestation signing"
-echo "  bin/hipaa-verify        — attestation verification"
-echo "  bin/hipaa-audit-packet  — signed audit packet generation"
+echo "Utilities (6):"
+echo "  bin/comply-db           — SQLite compliance database (init, status, query)"
+echo "  bin/comply-attest       — Ed25519 attestation signing"
+echo "  bin/comply-verify       — attestation verification"
+echo "  bin/comply-audit-packet — signed audit packet generation"
+echo "  bin/comply-evidence-hash — SHA-256 evidence hashing"
+echo "  bin/comply-slug         — project slug generation"

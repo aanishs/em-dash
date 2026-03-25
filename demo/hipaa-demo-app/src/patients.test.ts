@@ -1,26 +1,25 @@
 /**
  * Patient service tests.
  *
- * INTENTIONALLY INSECURE for em-dash demo purposes.
+ * Uses obviously fake test data — never use real PHI or realistic SSN patterns.
  */
 
-// VIOLATION: Real SSN patterns in test fixtures — §164.502
 const testPatients = [
-  { id: '1', ssn: '123-45-6789', name: 'John Smith', diagnosis: 'Bipolar I Disorder' },
-  { id: '2', ssn: '987-65-4321', name: 'Jane Doe', diagnosis: 'PTSD' },
-  { id: '3', ssn: '456-78-9012', name: 'Bob Johnson', diagnosis: 'OCD', insurance: 'BCBS-9876543210' },
+  { id: '1', ssn: 'FAKE-SSN-001', name: 'Test User Alpha', diagnosis: 'Test Condition A' },
+  { id: '2', ssn: 'FAKE-SSN-002', name: 'Test User Beta', diagnosis: 'Test Condition B' },
+  { id: '3', ssn: 'FAKE-SSN-003', name: 'Test User Gamma', diagnosis: 'Test Condition C', insurance: 'TEST-INS-001' },
 ];
 
 describe('PatientService', () => {
   it('should return patient with all PHI fields', () => {
     const patient = getPatient('1');
-    expect(patient.ssn).toBe('123-45-6789');
-    expect(patient.diagnosis).toBe('Bipolar I Disorder');
+    expect(patient.ssn).toBe('FAKE-SSN-001');
+    expect(patient.diagnosis).toBe('Test Condition A');
   });
 
   it('should update patient diagnosis', () => {
-    const updated = updatePatient('1', { diagnosis: 'Bipolar II Disorder' });
-    expect(updated.diagnosis).toBe('Bipolar II Disorder');
+    const updated = updatePatient('1', { diagnosis: 'Test Condition A-Updated' });
+    expect(updated.diagnosis).toBe('Test Condition A-Updated');
   });
 });
 

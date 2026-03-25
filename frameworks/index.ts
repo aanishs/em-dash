@@ -1,11 +1,13 @@
 /**
  * Framework loader — reads and validates framework definitions from JSON files.
+ *
+ * Framework definitions are display metadata only. Compliance relationships
+ * (which checks satisfy which requirements) live in the OSCAL mapping.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import type { FrameworkDefinition } from './schema';
-import { validateFrameworkChecks } from './checks-registry';
 
 const FRAMEWORKS_DIR = path.resolve(import.meta.dir);
 
@@ -41,13 +43,6 @@ export function loadFramework(id: string): FrameworkDefinition {
 
   if (def.id !== id) {
     throw new Error(`Framework ${id} has mismatched id field: "${def.id}"`);
-  }
-
-  // Validate check_ids reference existing checks
-  const allCheckIds = def.requirements.flatMap((r) => r.check_ids);
-  const { missing } = validateFrameworkChecks(id, allCheckIds);
-  if (missing.length > 0) {
-    console.warn(`Warning: Framework ${id} references ${missing.length} check IDs not in registry: ${missing.join(', ')}`);
   }
 
   return def;
