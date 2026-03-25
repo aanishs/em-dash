@@ -561,7 +561,7 @@
         datasets: [{
           data: hasFindings ? [sevCounts.critical, sevCounts.high, sevCounts.medium, sevCounts.low] : [1],
           backgroundColor: hasFindings
-            ? ['#dc2626', '#ea580c', '#ca8a04', '#2563eb']
+            ? [getCSSVar('--red') || '#dc2626', getCSSVar('--orange') || '#ea580c', getCSSVar('--yellow') || '#ca8a04', getCSSVar('--accent') || '#2563eb']
             : [getCSSVar('--border') || '#e5e5e5'],
         }]
       },
@@ -1348,15 +1348,15 @@
 
       const s = data.summary;
       const pct = s.pct || 0;
-      const barColor = pct >= 80 ? '#16a34a' : pct >= 40 ? '#eab308' : '#dc2626';
+      const barColor = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--yellow)' : 'var(--red)';
 
       let html = `
         <div style="margin-bottom: 1.5rem;">
           <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
             <div><strong>${s.total}</strong> controls</div>
-            <div style="color: #16a34a;"><strong>${s.complete}</strong> complete</div>
-            <div style="color: #eab308;"><strong>${s.partial}</strong> partial</div>
-            <div style="color: #9ca3af;"><strong>${s.pending}</strong> pending</div>
+            <div style="color: var(--green);"><strong>${s.complete}</strong> complete</div>
+            <div style="color: var(--yellow);"><strong>${s.partial}</strong> partial</div>
+            <div style="color: var(--text-secondary);"><strong>${s.pending}</strong> pending</div>
           </div>
           <div style="background: var(--bg-tertiary, #e5e7eb); border-radius: 4px; height: 8px; overflow: hidden;">
             <div style="background: ${barColor}; height: 100%; width: ${pct}%; transition: width 0.3s;"></div>
@@ -1375,7 +1375,7 @@
           <tbody>`;
 
       for (const c of data.controls) {
-        const statusColor = c.status === 'complete' ? '#16a34a' : c.status === 'partial' ? '#eab308' : '#9ca3af';
+        const statusColor = c.status === 'complete' ? 'var(--green)' : c.status === 'partial' ? 'var(--yellow)' : 'var(--text-secondary)';
         html += `
           <tr style="border-bottom: 1px solid var(--border, #f3f4f6);">
             <td style="padding: 0.5rem; font-weight: 600;">${escapeHtml(c.oscal_id)}</td>
@@ -1411,12 +1411,12 @@
       html += `<th style="text-align:center;padding:0.5rem;">Impact</th></tr></thead><tbody>`;
 
       for (const c of data.controls) {
-        const impactColor = c.framework_count >= 4 ? '#16a34a' : c.framework_count >= 3 ? '#eab308' : '#9ca3af';
-        html += `<tr style="border-bottom:1px solid var(--border,#f3f4f6);">
+        const impactColor = c.framework_count >= 4 ? 'var(--green)' : c.framework_count >= 3 ? 'var(--yellow)' : 'var(--text-secondary)';
+        html += `<tr style="border-bottom:1px solid var(--border);">
           <td style="padding:0.5rem;font-weight:600;">${escapeHtml(c.control_id)}</td>`;
         for (const fw of fws) {
           const has = c.frameworks.includes(fw);
-          html += `<td style="text-align:center;padding:0.5rem;color:${has ? '#16a34a' : '#d1d5db'};">${has ? '\u2713' : '\u00b7'}</td>`;
+          html += `<td style="text-align:center;padding:0.5rem;color:${has ? 'var(--green)' : 'var(--border)'};">${has ? '\u2713' : '\u00b7'}</td>`;
         }
         html += `<td style="text-align:center;padding:0.5rem;"><span style="background:${impactColor};color:white;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">${c.framework_count}/${fws.length}</span></td></tr>`;
       }

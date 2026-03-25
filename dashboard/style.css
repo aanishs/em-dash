@@ -344,7 +344,7 @@ header {
 .confirm-content h3 { margin-bottom: 0.5rem; }
 .confirm-content p { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem; }
 .btn-danger { background: var(--red); color: white; border-color: var(--red); }
-.btn-danger:hover { background: #b91c1c; }
+.btn-danger:hover { background: color-mix(in srgb, var(--red) 85%, black); }
 
 /* ─── Reveal button ──────────────────────────────────────── */
 
@@ -1361,7 +1361,7 @@ header {
   transition: background 0.15s, border-color 0.15s;
 }
 
-.btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.btn:hover { background: color-mix(in srgb, var(--accent) 85%, black); border-color: color-mix(in srgb, var(--accent) 85%, black); }
 .btn:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
 .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
 .btn-ghost { border: 1px solid transparent; background: transparent; color: var(--accent); }
