@@ -37,7 +37,7 @@ describe('Skill template validation', () => {
   const templates = findTemplates();
 
   test('8 skill templates exist', () => {
-    expect(templates.length).toBe(8);
+    expect(templates.length).toBe(12);
   });
 
   for (const tmpl of templates) {
@@ -61,7 +61,7 @@ describe('Generated SKILL.md files', () => {
   const generated = findGenerated();
 
   test('7 generated files exist', () => {
-    expect(generated.length).toBe(8);
+    expect(generated.length).toBe(12);
   });
 
   for (const md of generated) {

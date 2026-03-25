@@ -41,10 +41,18 @@ So em-dash is built to assist, not impersonate judgment. You stay in control. Yo
 (Why "em-dash"? The em dash and "delve" are both classic AI tells. LLMs can't stop using them. The Delve scandal pushed us to ship this publicly, so the name just... worked.)
 
 **Who this is for:**
-- You handle PHI and don't have a compliance person
-- You know you need HIPAA but don't know where to start
-- You got burned by vendor lock-in and want to own your compliance
-- You want to see your compliance state, not just hear about it
+- You need HIPAA, SOC 2, GDPR, or PCI-DSS compliance and don't have a dedicated compliance team
+- You're a startup founder who thinks compliance should take days, not months
+- You got burned by vendor lock-in ($10-50k/yr for a dashboard) and want to own your compliance
+- You want the AI to read the actual law and tell you exactly what to do — not a simplified checklist someone made up
+
+**What we support:**
+- **HIPAA** — healthcare, patient data (PHI), security rule, privacy rule
+- **SOC 2** — SaaS trust service criteria (security, availability, confidentiality)
+- **GDPR** — EU data protection, privacy rights, breach notification
+- **PCI-DSS** — payment card data security
+
+Run `/comply` and pick your framework. Need multiple? Select them all — controls are shared automatically.
 
 ---
 
@@ -80,8 +88,9 @@ em-dash works without any of these. The 19 code-level checks only need grep. Clo
 ## Demo
 
 ```
-You:    /comply
-Claude: Imported 50 NIST 800-53 controls for HIPAA.
+You:    /hipaa
+Claude: HIPAA compliance initialized.
+        Imported 50 NIST 800-53 controls.
         0% complete. 50 controls pending.
         Run /comply-auto to start.
 
@@ -113,19 +122,35 @@ Claude: → Signed audit packet: audit-packet.zip
         → Ed25519 signed, RFC 8785 canonicalized
 ```
 
+Need multiple? Run `/hipaa` then `/soc2` — controls are shared automatically.
+
 ## Usage
 
-Open Claude Code in any project that handles PHI.
+Open Claude Code in any project. Pick your framework:
+
+**Start here — pick your framework:**
+
+| Command | Framework |
+|---------|-----------|
+| `/hipaa` | **HIPAA** — healthcare, patient data (PHI), security rule |
+| `/soc2` | **SOC 2** — SaaS trust service criteria |
+| `/gdpr` | **GDPR** — EU data protection, privacy rights |
+| `/pci-dss` | **PCI-DSS** — payment card data security |
+
+Each command initializes the framework and imports the relevant NIST 800-53 controls. Run multiple to track several frameworks at once.
+
+**Then use these to do the work:**
 
 | Command | What it does |
 |---------|-------------|
-| `/comply` | Status dashboard. Shows compliance score per NIST control, recommends next step. |
-| `/comply-auto` | **Autopilot.** Loops through all controls: scans, fixes what it can, asks questions for the rest. |
-| `/comply-assess` | Focused interview. One NIST control at a time. Covers vendors, risk, training — all from NIST text. |
-| `/comply-scan` | Focused scan. One NIST control at a time. Runs em-dash + Prowler + Checkov. |
-| `/comply-fix` | Focused remediation. Picks failed controls, generates fixes, re-scans to verify. |
-| `/comply-report` | Compile evidence from SQLite. Generate compliance report + signed audit packet. |
-| `/comply-breach` | Incident response. Guided breach notification with 4-factor risk assessment. |
+| `/comply` | Status dashboard across all active frameworks. |
+| `/comply-auto` | **Autopilot.** Scans, fixes, asks questions — one control at a time. |
+| `/comply-assess` | Focused interview. One NIST control at a time. |
+| `/comply-scan` | Focused scan. Runs em-dash + Prowler + Checkov. |
+| `/comply-fix` | Focused remediation. Fix failures, re-scan to verify. |
+| `/comply-report` | Generate compliance report + signed audit packet. |
+| `/comply-breach` | Incident response. Guided breach notification. |
+| `/em-dashboard` | Open the visual compliance dashboard. |
 
 ### Architecture
 

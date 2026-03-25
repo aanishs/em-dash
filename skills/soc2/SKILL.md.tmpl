@@ -1,0 +1,43 @@
+---
+name: soc2
+version: 2.0.0
+description: |
+  SOC 2 compliance. Initializes the framework, shows status,
+  and routes to comply-auto/scan/assess/fix/report skills.
+allowed-tools:
+  - Bash
+  - Read
+  - AskUserQuestion
+---
+
+# /soc2 — SOC 2 Compliance
+
+Initialize SOC 2 compliance and show your status.
+
+## Step 1: Initialize
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+"$_EMDASH_BIN"/comply-db init --framework soc2 2>/dev/null || true
+"$_EMDASH_BIN"/comply-db summary
+"$_EMDASH_BIN"/comply-db status
+```
+
+Tell the user: "SOC 2 compliance initialized. [N] NIST 800-53 controls imported."
+
+## Step 2: Recommend next step
+
+- **0% complete:** "Run `/comply-auto` to start — it scans your infrastructure, fixes what it can, and asks you questions."
+- **Partial:** "Run `/comply-assess` for interviews or `/comply-scan` for automated checks."
+- **Failures found:** "Run `/comply-fix` to remediate."
+- **Complete:** "Run `/comply-report` to generate your signed audit packet."
+
+## Step 3: Multiple frameworks
+
+If user wants to add another framework: "Run `/soc2`, `/gdpr`, or `/pci-dss` to add more. Controls are shared automatically."
+
+## Important
+
+- All `/comply-*` skills work with whichever frameworks you've initialized.
+- Evidence lives in SQLite: `~/.em-dash/projects/{slug}/compliance.db`
+- SaaS trust service criteria — security, availability, confidentiality

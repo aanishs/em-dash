@@ -210,15 +210,15 @@ describe('Signing & Verification', () => {
 
 // ═══ Skills ═════════════════════════════════════════════════
 
-describe('Skills (8 total)', () => {
-  test('exactly 8 skill directories', () => {
+describe('Skills (12 total)', () => {
+  test('exactly 12 skill directories', () => {
     const skills = fs.readdirSync(path.join(ROOT, 'skills'))
       .filter((d: string) => fs.statSync(path.join(ROOT, 'skills', d)).isDirectory());
-    expect(skills.length).toBe(8);
+    expect(skills.length).toBe(12);
   });
 
   test('expected skills present', () => {
-    const expected = ['comply', 'comply-auto', 'comply-assess', 'comply-scan', 'comply-fix', 'comply-report', 'comply-breach', 'em-dashboard'];
+    const expected = ['comply', 'comply-auto', 'comply-assess', 'comply-scan', 'comply-fix', 'comply-report', 'comply-breach', 'em-dashboard', 'hipaa', 'soc2', 'gdpr', 'pci-dss'];
     const skills = fs.readdirSync(path.join(ROOT, 'skills'))
       .filter((d: string) => fs.statSync(path.join(ROOT, 'skills', d)).isDirectory());
     for (const s of expected) expect(skills).toContain(s);
@@ -235,7 +235,7 @@ describe('Skills (8 total)', () => {
 
   test('old skills removed', () => {
     const removed = ['comply-vendor', 'comply-risk', 'comply-monitor', 'comply-oscal-import',
-      'comply-verify', 'comply-remediate', 'soc2', 'soc2-scan'];
+      'comply-verify', 'comply-remediate', 'soc2-scan'];
     const skills = fs.readdirSync(path.join(ROOT, 'skills'))
       .filter((d: string) => fs.statSync(path.join(ROOT, 'skills', d)).isDirectory());
     for (const s of removed) expect(skills).not.toContain(s);
