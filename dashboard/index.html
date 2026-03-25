@@ -273,7 +273,7 @@
     <form method="dialog" id="evidence-edit-form">
       <h3>Edit Evidence</h3>
       <input type="hidden" id="evidence-edit-filename">
-      <label class="form-label">Type</label>
+      <label class="form-label" for="evidence-edit-type">Type</label>
       <select id="evidence-edit-type" class="form-select">
         <option value="baa">BAA</option>
         <option value="policy">Policy Document</option>
@@ -283,7 +283,7 @@
         <option value="training">Training Record</option>
         <option value="other">Other</option>
       </select>
-      <label class="form-label">Requirement</label>
+      <label class="form-label" for="evidence-edit-requirement">Requirement</label>
       <input type="text" id="evidence-edit-requirement" placeholder="e.g., 164.314(a)">
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="evidence-edit-cancel">Cancel</button>
@@ -298,16 +298,16 @@
       <h3>Add Finding</h3>
       <input type="text" id="finding-title" placeholder="Finding title" required>
       <textarea id="finding-description" placeholder="Description" rows="3"></textarea>
-      <label class="form-label">Severity</label>
+      <label class="form-label" for="finding-severity">Severity</label>
       <select id="finding-severity" class="form-select">
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium" selected>Medium</option>
         <option value="low">Low</option>
       </select>
-      <label class="form-label">Requirement</label>
+      <label class="form-label" for="finding-requirement">Requirement</label>
       <input type="text" id="finding-requirement" placeholder="e.g., 164.312(a)(1)">
-      <label class="form-label">Source</label>
+      <label class="form-label" for="finding-source">Source</label>
       <input type="text" id="finding-source" placeholder="e.g., scan, manual, audit">
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="finding-cancel">Cancel</button>
@@ -324,7 +324,7 @@
       <textarea id="risk-description" placeholder="Risk description" rows="2" required></textarea>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Likelihood</label>
+          <label class="form-label" for="risk-likelihood">Likelihood</label>
           <select id="risk-likelihood" class="form-select">
             <option value="1">1 - Very Unlikely</option>
             <option value="2">2 - Unlikely</option>
@@ -334,7 +334,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Impact</label>
+          <label class="form-label" for="risk-impact">Impact</label>
           <select id="risk-impact" class="form-select">
             <option value="1">1 - Insignificant</option>
             <option value="2">2 - Minor</option>
@@ -344,16 +344,16 @@
           </select>
         </div>
       </div>
-      <label class="form-label">Treatment</label>
+      <label class="form-label" for="risk-treatment">Treatment</label>
       <select id="risk-treatment" class="form-select">
         <option value="mitigate">Mitigate</option>
         <option value="accept">Accept</option>
         <option value="transfer">Transfer</option>
         <option value="avoid">Avoid</option>
       </select>
-      <label class="form-label">Owner</label>
+      <label class="form-label" for="risk-owner">Owner</label>
       <input type="text" id="risk-owner" placeholder="e.g., Security Officer">
-      <label class="form-label">Related Requirements</label>
+      <label class="form-label" for="risk-requirements">Related Requirements</label>
       <input type="text" id="risk-requirements" placeholder="e.g., 164.312(a)(2)(iv)">
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="risk-cancel">Cancel</button>
