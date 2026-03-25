@@ -4,12 +4,13 @@
  * Each compliance framework (HIPAA, SOC 2, GDPR, etc.) is defined as a JSON file
  * conforming to these interfaces. The template engine reads these at build time
  * to generate framework-specific SKILL.md files.
+ *
+ * IMPORTANT: Compliance relationships (which checks satisfy which requirements)
+ * are defined in the NIST 800-53 catalog + filter files (nist/), NOT here.
+ * Framework definitions contain display metadata only.
  */
 
-/** HIPAA implementation specification applicability */
-export type Applicability = 'required' | 'addressable';
-
-/** A single compliance requirement within a framework */
+/** A single compliance requirement within a framework (display only) */
 export interface Requirement {
   /** Unique ID within the framework (e.g., "164.312(a)(1)" for HIPAA) */
   id: string;
@@ -19,12 +20,6 @@ export interface Requirement {
   name: string;
   /** What this requirement means */
   description: string;
-  /** IDs of checks in the checks-registry that satisfy this requirement */
-  check_ids: string[];
-  /** NIST 800-53 OSCAL control references (e.g., ["AC-2", "AC-3"]) */
-  oscal_refs?: string[];
-  /** Whether this requirement is required or addressable (HIPAA-specific) */
-  applicability?: Applicability;
 }
 
 /** A checklist item for tracking compliance progress */
@@ -35,28 +30,6 @@ export interface ChecklistItem {
   section: string;
   /** Human-readable description */
   text: string;
-}
-
-/** An assessment question for organizational interviews */
-export interface AssessmentQuestion {
-  /** Question identifier */
-  id: string;
-  /** The question text (may contain {terminology.*} placeholders) */
-  question: string;
-  /** Example answers to guide the user */
-  examples?: string;
-  /** What "complete" means for this question */
-  completion_criteria?: string;
-  /** Which requirement this question maps to */
-  requirement_id?: string;
-}
-
-/** A phase of the assessment interview */
-export interface AssessmentPhase {
-  /** Phase name (e.g., "Organization Profile", "Security Rule") */
-  name: string;
-  /** Questions in this phase */
-  questions: AssessmentQuestion[];
 }
 
 /** Framework-specific terminology */
@@ -87,7 +60,7 @@ export interface Thresholds {
   credential_max_age_days: number;
 }
 
-/** Complete framework definition */
+/** Complete framework definition (display metadata — OSCAL mapping is the source of truth) */
 export interface FrameworkDefinition {
   /** Unique framework identifier (e.g., "hipaa", "soc2", "gdpr") */
   id: string;
@@ -105,6 +78,6 @@ export interface FrameworkDefinition {
   requirements: Requirement[];
   /** Checklist items for progress tracking */
   checklist: ChecklistItem[];
-  /** Assessment interview phases */
-  assessment_phases: AssessmentPhase[];
+  /** OSCAL profile ID that drives this framework's checks and assessments */
+  oscal_profile?: string;
 }
