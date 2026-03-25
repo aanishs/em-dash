@@ -423,20 +423,20 @@ header {
 .pipeline-step.pending { opacity: 0.4; border-style: dashed; }
 
 .pipeline-icon {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--border);
+  border-radius: 6px;
+  background: var(--bg);
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
   flex-shrink: 0;
 }
 
-.pipeline-step.complete .pipeline-icon { background: var(--green); color: white; }
-.pipeline-step.in-progress .pipeline-icon { background: var(--accent); color: white; }
+.pipeline-step.complete .pipeline-icon { background: var(--green-light); color: var(--green); }
+.pipeline-step.in-progress .pipeline-icon { background: var(--accent-light); color: var(--accent); }
 
 .pipeline-name {
   font-size: 0.8rem;
