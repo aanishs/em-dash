@@ -624,7 +624,7 @@
     if (findings.length === 0) {
       summaryEl.innerHTML = '';
       filtersEl.innerHTML = '';
-      el.innerHTML = '<div class="empty-state">No findings yet. Run <code>/comply-scan</code> to detect issues.</div>';
+      el.innerHTML = '<div class="empty-state">No compliance findings yet.<br>Run <code>/comply-scan</code> to automatically detect issues in your infrastructure.</div>';
       return;
     }
 
@@ -816,7 +816,7 @@
     }
 
     if (filtered.length === 0) {
-      html = '<div class="empty-state">No checklist items yet.</div>';
+      html = '<div class="empty-state">Your requirements checklist is empty.<br>Run <code>/comply-assess</code> to walk through compliance requirements, or add items manually.</div>';
     }
 
     el.innerHTML = html;
@@ -965,7 +965,7 @@
     }
 
     if (files.length === 0) {
-      el.innerHTML = `<div class="empty-state">${evidenceSearch ? 'No evidence matches your search.' : 'No evidence uploaded yet.'}</div>`;
+      el.innerHTML = `<div class="empty-state">${evidenceSearch ? 'No evidence matches your search.' : 'No evidence uploaded yet.<br>Drop files above or use <code>/comply-scan</code> to collect evidence automatically.'}</div>`;
       pagEl.innerHTML = '';
       return;
     }
@@ -1064,7 +1064,7 @@
     const risks = dashboard.risk_register || [];
 
     if (risks.length === 0) {
-      const emptyHtml = '<div class="empty-state">No risks identified. Add risks from your HIPAA risk analysis.</div>';
+      const emptyHtml = '<div class="empty-state">No risks in the register yet.<br>Run <code>/hipaa-risk</code> for a guided risk assessment, or add risks manually.</div>';
       matrixEl.innerHTML = risksView === 'matrix' ? emptyHtml : '';
       tableEl.innerHTML = risksView === 'table' ? emptyHtml : '';
       matrixEl.hidden = risksView !== 'matrix';
@@ -1294,7 +1294,7 @@
       const events = await res.json();
 
       if (!events || events.length === 0) {
-        el.innerHTML = '<div class="empty-state">No activity recorded yet.</div>';
+        el.innerHTML = '<div class="empty-state">No activity recorded yet.<br>Activity will appear here as you run scans, upload evidence, and make changes.</div>';
         return;
       }
 

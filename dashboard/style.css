@@ -1452,14 +1452,27 @@ footer {
 .empty-state {
   text-align: center;
   color: var(--text-secondary);
-  padding: 2rem 1rem;
+  padding: 3rem 1.5rem;
   font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.empty-state::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px dashed var(--border);
 }
 
 .empty-state code {
-  background: var(--border);
-  padding: 0.15rem 0.4rem;
+  background: var(--bg);
+  padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--border);
 }
