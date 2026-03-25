@@ -1,5 +1,5 @@
 ---
-name: hipaa-breach
+name: comply-breach
 version: 0.1.0
 description: |
   Guided HIPAA breach notification workflow. Walks through incident intake,
@@ -55,13 +55,18 @@ If `JUST_UPGRADED` was printed, note it and continue. Otherwise, skip this secti
 
 ## DISCLAIMER — Not Legal Advice
 
-> **IMPORTANT:** This provides technical guidance for implementing HIPAA compliance controls. It is NOT legal advice and does not constitute HIPAA certification. Consult qualified legal counsel and consider engaging a certified HIPAA auditor for formal compliance verification.
+> **IMPORTANT:** This tool provides technical guidance for implementing compliance
+> controls. It is NOT legal advice and does not constitute certification. Compliance
+> is a legal determination that depends on your specific circumstances. Always
+> consult qualified legal counsel and consider engaging a certified auditor for
+> formal compliance verification. This tool helps you implement and verify technical
+> safeguards — it does not certify compliance.
 
 ## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch, and the current compliance phase (e.g., "Assessment Q5 of 20", "Scanning AWS infrastructure", "Remediating encryption findings"). (1-2 sentences)
-2. **Simplify:** Explain the compliance requirement in plain English. No HIPAA Security Rule regulation numbers in the question itself — reference them in a note below.
+2. **Simplify:** Explain the compliance requirement in plain English. No compliance regulation numbers in the question itself — reference them in a note below.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]`
 4. **Options:** Lettered options: `A) ... B) ... C) ...`
 
@@ -116,7 +121,7 @@ When collecting evidence, always:
 After completing a skill, log the outcome:
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-breach" "<STATUS>" <FINDINGS_COUNT>
+"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "comply-breach" "<STATUS>" <FINDINGS_COUNT>
 ```
 
 ## Dashboard Sync
@@ -125,7 +130,7 @@ After logging the review, if `.em-dash/dashboard.json` exists in the project roo
 
 ```bash
 if [ -f .em-dash/dashboard.json ]; then
-  _SKILL_KEY="breach"
+  _SKILL_KEY="comply-breach"
   _STATUS_VAL="<STATUS>"
   _FINDINGS_VAL=<FINDINGS_COUNT>
   _SUMMARY="<ONE_LINE_SUMMARY>"
@@ -159,49 +164,11 @@ _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-da
 "$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
 ```
 
-## Dashboard Checklist Updates
 
-After documenting the breach response, update incident-related items based on how the response actually went.
-
-**Principle:** A breach response is evidence that your incident procedures work (or don't). Update the dashboard based on what actually happened, not what the policy says should happen.
-
-**Reference:**
-
-| Outcome | Checklist ID | Update |
-|---------|-------------|--------|
-| Incident identified and documented | 164.308(a)(6)(i) | Security incident procedures followed |
-| Response completed, notifications sent | 164.308(a)(6)(ii) | Response and reporting procedures work |
-| Breach report saved | 164.308(a)(6)(ii) | Attach as evidence with --evidence flag |
-| Response revealed gaps in procedures | 164.308(a)(6)(i) | Downgrade to pending if procedures failed |
-
-**How to update the dashboard:**
-
-```bash
-_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-# Checklist: mark an item as complete with reasoning
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete "<your reasoning>"
-# Checklist: mark as pending with an evidence gap
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" pending --gap "<what's missing>"
-# Checklist: attach evidence file
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete --evidence "<filename>"
-
-# Finding: add a new finding
-"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "<title>" --severity <critical|high|medium|low> --requirement "<id>" --source "<skill>"
-# Finding: resolve a finding
-"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "<title>"
-
-# Vendor: add a vendor/BA
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "<name>" --service "<service>" --baa-status <signed|pending|none> --risk-tier <low|medium|high|critical>
-# Vendor: update BAA status
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor update --name "<name>" --baa-status signed
-
-# Risk: add a risk
-"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "<desc>" --likelihood <1-5> --impact <1-5> --treatment <mitigate|accept|transfer|avoid> --owner "<owner>" --requirement "<ids>"
-```
 
 # HIPAA Breach Response Workflow
 
-You are running the `/hipaa-breach` skill. This is a guided workflow for assessing a potential HIPAA breach and determining notification requirements per the Breach Notification Rule (45 CFR 164.400-414).
+You are running the `/comply-breach` skill. This is a guided workflow for assessing a potential HIPAA breach and determining notification requirements per the Breach Notification Rule (45 CFR 164.400-414).
 
 **IMPORTANT: This is time-sensitive.** The HIPAA Breach Notification Rule requires individual notification within 60 calendar days of discovering a breach of unsecured PHI. Every day counts. Document everything.
 
@@ -618,7 +585,7 @@ Write the breach assessment and notification plan to `~/.em-dash/projects/$SLUG/
 ```bash
 USER=$(whoami)
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 REPORT_PATH="$HOME/.em-dash/projects/$SLUG/${USER}-breach-${DATETIME}.md"
 mkdir -p "$HOME/.em-dash/projects/$SLUG"
@@ -669,7 +636,7 @@ Write the report using the Write tool.
 ```bash
 # Findings count = number of risk factors rated MEDIUM or HIGH
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
 ```
 
@@ -694,7 +661,7 @@ CRITICAL REMINDERS
 
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
 ```
 

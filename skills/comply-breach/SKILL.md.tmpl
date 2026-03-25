@@ -1,5 +1,5 @@
 ---
-name: hipaa-breach
+name: comply-breach
 version: 0.1.0
 description: |
   Guided HIPAA breach notification workflow. Walks through incident intake,
@@ -25,7 +25,7 @@ requires_prior: []
 
 # HIPAA Breach Response Workflow
 
-You are running the `/hipaa-breach` skill. This is a guided workflow for assessing a potential HIPAA breach and determining notification requirements per the Breach Notification Rule (45 CFR 164.400-414).
+You are running the `/comply-breach` skill. This is a guided workflow for assessing a potential HIPAA breach and determining notification requirements per the Breach Notification Rule (45 CFR 164.400-414).
 
 **IMPORTANT: This is time-sensitive.** The HIPAA Breach Notification Rule requires individual notification within 60 calendar days of discovering a breach of unsecured PHI. Every day counts. Document everything.
 
@@ -442,7 +442,7 @@ Write the breach assessment and notification plan to `~/.em-dash/projects/$SLUG/
 ```bash
 USER=$(whoami)
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 REPORT_PATH="$HOME/.em-dash/projects/$SLUG/${USER}-breach-${DATETIME}.md"
 mkdir -p "$HOME/.em-dash/projects/$SLUG"
@@ -493,7 +493,7 @@ Write the report using the Write tool.
 ```bash
 # Findings count = number of risk factors rated MEDIUM or HIGH
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
 ```
 
@@ -518,7 +518,7 @@ CRITICAL REMINDERS
 
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 "$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
 ```
 
