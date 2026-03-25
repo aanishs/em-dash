@@ -1,0 +1,503 @@
+#!/usr/bin/env bun
+/**
+ * comply-db — SQLite compliance database manager.
+ *
+ * The single evidence store for all compliance data. Replaces:
+ * control-state.json, dashboard.json evidence, attestations/*.json
+ *
+ * Subcommands:
+ *   init                    Create DB + import HIPAA controls from NIST catalog
+ *   status                  Show compliance progress per control
+ *   control <oscal_id>      Show full detail for one control (NIST prose + evidence)
+ *   update-scan <id> <result>  Record scan result
+ *   update-interview <id>      Record interview completion
+ *   link-evidence <id> <file>  Link evidence document
+ *   sign <id>                  Record user signature
+ *   summary                    Overall compliance score
+ *   query <sql>                Run raw SQL (for debugging)
+ */
+
+import { Database } from 'bun:sqlite';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const args = process.argv.slice(2);
+const subcommand = args[0];
+const NIST_DIR = path.join(import.meta.dir, '..', 'nist');
+
+// ─── Framework detection ────────────────────────────────────
+
+function getFlag(name: string): string {
+  const idx = args.indexOf(`--${name}`);
+  if (idx === -1 || idx + 1 >= args.length) return '';
+  return args[idx + 1];
+}
+
+const FRAMEWORK = getFlag('framework') || 'hipaa';
+
+function getFilterPath(): string {
+  return path.join(NIST_DIR, `${FRAMEWORK}-filter.json`);
+}
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function getSlug(): string {
+  try {
+    const proc = Bun.spawnSync([path.join(import.meta.dir, 'comply-slug')], { stdout: 'pipe', stderr: 'pipe' });
+    const match = new TextDecoder().decode(proc.stdout).match(/SLUG=(\S+)/);
+    if (match) return match[1];
+  } catch {}
+  return path.basename(process.cwd());
+}
+
+function getDbPath(): string {
+  const dir = path.join(process.env.HOME ?? '', '.em-dash', 'projects', getSlug());
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'compliance.db');
+}
+
+function openDb(): InstanceType<typeof Database> {
+  return new Database(getDbPath());
+}
+
+function loadNistCatalog(): any {
+  const p = path.join(NIST_DIR, 'NIST_SP-800-53_rev5_catalog.json');
+  if (!fs.existsSync(p)) { console.error('NIST catalog not found at ' + p); process.exit(1); }
+  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+function loadFilter(): any {
+  const p = getFilterPath();
+  if (!fs.existsSync(p)) { console.error(`Filter not found: ${p}\nAvailable: ${fs.readdirSync(NIST_DIR).filter(f => f.endsWith('-filter.json')).join(', ')}`); process.exit(1); }
+  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+/** Extract control prose from NIST catalog */
+function extractControlProse(catalog: any, controlId: string): { prose: string; assess: string; title: string; family: string } {
+  const id = controlId.toLowerCase();
+  for (const group of catalog.catalog.groups) {
+    for (const ctrl of group.controls || []) {
+      if (ctrl.id === id) {
+        const prose = extractParts(ctrl.parts?.filter((p: any) => p.name === 'statement') || []);
+        const assess = extractParts(ctrl.parts?.filter((p: any) => p.name === 'assessment') || []);
+        return { prose, assess, title: ctrl.title, family: group.title };
+      }
+      // Check enhancements
+      for (const enh of ctrl.controls || []) {
+        if (enh.id === id) {
+          const prose = extractParts(enh.parts?.filter((p: any) => p.name === 'statement') || []);
+          const assess = extractParts(enh.parts?.filter((p: any) => p.name === 'assessment') || []);
+          return { prose, assess, title: enh.title || ctrl.title, family: group.title };
+        }
+      }
+    }
+  }
+  return { prose: '', assess: '', title: controlId, family: 'Unknown' };
+}
+
+function extractParts(parts: any[]): string {
+  let result = '';
+  for (const part of parts) {
+    if (part.prose) result += part.prose + '\n';
+    if (part.parts) result += extractParts(part.parts);
+  }
+  return result.trim();
+}
+
+// ─── Schema ─────────────────────────────────────────────────
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS metadata (
+  key            TEXT PRIMARY KEY,
+  value          TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS controls (
+  oscal_id       TEXT PRIMARY KEY,
+  title          TEXT NOT NULL,
+  family         TEXT NOT NULL,
+  nist_prose     TEXT NOT NULL,
+  nist_assess    TEXT,
+  framework_refs TEXT NOT NULL,
+  applicability  TEXT DEFAULT 'required',
+  status         TEXT DEFAULT 'pending',
+  updated_at     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS evidence (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  control_id     TEXT NOT NULL REFERENCES controls(oscal_id),
+  type           TEXT NOT NULL,
+  source         TEXT NOT NULL,
+  content        TEXT NOT NULL,
+  hash           TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  signed         INTEGER DEFAULT 0,
+  signature      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS check_results (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  control_id     TEXT NOT NULL REFERENCES controls(oscal_id),
+  tool           TEXT NOT NULL,
+  check_id       TEXT NOT NULL,
+  result         TEXT NOT NULL,
+  output         TEXT,
+  created_at     TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS signatures (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  control_id     TEXT,
+  signer         TEXT NOT NULL,
+  signer_type    TEXT NOT NULL,
+  statement      TEXT,
+  key_fingerprint TEXT,
+  signature      TEXT NOT NULL,
+  created_at     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_control ON evidence(control_id);
+CREATE INDEX IF NOT EXISTS idx_checks_control ON check_results(control_id);
+CREATE INDEX IF NOT EXISTS idx_sigs_control ON signatures(control_id);
+`;
+
+// ─── Subcommands ────────────────────────────────────────────
+
+function init() {
+  const db = openDb();
+  db.exec(SCHEMA);
+
+  const catalog = loadNistCatalog();
+  const filter = loadFilter();
+
+  // Collect unique control IDs from the filter
+  // framework_refs stores as {"hipaa": ["164.312(a)(1)"], "soc2": ["CC6.1"]}
+  // so multiple frameworks can share controls
+  const controlIds = new Set<string>();
+  const frameworkMap: Record<string, Record<string, string[]>> = {};
+  for (const [spec, controls] of Object.entries(filter.mapping)) {
+    for (const id of controls as string[]) {
+      controlIds.add(id);
+      if (!frameworkMap[id]) frameworkMap[id] = {};
+      if (!frameworkMap[id][FRAMEWORK]) frameworkMap[id][FRAMEWORK] = [];
+      frameworkMap[id][FRAMEWORK].push(spec);
+    }
+  }
+
+  // If DB already has controls from another framework, merge refs
+  const existingControls = db.prepare('SELECT oscal_id, framework_refs FROM controls').all() as any[];
+  for (const existing of existingControls) {
+    if (frameworkMap[existing.oscal_id]) {
+      const existingRefs = JSON.parse(existing.framework_refs || '{}');
+      frameworkMap[existing.oscal_id] = { ...existingRefs, ...frameworkMap[existing.oscal_id] };
+    }
+  }
+
+  // Store catalog version metadata
+  const catalogVersion = catalog.catalog?.metadata?.['oscal-version'] || 'unknown';
+  const catalogTitle = catalog.catalog?.metadata?.title || 'NIST SP 800-53';
+  const catalogModified = catalog.catalog?.metadata?.['last-modified'] || 'unknown';
+  const metaInsert = db.prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)');
+  metaInsert.run('catalog_version', catalogVersion);
+  metaInsert.run('catalog_title', catalogTitle);
+  metaInsert.run('catalog_last_modified', catalogModified);
+  metaInsert.run('framework', FRAMEWORK);
+  metaInsert.run('filter_version', filter.version || '1.0');
+  metaInsert.run('initialized_at', new Date().toISOString());
+
+  // Import controls from NIST catalog
+  const insert = db.prepare(`INSERT OR REPLACE INTO controls (oscal_id, title, family, nist_prose, nist_assess, framework_refs, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
+  let imported = 0;
+  let missing = 0;
+  const tx = db.transaction(() => {
+    for (const id of controlIds) {
+      const { prose, assess, title, family } = extractControlProse(catalog, id);
+      if (!prose && !title) {
+        console.error(`  WARNING: Control ${id} not found in NIST catalog`);
+        missing++;
+        continue;
+      }
+      const refs = JSON.stringify(frameworkMap[id] || []);
+      insert.run(id, title, family, prose || '(no prose)', assess || '', refs, new Date().toISOString());
+      imported++;
+    }
+  });
+  tx();
+  db.close();
+
+  console.log(`DB_INITIALIZED: ${getDbPath()}`);
+  console.log(`  Imported: ${imported} controls from NIST 800-53`);
+  if (missing > 0) console.log(`  Missing:  ${missing} controls not found in catalog`);
+  console.log(`  HIPAA specs: ${Object.keys(filter.mapping).length}`);
+}
+
+function status() {
+  const db = openDb();
+  const controls = db.prepare('SELECT oscal_id, title, family, status, framework_refs FROM controls ORDER BY oscal_id').all() as any[];
+
+  if (controls.length === 0) {
+    console.error('No controls. Run: comply-db init');
+    process.exit(1);
+  }
+
+  console.log(`\nCompliance Status — ${getSlug()}`);
+  console.log('═'.repeat(85));
+  console.log(`${'Control'.padEnd(8)} ${'Title'.padEnd(40)} ${'Family'.padEnd(20)} Status`);
+  console.log('─'.repeat(85));
+
+  for (const c of controls) {
+    const title = c.title.substring(0, 38).padEnd(40);
+    const family = c.family.substring(0, 18).padEnd(20);
+    console.log(`${c.oscal_id.padEnd(8)} ${title} ${family} ${c.status}`);
+  }
+
+  const total = controls.length;
+  const complete = controls.filter((c: any) => c.status === 'complete').length;
+  const partial = controls.filter((c: any) => c.status === 'partial').length;
+  const pending = controls.filter((c: any) => c.status === 'pending').length;
+  const pct = Math.round((complete / total) * 100);
+
+  console.log('─'.repeat(85));
+  console.log(`${total} controls | ${complete} complete (${pct}%) | ${partial} partial | ${pending} pending`);
+  db.close();
+}
+
+function controlDetail() {
+  const oscalId = args[1];
+  if (!oscalId) { console.error('Usage: comply-db control <oscal_id>'); process.exit(1); }
+
+  const db = openDb();
+  const ctrl = db.prepare('SELECT * FROM controls WHERE oscal_id = ?').get(oscalId) as any;
+  if (!ctrl) { console.error(`Control ${oscalId} not found`); process.exit(1); }
+
+  const checks = db.prepare('SELECT * FROM check_results WHERE control_id = ? ORDER BY created_at DESC').all(oscalId) as any[];
+  const evidence = db.prepare('SELECT * FROM evidence WHERE control_id = ? ORDER BY created_at DESC').all(oscalId) as any[];
+  const sigs = db.prepare('SELECT * FROM signatures WHERE control_id = ? ORDER BY created_at DESC').all(oscalId) as any[];
+
+  console.log(`\n═══ ${ctrl.oscal_id}: ${ctrl.title} ═══`);
+  console.log(`Family: ${ctrl.family} | Status: ${ctrl.status}`);
+  const refs = JSON.parse(ctrl.framework_refs || '{}');
+  const refSummary = Object.entries(refs).map(([fw, specs]) => `${fw}: ${(specs as string[]).join(', ')}`).join(' | ');
+  console.log(`Frameworks: ${refSummary}`);
+  console.log(`\nNIST Statement:\n${ctrl.nist_prose}`);
+  if (ctrl.nist_assess) console.log(`\nAssessment Method:\n${ctrl.nist_assess}`);
+
+  if (checks.length > 0) {
+    console.log(`\nCheck Results (${checks.length}):`);
+    for (const c of checks) console.log(`  ${c.result.padEnd(6)} ${c.tool}:${c.check_id} (${c.created_at})`);
+  }
+
+  if (evidence.length > 0) {
+    console.log(`\nEvidence (${evidence.length}):`);
+    for (const e of evidence) console.log(`  ${e.type} from ${e.source}: ${e.content.substring(0, 80)}...`);
+  }
+
+  if (sigs.length > 0) {
+    console.log(`\nSignatures (${sigs.length}):`);
+    for (const s of sigs) console.log(`  ${s.signer_type}: ${s.signer} (${s.created_at})`);
+  }
+
+  db.close();
+}
+
+function summary() {
+  const db = openDb();
+  const controls = db.prepare('SELECT status FROM controls').all() as any[];
+  const checks = db.prepare('SELECT result, COUNT(*) as cnt FROM check_results GROUP BY result').all() as any[];
+  const evidenceCount = db.prepare('SELECT COUNT(*) as cnt FROM evidence').get() as any;
+  const sigCount = db.prepare('SELECT COUNT(*) as cnt FROM signatures').get() as any;
+
+  const total = controls.length;
+  const complete = controls.filter((c: any) => c.status === 'complete').length;
+  const pct = Math.round((complete / total) * 100);
+
+  console.log(`\nCompliance Summary — ${getSlug()}`);
+  console.log('═'.repeat(50));
+  console.log(`  Controls:    ${total} total, ${complete} complete (${pct}%)`);
+  for (const c of checks) console.log(`  Checks:      ${c.cnt} ${c.result}`);
+  console.log(`  Evidence:    ${evidenceCount.cnt} items`);
+  console.log(`  Signatures:  ${sigCount.cnt}`);
+  db.close();
+}
+
+function updateScan() {
+  const oscalId = args[1];
+  const result = args[2]?.toUpperCase();
+  const tool = args[3] || 'emdash';
+  const checkId = args[4] || oscalId;
+  const output = args[5] || '';
+
+  if (!oscalId || !result) { console.error('Usage: comply-db update-scan <oscal_id> <PASS|FAIL> [tool] [check_id] [output]'); process.exit(1); }
+
+  const db = openDb();
+  db.prepare('INSERT INTO check_results (control_id, tool, check_id, result, output, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(oscalId, tool, checkId, result, output, new Date().toISOString());
+  db.prepare("UPDATE controls SET status = 'partial', updated_at = ? WHERE oscal_id = ?").run(new Date().toISOString(), oscalId);
+  db.close();
+  console.log(`CHECK_RECORDED: ${oscalId} ${tool}:${checkId} → ${result}`);
+}
+
+function signControl() {
+  const oscalId = args[1];
+  const statement = args[2] || 'I attest that the evidence for this control is accurate and complete.';
+
+  if (!oscalId) { console.error('Usage: comply-db sign <oscal_id> ["attestation statement"]'); process.exit(1); }
+
+  // Load signing key
+  const keysDir = path.join(process.env.HOME ?? '', '.em-dash', 'keys');
+  const privatePath = path.join(keysDir, 'default.pem');
+  const publicPath = path.join(keysDir, 'default.pub');
+
+  if (!fs.existsSync(privatePath)) {
+    console.error('No signing key. Run: bin/comply-attest init-keys');
+    process.exit(1);
+  }
+
+  const crypto = require('crypto');
+  const canonicalize = require('canonicalize');
+
+  const privateKey = crypto.createPrivateKey(fs.readFileSync(privatePath, 'utf-8'));
+  const publicKey = crypto.createPublicKey(privateKey);
+  const fp = 'ed25519:' + crypto.createHash('sha256')
+    .update(publicKey.export({ type: 'spki', format: 'der' }))
+    .digest('hex').slice(0, 16);
+
+  // Build the attestation payload
+  const payload = {
+    control_id: oscalId,
+    signer: process.env.USER || 'unknown',
+    signer_type: 'user',
+    statement,
+    key_fingerprint: fp,
+    created_at: new Date().toISOString(),
+  };
+
+  // Sign with RFC 8785 canonicalization
+  const canonical = canonicalize(payload);
+  const sig = crypto.sign(null, Buffer.from(canonical), privateKey).toString('base64');
+
+  // Store in SQLite
+  const db = openDb();
+  db.prepare('INSERT INTO signatures (control_id, signer, signer_type, statement, key_fingerprint, signature, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    oscalId, payload.signer, 'user', statement, fp, sig, payload.created_at,
+  );
+  db.close();
+
+  console.log(`USER_SIGNED: ${oscalId} by ${payload.signer} (${fp})`);
+  console.log(`Statement: ${statement}`);
+}
+
+function validateTools() {
+  const bindingsPath = path.join(NIST_DIR, 'tool-bindings.json');
+  if (!fs.existsSync(bindingsPath)) { console.error('Tool bindings not found'); process.exit(1); }
+  const bindings = JSON.parse(fs.readFileSync(bindingsPath, 'utf-8'));
+
+  // Validate em-dash checks against registry
+  const registryPath = path.join(import.meta.dir, '..', 'frameworks', 'checks-registry.ts');
+  const registryContent = fs.readFileSync(registryPath, 'utf-8');
+  const regIds = new Set<string>();
+  const re = /id:\s*['"]([^'"]+)['"]/g;
+  let m;
+  while ((m = re.exec(registryContent)) !== null) regIds.add(m[1]);
+
+  let errors = 0;
+  let prowlerCount = 0;
+  let checkovCount = 0;
+  const prowlerIds = new Set<string>();
+  const checkovIds = new Set<string>();
+
+  for (const [controlId, tools] of Object.entries(bindings.bindings)) {
+    const t = tools as any;
+
+    // Validate em-dash checks
+    for (const checkId of t.emdash || []) {
+      if (!regIds.has(checkId)) {
+        console.error(`  ERROR: ${controlId} references unknown em-dash check '${checkId}'`);
+        errors++;
+      }
+    }
+
+    // Count external tool references
+    for (const id of t.prowler || []) { prowlerIds.add(id); prowlerCount++; }
+    for (const id of t.checkov || []) { checkovIds.add(id); checkovCount++; }
+  }
+
+  // Validate Prowler IDs if prowler is installed
+  const prowlerInstalled = Bun.spawnSync(['which', 'prowler'], { stdout: 'pipe' }).exitCode === 0;
+  if (prowlerInstalled && prowlerIds.size > 0) {
+    console.log('  Validating Prowler check IDs...');
+    const proc = Bun.spawnSync(['prowler', '--list-checks-json'], { stdout: 'pipe', stderr: 'pipe' });
+    if (proc.exitCode === 0) {
+      try {
+        const checks = JSON.parse(new TextDecoder().decode(proc.stdout));
+        const validProwler = new Set(checks.map((c: any) => c.CheckID || c.check_id || c.id));
+        for (const id of prowlerIds) {
+          if (!validProwler.has(id)) {
+            console.error(`  WARNING: Prowler check '${id}' not found in installed version`);
+          }
+        }
+      } catch {
+        console.log('  Could not parse Prowler check list — skipping validation');
+      }
+    }
+  } else if (prowlerIds.size > 0) {
+    console.log(`  Prowler not installed — ${prowlerIds.size} check IDs not validated`);
+  }
+
+  // Validate Checkov IDs if checkov is installed
+  const checkovInstalled = Bun.spawnSync(['which', 'checkov'], { stdout: 'pipe' }).exitCode === 0;
+  if (checkovInstalled && checkovIds.size > 0) {
+    console.log('  Validating Checkov check IDs...');
+    const proc = Bun.spawnSync(['checkov', '--list'], { stdout: 'pipe', stderr: 'pipe' });
+    if (proc.exitCode === 0) {
+      const output = new TextDecoder().decode(proc.stdout);
+      for (const id of checkovIds) {
+        if (!output.includes(id)) {
+          console.error(`  WARNING: Checkov check '${id}' not found in installed version`);
+        }
+      }
+    }
+  } else if (checkovIds.size > 0) {
+    console.log(`  Checkov not installed — ${checkovIds.size} check IDs not validated`);
+  }
+
+  console.log(`\nTool Binding Validation:`);
+  console.log(`  Controls: ${Object.keys(bindings.bindings).length}`);
+  console.log(`  em-dash checks: ${regIds.size} in registry, ${errors} invalid references`);
+  console.log(`  Prowler refs: ${prowlerIds.size} unique IDs ${prowlerInstalled ? '(validated)' : '(not validated — install prowler)'}`);
+  console.log(`  Checkov refs: ${checkovIds.size} unique IDs ${checkovInstalled ? '(validated)' : '(not validated — install checkov)'}`);
+
+  if (errors > 0) process.exit(1);
+}
+
+function rawQuery() {
+  const sql = args.slice(1).join(' ');
+  if (!sql) { console.error('Usage: comply-db query "SELECT ..."'); process.exit(1); }
+  const db = openDb();
+  try {
+    const rows = db.prepare(sql).all();
+    console.log(JSON.stringify(rows, null, 2));
+  } catch (e: any) {
+    console.error(e.message);
+    process.exit(1);
+  }
+  db.close();
+}
+
+// ─── Router ─────────────────────────────────────────────────
+
+switch (subcommand) {
+  case 'init': init(); break;
+  case 'status': status(); break;
+  case 'control': controlDetail(); break;
+  case 'update-scan': updateScan(); break;
+  case 'summary': summary(); break;
+  case 'sign': signControl(); break;
+  case 'validate-tools': validateTools(); break;
+  case 'query': rawQuery(); break;
+  default:
+    console.error('Usage: comply-db <init|status|control|update-scan|summary|query>');
+    if (subcommand) console.error(`Unknown: ${subcommand}`);
+    process.exit(1);
+}
