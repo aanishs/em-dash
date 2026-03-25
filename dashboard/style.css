@@ -550,13 +550,13 @@ header {
 
 .chart-container {
   position: relative;
-  height: 200px;
+  height: 180px;
   min-width: 0;
   overflow: hidden;
 }
 
 .chart-container h3 {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-secondary);
   text-align: center;
