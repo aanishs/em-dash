@@ -148,7 +148,7 @@ main .page.active { display: flex; flex-direction: column; gap: 1.5rem; }
 }
 
 .sidebar-brand h1 {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   font-family: var(--mono);
@@ -167,13 +167,13 @@ main .page.active { display: flex; flex-direction: column; gap: 1.5rem; }
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 1rem;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  min-height: 44px;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  border-left: 3px solid transparent;
   transition: background 0.15s, color 0.15s;
   cursor: pointer;
 }
@@ -186,7 +186,7 @@ main .page.active { display: flex; flex-direction: column; gap: 1.5rem; }
 .nav-item.active {
   color: var(--accent);
   background: var(--accent-light);
-  border-left-color: var(--accent);
+  font-weight: 600;
 }
 
 .nav-icon {
@@ -202,7 +202,7 @@ main .page.active { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .nav-badge {
   margin-left: auto;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-family: var(--mono);
   background: var(--border);
   color: var(--text-secondary);
@@ -280,12 +280,13 @@ header {
 }
 
 .theme-toggle {
-  padding: 0.35rem 0.65rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 36px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   font-family: var(--font);
   cursor: pointer;
@@ -353,7 +354,7 @@ header {
   border-radius: var(--radius);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   cursor: pointer;
   font-family: var(--font);
 }
@@ -372,7 +373,7 @@ header {
 }
 
 .section h2 {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   margin-bottom: 1rem;
   letter-spacing: -0.01em;
@@ -489,7 +490,7 @@ header {
 /* ─── Pipeline Summary ───────────────────────────────────── */
 
 .pipeline-summary {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   margin-top: 0.125rem;
   line-height: 1.35;
@@ -519,14 +520,14 @@ header {
   line-height: 1.5;
 }
 
-.finding-dates { font-family: var(--mono); font-size: 0.7rem; margin-bottom: 0.3rem; }
+.finding-dates { font-family: var(--mono); font-size: 0.75rem; margin-bottom: 0.3rem; }
 
 .finding-evidence { margin-top: 0.25rem; }
 
 /* ─── Vendor Notes ───────────────────────────────────────── */
 
 .vendor-notes {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-style: italic;
   margin-top: 0.15rem;
@@ -621,7 +622,7 @@ header {
 }
 
 .finding-meta {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: var(--mono);
 }
@@ -672,7 +673,7 @@ header {
 
 .filter-tab .tab-progress {
   font-family: var(--mono);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   margin-left: 0.25rem;
   opacity: 0.8;
 }
@@ -720,7 +721,7 @@ header {
 }
 
 .checklist-item-id {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-family: var(--mono);
   color: var(--text-secondary);
 }
@@ -734,7 +735,7 @@ header {
 }
 
 .evidence-tag {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
   background: var(--accent-light);
@@ -751,7 +752,7 @@ header {
 .evidence-tag .unlink-btn {
   cursor: pointer;
   opacity: 0.6;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   border: none;
   background: none;
   color: inherit;
@@ -762,7 +763,7 @@ header {
 .evidence-tag .unlink-btn:hover { opacity: 1; }
 
 .evidence-link-btn {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.05rem 0.35rem;
   border-radius: 4px;
   border: 1px dashed var(--border);
@@ -778,7 +779,7 @@ header {
 }
 
 .evidence-link-select {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   padding: 0.15rem 0.3rem;
   border: 1px solid var(--accent);
   border-radius: 4px;
@@ -803,7 +804,7 @@ header {
 }
 
 .notes-btn {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.1rem 0.35rem;
   border: none;
   background: transparent;
@@ -953,7 +954,7 @@ header {
 .evidence-item-name a:hover { text-decoration: underline; }
 
 .evidence-item-meta {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: var(--mono);
 }
@@ -970,7 +971,7 @@ header {
   border-radius: 4px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   cursor: pointer;
   font-family: var(--font);
 }
@@ -979,7 +980,7 @@ header {
 .evidence-action-btn.delete:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
 
 .type-badge {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
   font-family: var(--mono);
@@ -1070,7 +1071,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-family: var(--mono);
   color: var(--text-secondary);
   height: 24px;
@@ -1080,7 +1081,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-family: var(--mono);
   color: var(--text-secondary);
 }
@@ -1102,7 +1103,7 @@ header {
 .matrix-cell.critical { background: var(--red-light); color: var(--red); }
 
 .matrix-axis-label {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
@@ -1147,13 +1148,13 @@ header {
 }
 
 .risk-meta {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: var(--mono);
 }
 
 .risk-treatment-badge {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
   font-family: var(--mono);
@@ -1193,12 +1194,12 @@ header {
 }
 
 .vendor-service {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
 .baa-badge {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
@@ -1213,7 +1214,7 @@ header {
 .baa-badge.none { background: var(--red-light); color: var(--red); }
 
 .vendor-expiry {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-family: var(--mono);
   flex-shrink: 0;
   min-width: 110px;
@@ -1224,7 +1225,7 @@ header {
 .vendor-expiry.expired { color: var(--red); font-weight: 600; }
 
 .vendor-risk-tier {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
   font-family: var(--mono);
@@ -1277,7 +1278,7 @@ header {
 .gap-item-text { font-size: 0.875rem; }
 
 .gap-item-req {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-family: var(--mono);
   color: var(--text-secondary);
 }
@@ -1335,7 +1336,7 @@ header {
 }
 
 .activity-time {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: var(--mono);
 }
