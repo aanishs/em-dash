@@ -235,7 +235,8 @@ main .page.active { display: flex; flex-direction: column; gap: 1.5rem; }
   #sidebar.open { transform: translateX(0); }
   .sidebar-toggle { display: block; }
   #content { margin-left: 0; }
-  main { max-width: 100%; }
+  main { max-width: 100%; padding: 1rem; }
+  body { overflow-x: hidden; }
 
   .sidebar-backdrop {
     display: none;
@@ -370,7 +371,7 @@ header {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.5rem;
-  overflow: hidden;
+  overflow-x: auto;
   min-width: 0;
 }
 
