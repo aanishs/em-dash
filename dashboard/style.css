@@ -1357,6 +1357,11 @@ header {
 
 /* ─── Buttons ────────────────────────────────────────────── */
 
+/* ─── Table row hover ────────────────────────────────────── */
+
+.section table tbody tr { transition: background 0.1s; }
+.section table tbody tr:hover { background: var(--bg); }
+
 .btn {
   padding: 0.4rem 0.75rem;
   border: 1px solid var(--accent);
