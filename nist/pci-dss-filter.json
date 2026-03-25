@@ -1,0 +1,29 @@
+{
+  "framework": "pci-dss",
+  "name": "PCI DSS v4.0 — Payment Card Industry Data Security Standard",
+  "source": "PCI SSC PCI-DSS-to-800-53 mapping",
+  "version": "1.0",
+  "note": "Maps PCI DSS v4.0 requirements to NIST 800-53 controls. PCI DSS is more prescriptive than HIPAA — specific technical requirements like TLS 1.2+, AES-256, etc.",
+  "mapping": {
+    "1.3.1":  ["SC-7", "SC-8"],
+    "1.3.2":  ["SC-7"],
+    "2.2.7":  ["CM-6", "AC-3"],
+    "3.4":    ["SC-28"],
+    "3.4.1":  ["SC-28"],
+    "3.5":    ["SC-12", "SC-28"],
+    "3.6.4":  ["SC-12"],
+    "4.2.1":  ["SC-8", "SC-13"],
+    "7.1":    ["AC-2", "AC-3"],
+    "7.2":    ["AC-2", "AC-3", "AC-6"],
+    "7.2.1":  ["AC-6"],
+    "8.2.8":  ["AC-11"],
+    "8.3.2":  ["IA-5"],
+    "8.3.6":  ["IA-5"],
+    "8.4.2":  ["IA-2"],
+    "8.6.3":  ["IA-5"],
+    "10.1":   ["AU-2", "AU-12"],
+    "10.2":   ["AU-2", "AU-3"],
+    "10.3":   ["AU-3"],
+    "10.6":   ["AU-6"]
+  }
+}
