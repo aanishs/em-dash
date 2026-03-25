@@ -108,6 +108,200 @@ describe('HIPAA Filter', () => {
   });
 });
 
+// ═══ All Framework Filters ═══════════════════════════════════
+
+describe('Framework Filters (all)', () => {
+  const filterFiles = fs.readdirSync(NIST).filter(f => f.endsWith('-filter.json'));
+
+  test('at least 5 framework filters exist', () => {
+    expect(filterFiles.length).toBeGreaterThanOrEqual(5);
+  });
+
+  for (const file of filterFiles) {
+    const filter = JSON.parse(fs.readFileSync(path.join(NIST, file), 'utf-8'));
+    const name = filter.framework || file.replace('-filter.json', '');
+
+    test(`${name}: has valid mapping field`, () => {
+      expect(filter.mapping).toBeDefined();
+      expect(Object.keys(filter.mapping).length).toBeGreaterThan(0);
+    });
+
+    test(`${name}: all mapping values are arrays of valid 800-53 control IDs`, () => {
+      for (const [, controls] of Object.entries(filter.mapping)) {
+        expect(Array.isArray(controls)).toBe(true);
+        for (const id of controls as string[]) {
+          expect(id).toMatch(/^[A-Z]{2}-\d+$/);
+        }
+      }
+    });
+  }
+});
+
+// ═══ CIS Filter ═══════════════════════════════════════════════
+
+describe('CIS Filter', () => {
+  const filter = JSON.parse(fs.readFileSync(path.join(NIST, 'cis-filter.json'), 'utf-8'));
+
+  test('framework is "cis"', () => {
+    expect(filter.framework).toBe('cis');
+  });
+
+  test('has 100+ safeguards', () => {
+    expect(Object.keys(filter.mapping).length).toBeGreaterThanOrEqual(100);
+  });
+
+  test('has implementation_groups with ig1, ig2, ig3', () => {
+    expect(filter.implementation_groups).toBeDefined();
+    expect(filter.implementation_groups.ig1).toBeArray();
+    expect(filter.implementation_groups.ig2).toBeArray();
+    expect(filter.implementation_groups.ig3).toBeArray();
+  });
+
+  test('every safeguard appears in exactly one IG', () => {
+    const ig = filter.implementation_groups;
+    const all = [...ig.ig1, ...ig.ig2, ...ig.ig3];
+    const mappingKeys = Object.keys(filter.mapping);
+
+    // No duplicates across tiers
+    expect(new Set(all).size).toBe(all.length);
+
+    // Every mapping key is in an IG
+    for (const key of mappingKeys) {
+      expect(all).toContain(key);
+    }
+
+    // Every IG entry is in mapping
+    for (const key of all) {
+      expect(mappingKeys).toContain(key);
+    }
+  });
+
+  test('IG1 has the most safeguards (essential hygiene)', () => {
+    const ig = filter.implementation_groups;
+    expect(ig.ig1.length).toBeGreaterThan(ig.ig3.length);
+  });
+});
+
+// ═══ Cross-Framework Matrix ══════════════════════════════════
+
+describe('Cross-Framework Matrix', () => {
+  test('buildCrossFrameworkMatrix returns valid structure', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix();
+
+    expect(matrix.frameworks).toBeArray();
+    expect(matrix.frameworks.length).toBeGreaterThanOrEqual(6);
+    expect(matrix.frameworks).toContain('cis');
+    expect(matrix.frameworks).toContain('hipaa');
+    expect(matrix.frameworks).toContain('iso27001');
+    expect(matrix.controls).toBeArray();
+    expect(matrix.total_controls).toBeGreaterThan(0);
+  });
+
+  test('SC-28 appears in all 6 frameworks', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix();
+    const sc28 = matrix.controls.find(c => c.control_id === 'SC-28');
+
+    expect(sc28).toBeDefined();
+    expect(sc28!.framework_count).toBe(6);
+    expect(sc28!.frameworks).toContain('hipaa');
+    expect(sc28!.frameworks).toContain('cis');
+    expect(sc28!.frameworks).toContain('soc2');
+    expect(sc28!.frameworks).toContain('gdpr');
+    expect(sc28!.frameworks).toContain('pci-dss');
+    expect(sc28!.frameworks).toContain('iso27001');
+  });
+
+  test('SC-28 has CIS benchmark refs', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix();
+    const sc28 = matrix.controls.find(c => c.control_id === 'SC-28');
+
+    expect(sc28!.cis_benchmark_refs.length).toBeGreaterThan(0);
+  });
+
+  test('controls are sorted by framework_count descending', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix();
+
+    for (let i = 1; i < matrix.controls.length; i++) {
+      expect(matrix.controls[i].framework_count).toBeLessThanOrEqual(matrix.controls[i - 1].framework_count);
+    }
+  });
+
+  test('formatMatrixTable produces readable output', async () => {
+    const { buildCrossFrameworkMatrix, formatMatrixTable } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix();
+    const table = formatMatrixTable(matrix);
+
+    expect(table).toContain('Cross-Framework');
+    expect(table).toContain('SC-28');
+    expect(table).toContain('CIS');
+    expect(table).toContain('HIPAA');
+  });
+});
+
+// ═══ Cross-Framework Filtering ═══════════════════════════════
+
+describe('Cross-Framework Filtering', () => {
+  test('filtering to ["hipaa"] returns only HIPAA controls', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix(['hipaa']);
+
+    expect(matrix.frameworks).toEqual(['hipaa']);
+    expect(matrix.controls.length).toBeGreaterThan(0);
+    for (const c of matrix.controls) {
+      expect(c.frameworks).toEqual(['hipaa']);
+      expect(c.framework_count).toBe(1);
+    }
+  });
+
+  test('filtering to ["hipaa", "cis"] returns 2-framework matrix', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix(['hipaa', 'cis']);
+
+    expect(matrix.frameworks).toEqual(['cis', 'hipaa']);
+    expect(matrix.controls.length).toBeGreaterThan(0);
+    // SC-28 should be in both
+    const sc28 = matrix.controls.find(c => c.control_id === 'SC-28');
+    expect(sc28).toBeDefined();
+    expect(sc28!.framework_count).toBe(2);
+  });
+
+  test('no filter returns all 6 frameworks (backward compat)', async () => {
+    const { buildCrossFrameworkMatrix } = await import('../nist/cross-framework.ts');
+    const matrix = buildCrossFrameworkMatrix();
+
+    expect(matrix.frameworks.length).toBeGreaterThanOrEqual(6);
+  });
+});
+
+// ═══ CIS Benchmark Refs in Tool Bindings ═════════════════════
+
+describe('CIS Benchmark Refs', () => {
+  const bindings = JSON.parse(fs.readFileSync(path.join(NIST, 'tool-bindings.json'), 'utf-8'));
+
+  test('at least 5 controls have cis_benchmark refs', () => {
+    let count = 0;
+    for (const binding of Object.values(bindings.bindings) as any[]) {
+      if (binding.cis_benchmark && binding.cis_benchmark.length > 0) count++;
+    }
+    expect(count).toBeGreaterThanOrEqual(5);
+  });
+
+  test('cis_benchmark values are strings', () => {
+    for (const binding of Object.values(bindings.bindings) as any[]) {
+      if (binding.cis_benchmark) {
+        expect(Array.isArray(binding.cis_benchmark)).toBe(true);
+        for (const ref of binding.cis_benchmark) {
+          expect(typeof ref).toBe('string');
+        }
+      }
+    }
+  });
+});
+
 // ═══ Tool Bindings ══════════════════════════════════════════
 
 describe('Tool Bindings', () => {
@@ -145,7 +339,7 @@ describe('SQLite Database', () => {
     const { stdout, exitCode } = await run('comply-db', ['init'], { env: env() });
     expect(exitCode).toBe(0);
     expect(stdout).toContain('DB_INITIALIZED');
-    expect(stdout).toContain('50 controls');
+    expect(stdout).toMatch(/\d+ controls/);
   });
 
   test('hipaa-db status shows all controls', async () => {
@@ -173,14 +367,14 @@ describe('SQLite Database', () => {
   test('hipaa-db summary shows counts', async () => {
     const { stdout, exitCode } = await run('comply-db', ['summary'], { env: env() });
     expect(exitCode).toBe(0);
-    expect(stdout).toContain('50 total');
+    expect(stdout).toMatch(/\d+ total/);
   });
 
   test('hipaa-db query works', async () => {
     const { stdout, exitCode } = await run('comply-db', ['query', 'SELECT COUNT(*) as cnt FROM controls'], { env: env() });
     expect(exitCode).toBe(0);
     const data = JSON.parse(stdout);
-    expect(data[0].cnt).toBe(50);
+    expect(data[0].cnt).toBeGreaterThanOrEqual(50);
   });
 });
 
@@ -252,12 +446,12 @@ describe('Checks Registry (pure execution)', () => {
     expect(content).not.toContain('FrameworkMapping');
   });
 
-  test('50 checks defined', () => {
+  test('at least 50 checks defined', () => {
     const ids: string[] = [];
     const re = /id:\s*['"]([^'"]+)['"]/g;
     let m;
     while ((m = re.exec(content)) !== null) ids.push(m[1]);
-    expect(ids.length).toBe(50);
-    expect(new Set(ids).size).toBe(50);
+    expect(ids.length).toBeGreaterThanOrEqual(50);
+    expect(new Set(ids).size).toBe(ids.length); // no duplicates
   });
 });

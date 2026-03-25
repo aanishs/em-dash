@@ -114,3 +114,43 @@ deny[msg] {
         "resource": name,
     }
 }
+
+# Azure — NSG rules must not allow 0.0.0.0/0 on sensitive ports
+deny[msg] {
+    resource := input.resource.azurerm_network_security_rule[name]
+    resource.direction == "Inbound"
+    resource.access == "Allow"
+    resource.source_address_prefix == "*"
+    sensitive_ports := {"22", "3306", "5432", "27017", "1433", "3389"}
+    resource.destination_port_range == sensitive_ports[_]
+    msg := {
+        "msg": sprintf("Azure NSG rule '%s' allows inbound * on sensitive port %s", [name, resource.destination_port_range]),
+        "check_id": "rego-security-group-open",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# Azure — App Service must use HTTPS only
+deny[msg] {
+    resource := input.resource.azurerm_app_service[name]
+    not resource.https_only
+    msg := {
+        "msg": sprintf("Azure App Service '%s' does not enforce HTTPS-only", [name]),
+        "check_id": "rego-security-group-open",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# GCP — Cloud Run must not allow unauthenticated invocations
+deny[msg] {
+    resource := input.resource.google_cloud_run_service_iam_member[name]
+    resource.member == "allUsers"
+    msg := {
+        "msg": sprintf("Cloud Run IAM binding '%s' allows unauthenticated access", [name]),
+        "check_id": "rego-security-group-open",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}

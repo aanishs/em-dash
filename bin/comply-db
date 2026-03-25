@@ -14,6 +14,7 @@
  *   link-evidence <id> <file>  Link evidence document
  *   sign <id>                  Record user signature
  *   summary                    Overall compliance score
+ *   cross-framework            Show cross-framework compliance matrix
  *   query <sql>                Run raw SQL (for debugging)
  */
 
@@ -34,6 +35,12 @@ function getFlag(name: string): string {
 }
 
 const FRAMEWORK = getFlag('framework') || 'hipaa';
+
+// Validate framework name to prevent path traversal
+if (!/^[a-z0-9-]+$/.test(FRAMEWORK)) {
+  console.error(`Invalid framework name: ${FRAMEWORK}`);
+  process.exit(1);
+}
 
 function getFilterPath(): string {
   return path.join(NIST_DIR, `${FRAMEWORK}-filter.json`);
@@ -164,9 +171,38 @@ CREATE INDEX IF NOT EXISTS idx_sigs_control ON signatures(control_id);
 
 // ─── Subcommands ────────────────────────────────────────────
 
+function migrateSchema(db: InstanceType<typeof Database>) {
+  // Add columns for orchestrator support (backward compatible)
+  const addColumnSafe = (table: string, column: string, type: string) => {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    } catch {
+      // Column already exists — ignore
+    }
+  };
+  addColumnSafe('check_results', 'severity', 'TEXT');
+  addColumnSafe('check_results', 'resource', 'TEXT');
+  addColumnSafe('check_results', 'scan_id', 'TEXT');
+  addColumnSafe('compliance_baselines', 'cross_framework_scores', 'TEXT');
+
+  // Compliance baselines for drift detection
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS compliance_baselines (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      snapshot_at    TEXT DEFAULT (datetime('now')),
+      total_controls INTEGER,
+      passing        INTEGER,
+      failing        INTEGER,
+      score          REAL,
+      tool_versions  TEXT
+    );
+  `);
+}
+
 function init() {
   const db = openDb();
   db.exec(SCHEMA);
+  migrateSchema(db);
 
   const catalog = loadNistCatalog();
   const filter = loadFilter();
@@ -205,6 +241,12 @@ function init() {
   metaInsert.run('framework', FRAMEWORK);
   metaInsert.run('filter_version', filter.version || '1.0');
   metaInsert.run('initialized_at', new Date().toISOString());
+
+  // Track active frameworks (append, don't overwrite)
+  const existingRow = db.prepare("SELECT value FROM metadata WHERE key = 'active_frameworks'").get() as any;
+  const activeList: string[] = existingRow ? JSON.parse(existingRow.value) : [];
+  if (!activeList.includes(FRAMEWORK)) activeList.push(FRAMEWORK);
+  metaInsert.run('active_frameworks', JSON.stringify(activeList));
 
   // Import controls from NIST catalog
   const insert = db.prepare(`INSERT OR REPLACE INTO controls (oscal_id, title, family, nist_prose, nist_assess, framework_refs, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -333,21 +375,28 @@ function updateScan() {
 
   const db = openDb();
   db.prepare('INSERT INTO check_results (control_id, tool, check_id, result, output, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(oscalId, tool, checkId, result, output, new Date().toISOString());
-  db.prepare("UPDATE controls SET status = 'partial', updated_at = ? WHERE oscal_id = ?").run(new Date().toISOString(), oscalId);
+
+  // Derive control status from check results instead of hard-setting to 'partial'
+  const results = db.prepare('SELECT result FROM check_results WHERE control_id = ?').all(oscalId) as any[];
+  const allPass = results.length > 0 && results.every((r: any) => r.result === 'PASS');
+  const derivedStatus = allPass ? 'complete' : (results.length > 0 ? 'partial' : 'pending');
+  db.prepare("UPDATE controls SET status = ?, updated_at = ? WHERE oscal_id = ?").run(derivedStatus, new Date().toISOString(), oscalId);
+
   db.close();
-  console.log(`CHECK_RECORDED: ${oscalId} ${tool}:${checkId} → ${result}`);
+  console.log(`CHECK_RECORDED: ${oscalId} ${tool}:${checkId} → ${result} (control: ${derivedStatus})`);
 }
 
 function signControl() {
   const oscalId = args[1];
-  const statement = args[2] || 'I attest that the evidence for this control is accurate and complete.';
+  const name = getFlag('name') || process.env.USER || 'unknown';
+  const role = getFlag('role') || 'unspecified';
+  const statement = getFlag('statement') || args[2] || 'I attest that the evidence for this control is accurate and complete.';
 
-  if (!oscalId) { console.error('Usage: comply-db sign <oscal_id> ["attestation statement"]'); process.exit(1); }
+  if (!oscalId) { console.error('Usage: comply-db sign <oscal_id> [--name "Jane Smith"] [--role "Security Officer"] [--statement "..."]'); process.exit(1); }
 
   // Load signing key
   const keysDir = path.join(process.env.HOME ?? '', '.em-dash', 'keys');
   const privatePath = path.join(keysDir, 'default.pem');
-  const publicPath = path.join(keysDir, 'default.pub');
 
   if (!fs.existsSync(privatePath)) {
     console.error('No signing key. Run: bin/comply-attest init-keys');
@@ -365,8 +414,11 @@ function signControl() {
 
   // Build the attestation payload
   const payload = {
+    type: 'user-attestation',
+    version: '1.0',
     control_id: oscalId,
-    signer: process.env.USER || 'unknown',
+    signer: name,
+    signer_role: role,
     signer_type: 'user',
     statement,
     key_fingerprint: fp,
@@ -380,12 +432,21 @@ function signControl() {
   // Store in SQLite
   const db = openDb();
   db.prepare('INSERT INTO signatures (control_id, signer, signer_type, statement, key_fingerprint, signature, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-    oscalId, payload.signer, 'user', statement, fp, sig, payload.created_at,
+    oscalId, name, 'user', statement, fp, sig, payload.created_at,
   );
+
+  // Also write file-based attestation for audit packets
+  const slug = getSlug();
+  const attestDir = path.join(process.env.HOME ?? '', '.em-dash', 'projects', slug, 'attestations');
+  if (!fs.existsSync(attestDir)) fs.mkdirSync(attestDir, { recursive: true });
+  const attestPath = path.join(attestDir, `user-${oscalId}-${Date.now()}.json`);
+  fs.writeFileSync(attestPath, JSON.stringify({ ...payload, signature: sig }, null, 2));
+
   db.close();
 
-  console.log(`USER_SIGNED: ${oscalId} by ${payload.signer} (${fp})`);
+  console.log(`USER_SIGNED: ${oscalId} by ${name} (${role}) — ${fp}`);
   console.log(`Statement: ${statement}`);
+  console.log(`Attestation: ${attestPath}`);
 }
 
 function validateTools() {
@@ -406,6 +467,7 @@ function validateTools() {
   let checkovCount = 0;
   const prowlerIds = new Set<string>();
   const checkovIds = new Set<string>();
+  const trivyIds = new Set<string>();
 
   for (const [controlId, tools] of Object.entries(bindings.bindings)) {
     const t = tools as any;
@@ -421,6 +483,7 @@ function validateTools() {
     // Count external tool references
     for (const id of t.prowler || []) { prowlerIds.add(id); prowlerCount++; }
     for (const id of t.checkov || []) { checkovIds.add(id); checkovCount++; }
+    for (const id of t.trivy || []) { trivyIds.add(id); }
   }
 
   // Validate Prowler IDs if prowler is installed
@@ -467,6 +530,7 @@ function validateTools() {
   console.log(`  em-dash checks: ${regIds.size} in registry, ${errors} invalid references`);
   console.log(`  Prowler refs: ${prowlerIds.size} unique IDs ${prowlerInstalled ? '(validated)' : '(not validated — install prowler)'}`);
   console.log(`  Checkov refs: ${checkovIds.size} unique IDs ${checkovInstalled ? '(validated)' : '(not validated — install checkov)'}`);
+  console.log(`  Trivy refs: ${trivyIds.size} unique AVD IDs`);
 
   if (errors > 0) process.exit(1);
 }
@@ -485,6 +549,167 @@ function rawQuery() {
   db.close();
 }
 
+// ─── Active Frameworks ──────────────────────────────────────
+
+function getActiveFrameworksList(): string[] {
+  try {
+    const db = openDb();
+    const row = db.prepare("SELECT value FROM metadata WHERE key = 'active_frameworks'").get() as any;
+    if (!row) {
+      // Legacy fallback: single 'framework' key
+      const legacy = db.prepare("SELECT value FROM metadata WHERE key = 'framework'").get() as any;
+      db.close();
+      return legacy ? [legacy.value] : [];
+    }
+    db.close();
+    return JSON.parse(row.value);
+  } catch {
+    return [];
+  }
+}
+
+function frameworks() {
+  const add = getFlag('add');
+  const remove = getFlag('remove');
+
+  if (add) {
+    if (!/^[a-z0-9-]+$/.test(add)) { console.error(`Invalid framework name: ${add}`); process.exit(1); }
+    const filterPath = path.join(NIST_DIR, `${add}-filter.json`);
+    if (!fs.existsSync(filterPath)) { console.error(`No filter file for ${add}. Available: ${fs.readdirSync(NIST_DIR).filter(f => f.endsWith('-filter.json')).map(f => f.replace('-filter.json', '')).join(', ')}`); process.exit(1); }
+    const db = openDb();
+    const row = db.prepare("SELECT value FROM metadata WHERE key = 'active_frameworks'").get() as any;
+    const active: string[] = row ? JSON.parse(row.value) : [];
+    if (!active.includes(add)) {
+      active.push(add);
+      db.prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('active_frameworks', ?)").run(JSON.stringify(active));
+      console.log(`Added ${add}. Active: ${active.join(', ')}`);
+    } else {
+      console.log(`${add} already active. Active: ${active.join(', ')}`);
+    }
+    db.close();
+    return;
+  }
+
+  if (remove) {
+    const db = openDb();
+    const row = db.prepare("SELECT value FROM metadata WHERE key = 'active_frameworks'").get() as any;
+    const active: string[] = row ? JSON.parse(row.value) : [];
+    const filtered = active.filter(f => f !== remove);
+    db.prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('active_frameworks', ?)").run(JSON.stringify(filtered));
+    console.log(`Removed ${remove}. Active: ${filtered.join(', ') || '(none)'}`);
+    db.close();
+    return;
+  }
+
+  // List
+  const active = getActiveFrameworksList();
+  if (active.length === 0) {
+    console.log('No active frameworks. Run /hipaa, /soc2, etc. to initialize.');
+  } else {
+    console.log(`Active frameworks: ${active.join(', ')}`);
+    console.log(`Available: hipaa, soc2, gdpr, pci-dss, cis, iso27001`);
+  }
+}
+
+// ─── Cross-Framework Matrix ─────────────────────────────────
+
+function crossFramework() {
+  const { buildCrossFrameworkMatrix, formatMatrixTable } = require(path.join(import.meta.dir, '..', 'nist', 'cross-framework.ts'));
+  const showAll = args.includes('--all');
+  const active = showAll ? [] : getActiveFrameworksList();
+  // If no active frameworks or --all, show all (backward compat for CLI)
+  const matrix = buildCrossFrameworkMatrix(active.length > 0 ? active : undefined);
+  const format = getFlag('format') || 'table';
+
+  if (format === 'json') {
+    console.log(JSON.stringify(matrix, null, 2));
+  } else {
+    console.log(formatMatrixTable(matrix));
+  }
+}
+
+// ─── CIS Coverage Gap Report ────────────────────────────────
+
+function cisCoverage() {
+  // CIS AWS Foundations Benchmark v3.0 Level 1 automated recommendations
+  // IDs only — all descriptions independently written (OpenSCAP model)
+  const CIS_AWS_LEVEL1: Array<{ id: string; section: string; description: string }> = [
+    { id: '1.4', section: 'IAM', description: 'Ensure no root account access key exists' },
+    { id: '1.5', section: 'IAM', description: 'Ensure MFA is enabled for root account' },
+    { id: '1.6', section: 'IAM', description: 'Ensure hardware MFA is enabled for root' },
+    { id: '1.10', section: 'IAM', description: 'Ensure MFA for IAM users with console access' },
+    { id: '1.12', section: 'IAM', description: 'Ensure credentials unused for 45+ days are disabled' },
+    { id: '1.14', section: 'IAM', description: 'Ensure access keys are rotated within 90 days' },
+    { id: '1.16', section: 'IAM', description: 'Ensure IAM policies are attached only to groups or roles' },
+    { id: '1.17', section: 'IAM', description: 'Ensure a support role has been created for AWS Support' },
+    { id: '1.22', section: 'IAM', description: 'Ensure IAM users are managed centrally via identity federation' },
+    { id: '2.1.1', section: 'Storage', description: 'Ensure S3 bucket encryption is enabled' },
+    { id: '2.1.2', section: 'Storage', description: 'Ensure S3 bucket policy denies HTTP requests' },
+    { id: '2.1.4', section: 'Storage', description: 'Ensure S3 public access is blocked at account level' },
+    { id: '2.3.1', section: 'Storage', description: 'Ensure RDS instances have encryption at rest enabled' },
+    { id: '2.3.2', section: 'Storage', description: 'Ensure RDS instances have auto minor version upgrade enabled' },
+    { id: '2.3.3', section: 'Storage', description: 'Ensure RDS instances are not publicly accessible' },
+    { id: '2.4.1', section: 'Storage', description: 'Ensure EBS volume encryption is enabled by default' },
+    { id: '3.1', section: 'Logging', description: 'Ensure CloudTrail is enabled in all regions' },
+    { id: '3.2', section: 'Logging', description: 'Ensure CloudTrail log file validation is enabled' },
+    { id: '3.3', section: 'Logging', description: 'Ensure CloudTrail S3 bucket is not publicly accessible' },
+    { id: '3.4', section: 'Logging', description: 'Ensure CloudTrail trails are integrated with CloudWatch Logs' },
+    { id: '3.5', section: 'Logging', description: 'Ensure AWS Config is enabled in all regions' },
+    { id: '3.6', section: 'Logging', description: 'Ensure S3 bucket access logging is enabled on CloudTrail bucket' },
+    { id: '3.7', section: 'Logging', description: 'Ensure CloudTrail logs are encrypted with KMS CMK' },
+    { id: '4.1', section: 'Monitoring', description: 'Ensure unauthorized API calls alarm is configured' },
+    { id: '4.3', section: 'Monitoring', description: 'Ensure root account usage alarm is configured' },
+    { id: '4.4', section: 'Monitoring', description: 'Ensure IAM policy changes alarm is configured' },
+    { id: '4.5', section: 'Monitoring', description: 'Ensure CloudTrail config changes alarm is configured' },
+    { id: '4.6', section: 'Monitoring', description: 'Ensure console auth failures alarm is configured' },
+    { id: '4.12', section: 'Monitoring', description: 'Ensure network gateway changes alarm is configured' },
+    { id: '4.14', section: 'Monitoring', description: 'Ensure VPC changes alarm is configured' },
+    { id: '5.1', section: 'Networking', description: 'Ensure no network ACLs allow 0.0.0.0/0 ingress to admin ports' },
+    { id: '5.2', section: 'Networking', description: 'Ensure no security groups allow 0.0.0.0/0 ingress to admin ports' },
+    { id: '5.3', section: 'Networking', description: 'Ensure default security group restricts all traffic' },
+    { id: '5.4', section: 'Networking', description: 'Ensure VPC flow logging is enabled in all VPCs' },
+  ];
+
+  // Load tool-bindings to find which CIS benchmark IDs em-dash covers
+  const bindingsPath = path.join(NIST_DIR, 'tool-bindings.json');
+  const bindings = JSON.parse(fs.readFileSync(bindingsPath, 'utf-8'));
+
+  const coveredIds = new Set<string>();
+  for (const binding of Object.values(bindings.bindings) as any[]) {
+    for (const ref of binding.cis_benchmark || []) coveredIds.add(ref);
+  }
+
+  console.log('CIS AWS Foundations Benchmark v3.0 — Level 1 Coverage Report');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log(`em-dash covers ${coveredIds.size} of ${CIS_AWS_LEVEL1.length} Level 1 automated recommendations\n`);
+
+  const covered: typeof CIS_AWS_LEVEL1 = [];
+  const gaps: typeof CIS_AWS_LEVEL1 = [];
+
+  for (const rec of CIS_AWS_LEVEL1) {
+    if (coveredIds.has(rec.id)) covered.push(rec);
+    else gaps.push(rec);
+  }
+
+  if (covered.length > 0) {
+    console.log(`COVERED (${covered.length}):`);
+    for (const r of covered) console.log(`  ✓ ${r.id.padEnd(8)} ${r.section.padEnd(12)} ${r.description}`);
+    console.log();
+  }
+
+  if (gaps.length > 0) {
+    console.log(`GAPS (${gaps.length}):`);
+    for (const r of gaps) console.log(`  ✗ ${r.id.padEnd(8)} ${r.section.padEnd(12)} ${r.description}`);
+    console.log();
+  }
+
+  const pct = Math.round((covered.length / CIS_AWS_LEVEL1.length) * 100);
+  console.log(`Coverage: ${pct}% (${covered.length}/${CIS_AWS_LEVEL1.length})`);
+  if (gaps.length > 0) {
+    console.log(`\nTo improve: add cis_benchmark IDs to controls in nist/tool-bindings.json`);
+  }
+}
+
 // ─── Router ─────────────────────────────────────────────────
 
 switch (subcommand) {
@@ -495,9 +720,12 @@ switch (subcommand) {
   case 'summary': summary(); break;
   case 'sign': signControl(); break;
   case 'validate-tools': validateTools(); break;
+  case 'cross-framework': crossFramework(); break;
+  case 'frameworks': frameworks(); break;
+  case 'cis-coverage': cisCoverage(); break;
   case 'query': rawQuery(); break;
   default:
-    console.error('Usage: comply-db <init|status|control|update-scan|summary|query>');
+    console.error('Usage: comply-db <init|status|control|update-scan|summary|cross-framework|frameworks|cis-coverage|query>');
     if (subcommand) console.error(`Unknown: ${subcommand}`);
     process.exit(1);
 }

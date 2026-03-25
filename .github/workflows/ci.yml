@@ -17,3 +17,48 @@ jobs:
       - run: bun install
       - run: bun run gen:skill-docs -- --dry-run
       - run: bun test
+
+  compliance:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+
+      # Initialize compliance database
+      - run: bun bin/comply-db init --framework hipaa
+
+      # Detect available scanning tools
+      - run: bun bin/comply-orchestrate detect
+
+      # Run code-level checks (always available, no cloud credentials needed)
+      - name: Validate tool bindings
+        run: bun bin/comply-db validate-tools
+
+      # Show compliance summary
+      - run: bun bin/comply-db summary
+
+      # Comment compliance status on PR (warn-only, does not block)
+      - name: Comment compliance status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            let summary = '';
+            try {
+              summary = execSync('bun bin/comply-db summary', { encoding: 'utf8' });
+            } catch (e) {
+              summary = 'Compliance summary unavailable.';
+            }
+            const body = `## em-dash Compliance Check\n\n\`\`\`\n${summary}\n\`\`\`\n\n> This is an informational check — it does not block merging.\n> Run \`/hipaa\` locally for a full interactive compliance audit.`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body,
+            });

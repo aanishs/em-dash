@@ -4,6 +4,11 @@
   'use strict';
 
   let dashboard = {};
+  let complianceData = null;   // SQLite compliance data (controls, summary, checks)
+  let complianceScore = null;  // per-family score breakdown
+  let crossFrameworkData = null; // cross-framework matrix
+  let toolsData = null;        // available scanning tools
+  let frameworksData = null;   // { active: [...], available: [...] }
   let activeFilter = 'all';
   let evidencePage = 0;
   let evidenceSearch = '';
@@ -61,7 +66,7 @@
       Chart.defaults.color = getCSSVar('--text-secondary') || '#666';
     }
 
-    await fetchDashboard();
+    await Promise.all([fetchDashboard(), fetchComplianceData()]);
     render();
     setupSidebar();
     setupUpload();
@@ -89,6 +94,23 @@
     for (const fw of Object.values(dashboard.frameworks || {})) {
       if (!fw.findings) fw.findings = [];
     }
+  }
+
+  async function fetchComplianceData() {
+    // Fetch SQLite-backed compliance data in parallel (all non-blocking)
+    const [compRes, scoreRes, crossRes, toolsRes, fwRes] = await Promise.all([
+      fetch('/api/compliance?view=summary').catch(() => null),
+      fetch('/api/compliance/score').catch(() => null),
+      fetch('/api/cross-framework').catch(() => null),
+      fetch('/api/tools').catch(() => null),
+      fetch('/api/frameworks').catch(() => null),
+    ]);
+
+    if (compRes?.ok) complianceData = await compRes.json().catch(() => null);
+    if (scoreRes?.ok) complianceScore = await scoreRes.json().catch(() => null);
+    if (crossRes?.ok) crossFrameworkData = await crossRes.json().catch(() => null);
+    if (toolsRes?.ok) toolsData = await toolsRes.json().catch(() => null);
+    if (fwRes?.ok) frameworksData = await fwRes.json().catch(() => null);
   }
 
   // ─── Sidebar Navigation ──────────────────────────────────
@@ -144,15 +166,22 @@
   }
 
   function updateNavBadges() {
-    const fw = dashboard.frameworks?.hipaa || {};
-    const findings = (fw.findings || []).filter(f => f.status !== 'resolved');
-    const badge = document.getElementById('nav-findings-badge');
-    if (badge) badge.textContent = findings.length || '';
+    // Aggregate across active frameworks (not just hipaa)
+    const activeIds = frameworksData?.active || Object.keys(dashboard.frameworks || {});
+    let totalFindings = 0, totalComplete = 0, totalChecklist = 0;
+    for (const fwId of activeIds) {
+      const fw = dashboard.frameworks?.[fwId] || {};
+      totalFindings += (fw.findings || []).filter(f => f.status !== 'resolved').length;
+      const cl = fw.checklist || [];
+      totalChecklist += cl.length;
+      totalComplete += cl.filter(i => i.status === 'complete').length;
+    }
 
-    const checklist = fw.checklist || [];
-    const complete = checklist.filter(i => i.status === 'complete').length;
+    const badge = document.getElementById('nav-findings-badge');
+    if (badge) badge.textContent = totalFindings || '';
+
     const clBadge = document.getElementById('nav-checklist-badge');
-    if (clBadge) clBadge.textContent = complete + '/' + checklist.length;
+    if (clBadge) clBadge.textContent = totalChecklist > 0 ? totalComplete + '/' + totalChecklist : '';
 
     const risks = (dashboard.risk_register || []).filter(r => r.status !== 'closed');
     const rBadge = document.getElementById('nav-risks-badge');
@@ -214,6 +243,7 @@
     renderHeader();
     renderNLSummary();
     renderPipeline();
+    renderTools();
     renderSummaryCharts();
     renderFindings();
     renderChecklist();
@@ -223,21 +253,25 @@
     renderGaps();
     renderActivity();
     renderNistControls();
+    renderCrossFramework();
     updateNavBadges();
   }
 
   function renderHeader() {
     const el = document.getElementById('project-name');
     const proj = dashboard.project || {};
-    const frameworks = Object.keys(dashboard.frameworks || {});
-    const lastUpdated = dashboard.frameworks?.hipaa?.last_updated;
-    const updatedText = lastUpdated ? ` \u00b7 Updated ${timeAgo(lastUpdated)}` : '';
+
+    // Show only frameworks the user has opted into
+    const activeFrameworkList = frameworksData?.active || [];
+    const legacyFrameworks = Object.keys(dashboard.frameworks || {});
+    const allFrameworks = activeFrameworkList.length > 0 ? activeFrameworkList : legacyFrameworks;
+
     el.textContent = proj.name
-      ? `${proj.name} \u2014 ${frameworks.map(f => f.toUpperCase()).join(', ') || 'No frameworks'}${updatedText}`
+      ? `${proj.name} \u2014 ${allFrameworks.map(f => f.toUpperCase()).join(', ') || 'No frameworks'}`
       : 'No project configured. Run /hipaa to get started.';
 
-    // Score
-    const score = computeScore();
+    // Score: prefer SQLite compliance score, fall back to legacy checklist
+    const score = complianceScore?.score ?? complianceData?.summary?.pct ?? computeScore();
     document.getElementById('score-text').textContent = score + '%';
     document.getElementById('ring-fill').setAttribute('stroke-dasharray', `${score}, 100`);
 
@@ -304,24 +338,83 @@
   }
 
   function computeNextStep(frameworks) {
-    const fw = frameworks.hipaa || {};
+    // Use first active framework for recommendations
+    const activeIds = frameworksData?.active || Object.keys(frameworks);
+    const primaryFw = activeIds[0] || 'hipaa';
+    const fw = frameworks[primaryFw] || {};
     const skills = fw.skills || {};
     const findings = (fw.findings || []).filter(f => f.status !== 'resolved');
     const criticals = findings.filter(f => f.severity === 'critical').length;
 
     // Helper to look up skill by short or prefixed key
-    const sk = (name) => skills[name] || skills[`hipaa-${name}`] || {};
+    const sk = (name) => skills[name] || skills[`${primaryFw}-${name}`] || {};
     const isDone = (name) => { const s = sk(name).status; return s === 'complete' || s === 'completed'; };
     const isPending = (name) => { const s = sk(name).status; return !s || s === 'pending' || s === 'not-run'; };
 
-    if (isPending('assess')) return 'Next: Run <code>/hipaa-assess</code> to start your compliance assessment.';
-    if (isPending('scan')) return 'Next: Run <code>/hipaa-scan</code> to scan your code and infrastructure.';
+    if (isPending('assess')) return 'Next: Run <code>/comply-assess</code> to start your compliance assessment.';
+    if (isPending('scan')) return 'Next: Run <code>/comply-scan</code> to scan your code and infrastructure.';
     if (findings.length > 0 && !isDone('remediate')) {
-      return `Next: Run <code>/hipaa-remediate</code> to fix ${findings.length} open findings${criticals ? ` (${criticals} critical)` : ''}.`;
+      return `Next: Run <code>/comply-fix</code> to fix ${findings.length} open findings${criticals ? ` (${criticals} critical)` : ''}.`;
     }
-    if (isPending('report')) return 'Next: Run <code>/hipaa-report</code> to generate your compliance report.';
-    if (isPending('monitor')) return 'Next: Run <code>/hipaa-monitor</code> to check for compliance drift.';
-    return 'All up to date. Run <code>/hipaa-monitor</code> periodically to detect drift.';
+    if (isPending('report')) return 'Next: Run <code>/comply-report</code> to generate your compliance report.';
+    if (isPending('monitor')) return 'Next: Run <code>/comply-auto</code> to check for compliance drift.';
+    return 'All up to date. Run <code>/comply-auto</code> periodically to detect drift.';
+  }
+
+  // ─── Scanning Tools + Scan Trigger ─────────────────────
+
+  function renderTools() {
+    const el = document.getElementById('tools-list');
+    const statusEl = document.getElementById('scan-status');
+    const btn = document.getElementById('scan-trigger-btn');
+    if (!el) return;
+
+    if (!toolsData || !toolsData.tools || toolsData.tools.length === 0) {
+      el.innerHTML = '<div class="empty-state">No scanning tools detected. Install <code>prowler</code>, <code>trivy</code>, or <code>checkov</code> to enable automated scanning.</div>';
+      if (btn) btn.style.display = 'none';
+      return;
+    }
+
+    const installed = toolsData.tools.filter(t => t.installed);
+    const notInstalled = toolsData.tools.filter(t => !t.installed);
+
+    let html = '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">';
+    for (const tool of installed) {
+      html += `<span style="background:var(--bg-secondary,#f3f4f6);padding:4px 10px;border-radius:4px;font-size:0.8rem;">
+        <span style="color:var(--green,#16a34a);">\u2713</span> ${escapeHtml(tool.name)}${tool.version ? ' ' + escapeHtml(tool.version) : ''}
+      </span>`;
+    }
+    html += '</div>';
+
+    if (notInstalled.length > 0) {
+      html += `<div style="font-size:0.8rem;color:var(--text-secondary,#6b7280);">Not installed: ${notInstalled.map(t => t.name).join(', ')}</div>`;
+    }
+
+    el.innerHTML = html;
+
+    // Wire up scan trigger (only once — avoid accumulating listeners on re-render)
+    if (btn && !btn.dataset.wired) {
+      btn.dataset.wired = 'true';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Scanning...';
+        if (statusEl) statusEl.innerHTML = '<div style="font-size:0.85rem;color:var(--text-secondary,#6b7280);margin-top:0.5rem;">Scan started. Running tools in parallel...</div>';
+
+        try {
+          const res = await fetch('/api/scan/trigger', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) {
+            if (statusEl) statusEl.innerHTML = `<div style="font-size:0.85rem;color:var(--yellow,#eab308);margin-top:0.5rem;">${escapeHtml(data.error || 'Scan failed')}</div>`;
+            btn.disabled = false;
+            btn.textContent = 'Run Scan';
+          }
+        } catch {
+          if (statusEl) statusEl.innerHTML = '<div style="font-size:0.85rem;color:var(--red,#dc2626);margin-top:0.5rem;">Failed to start scan.</div>';
+          btn.disabled = false;
+          btn.textContent = 'Run Scan';
+        }
+      });
+    }
   }
 
   // ─── Natural Language Summary ────────────────────────────
@@ -338,29 +431,43 @@
       pipelineSection.parentNode.insertBefore(el, pipelineSection);
     }
 
-    const fw = dashboard.frameworks?.hipaa || {};
-    const checklist = fw.checklist || [];
-    const findings = (fw.findings || []).filter(f => f.status !== 'resolved');
+    // Prefer SQLite compliance data when available
+    const sqlSummary = complianceData?.summary;
+    // Aggregate legacy data across active frameworks (not just hipaa)
+    const activeIds = frameworksData?.active || Object.keys(dashboard.frameworks || {});
+    const firstFw = dashboard.frameworks?.[activeIds[0]] || {};
+    let checklist = [], findings = [];
+    for (const fwId of activeIds) {
+      const fw = dashboard.frameworks?.[fwId] || {};
+      checklist = checklist.concat(fw.checklist || []);
+      findings = findings.concat((fw.findings || []).filter(f => f.status !== 'resolved'));
+    }
     const vendors = dashboard.vendors || [];
     const risks = dashboard.risk_register || [];
     const evidence = dashboard.evidence?.files || [];
 
-    const total = checklist.length;
-    const complete = checklist.filter(i => i.status === 'complete').length;
-    const pct = total ? Math.round((complete / total) * 100) : 0;
+    const total = sqlSummary?.total ?? checklist.length;
+    const complete = sqlSummary?.complete ?? checklist.filter(i => i.status === 'complete').length;
+    const pct = sqlSummary?.pct ?? (total ? Math.round((complete / total) * 100) : 0);
 
     const criticals = findings.filter(f => f.severity === 'critical').length;
     const highs = findings.filter(f => f.severity === 'high').length;
     const missingBAA = vendors.filter(v => v.baa_status === 'none' && !v.notes?.includes('not process PHI')).length;
     const topRisk = risks.filter(r => r.status !== 'closed').sort((a, b) => b.score - a.score)[0];
 
-    if (total === 0) {
-      el.innerHTML = '<p>No compliance data yet. Run <code>/hipaa</code> to initialize your HIPAA dashboard.</p>';
+    const numFrameworks = frameworksData?.active?.length || Object.keys(dashboard.frameworks || {}).length;
+
+    if (total === 0 && checklist.length === 0) {
+      el.innerHTML = '<p>No compliance data yet. Run <code>/hipaa</code> to initialize your first compliance framework.</p>';
       return;
     }
 
     let parts = [];
-    parts.push(`Your HIPAA compliance is <strong>${pct}%</strong> (${complete}/${total} requirements).`);
+    if (numFrameworks > 1) {
+      parts.push(`Tracking <strong>${numFrameworks} frameworks</strong>. Compliance: <strong>${pct}%</strong> (${complete}/${total} controls).`);
+    } else {
+      parts.push(`Compliance: <strong>${pct}%</strong> (${complete}/${total} controls).`);
+    }
 
     if (findings.length > 0) {
       let findingText = `${findings.length} open finding${findings.length !== 1 ? 's' : ''}`;
@@ -517,7 +624,7 @@
     if (findings.length === 0) {
       summaryEl.innerHTML = '';
       filtersEl.innerHTML = '';
-      el.innerHTML = '<div class="empty-state">No findings yet. Run <code>/hipaa-scan</code> to detect issues.</div>';
+      el.innerHTML = '<div class="empty-state">No findings yet. Run <code>/comply-scan</code> to detect issues.</div>';
       return;
     }
 
@@ -1285,12 +1392,58 @@
     }
   }
 
+  // ─── Cross-Framework Matrix ──────────────────────────────
+
+  async function renderCrossFramework() {
+    const el = document.getElementById('cross-framework-matrix');
+    if (!el) return;
+
+    try {
+      // Use pre-fetched data instead of re-fetching
+      const data = crossFrameworkData;
+      if (!data || !data.controls || data.controls.length === 0) { el.innerHTML = '<div class="empty-state">Cross-framework data unavailable. Run <code>bin/comply-db init</code> to initialize.</div>'; return; }
+
+      const fws = data.frameworks || [];
+      let html = `<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+        <thead><tr style="border-bottom:2px solid var(--border,#e5e7eb);">
+          <th style="text-align:left;padding:0.5rem;">Control</th>`;
+      for (const fw of fws) html += `<th style="text-align:center;padding:0.5rem;">${escapeHtml(fw.toUpperCase())}</th>`;
+      html += `<th style="text-align:center;padding:0.5rem;">Impact</th></tr></thead><tbody>`;
+
+      for (const c of data.controls) {
+        const impactColor = c.framework_count >= 4 ? '#16a34a' : c.framework_count >= 3 ? '#eab308' : '#9ca3af';
+        html += `<tr style="border-bottom:1px solid var(--border,#f3f4f6);">
+          <td style="padding:0.5rem;font-weight:600;">${escapeHtml(c.control_id)}</td>`;
+        for (const fw of fws) {
+          const has = c.frameworks.includes(fw);
+          html += `<td style="text-align:center;padding:0.5rem;color:${has ? '#16a34a' : '#d1d5db'};">${has ? '\u2713' : '\u00b7'}</td>`;
+        }
+        html += `<td style="text-align:center;padding:0.5rem;"><span style="background:${impactColor};color:white;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">${c.framework_count}/${fws.length}</span></td></tr>`;
+      }
+
+      html += '</tbody></table>';
+      html += `<div style="margin-top:1rem;font-size:0.85rem;color:var(--text-secondary,#6b7280);">${data.total_controls} controls across ${fws.length} frameworks</div>`;
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = '<div class="empty-state">Could not load cross-framework data.</div>';
+    }
+  }
+
   // ─── Upload ───────────────────────────────────────────────
 
   function setupUpload() {
     const zone = document.getElementById('upload-zone');
     const input = document.getElementById('file-input');
     const meta = document.getElementById('upload-meta');
+
+    // Populate framework dropdown from active frameworks
+    const fwSelect = document.getElementById('upload-framework');
+    if (fwSelect) {
+      const fwNames = { hipaa: 'HIPAA', soc2: 'SOC 2', gdpr: 'GDPR', 'pci-dss': 'PCI-DSS', cis: 'CIS', iso27001: 'ISO 27001' };
+      const active = frameworksData?.active || Object.keys(dashboard.frameworks || {});
+      fwSelect.innerHTML = (active.length > 0 ? active : ['hipaa'])
+        .map(f => `<option value="${f}">${fwNames[f] || f.toUpperCase()}</option>`).join('');
+    }
 
     zone.addEventListener('click', (e) => {
       if (e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') {
@@ -1598,9 +1751,20 @@
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${proto}//${location.host}/ws`);
 
-    ws.onmessage = async () => {
-      await fetchDashboard();
+    ws.onmessage = async (event) => {
+      await Promise.all([fetchDashboard(), fetchComplianceData()]);
       render();
+
+      // Reset scan button on scan completion
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.event === 'scan_complete') {
+          const btn = document.getElementById('scan-trigger-btn');
+          const statusEl = document.getElementById('scan-status');
+          if (btn) { btn.disabled = false; btn.textContent = 'Run Scan'; }
+          if (statusEl) statusEl.innerHTML = '<div style="font-size:0.85rem;color:var(--green,#16a34a);margin-top:0.5rem;">Scan complete. Data refreshed.</div>';
+        }
+      } catch {}
     };
 
     ws.onclose = () => {

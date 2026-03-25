@@ -1,0 +1,659 @@
+#!/usr/bin/env bun
+/**
+ * comply-orchestrate — Run all available scanning tools in parallel.
+ *
+ * Registry-driven: reads tool_integration entries from checks-registry.ts
+ * to discover tools, then runs them via Bun.spawn. Findings are normalized
+ * to NIST 800-53 controls using the reverse of tool-bindings.json.
+ *
+ * Subcommands:
+ *   detect              List available tools and versions
+ *   scan [--framework]  Run all available tools, write results to SQLite
+ *   diff                Compare current results to last baseline
+ *
+ * Architecture:
+ *   checks-registry.ts  → defines WHAT tools exist and HOW to run them
+ *   tool-bindings.json  → defines WHICH check IDs map to WHICH controls
+ *   comply-orchestrate  → thin runner that reads both and executes
+ */
+
+import { spawnSync } from 'bun';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const args = process.argv.slice(2);
+const subcommand = args[0];
+const NIST_DIR = path.join(import.meta.dir, '..', 'nist');
+const CONCURRENCY = parseInt(process.env.COMPLY_CONCURRENCY || '4');
+const TIMEOUT_MS = parseInt(process.env.COMPLY_TIMEOUT_MS || '300000'); // 5 min
+
+// ─── Types ──────────────────────────────────────────────────────
+
+interface Finding {
+  tool: string;
+  check_id: string;
+  control_ids: string[];
+  cis_benchmark_refs: string[];
+  result: 'PASS' | 'FAIL' | 'FINDING';
+  severity: string;
+  resource?: string;
+  output: string;
+  scan_id: string;
+}
+
+interface ToolInfo {
+  id: string;
+  name: string;
+  binary: string;
+  command: string;
+  installed: boolean;
+  version?: string;
+}
+
+// ─── Registry + Bindings Loader ─────────────────────────────────
+
+function loadToolEntries(): Array<{ id: string; description: string; command: string }> {
+  // Dynamically import the registry to get tool_integration checks
+  const registryPath = path.join(import.meta.dir, '..', 'frameworks', 'checks-registry.ts');
+  const content = fs.readFileSync(registryPath, 'utf8');
+
+  const tools: Array<{ id: string; description: string; command: string }> = [];
+  // Parse tool_integration entries from the source
+  const toolBlock = content.match(/TOOL_INTEGRATION_CHECKS[\s\S]*?\n\];/)?.[0] || '';
+  const entryRegex = /\{\s*id:\s*'([^']+)'[\s\S]*?description:\s*'([^']+)'[\s\S]*?command:\s*'([^']+)'/g;
+  let m;
+  while ((m = entryRegex.exec(toolBlock)) !== null) {
+    tools.push({ id: m[1], description: m[2], command: m[3] });
+  }
+  return tools;
+}
+
+function loadReverseBindings(): Map<string, Map<string, string[]>> {
+  // Build: tool_name → check_id → control_ids[]
+  const bindingsPath = path.join(NIST_DIR, 'tool-bindings.json');
+  const data = JSON.parse(fs.readFileSync(bindingsPath, 'utf8'));
+  const reverse = new Map<string, Map<string, string[]>>();
+
+  // Discover tool keys dynamically from bindings (skip known non-tool fields)
+  const NON_TOOL_KEYS = new Set(['emdash', 'description', 'interview_only', 'cis_benchmark']);
+
+  for (const [controlId, binding] of Object.entries(data.bindings) as [string, any][]) {
+    for (const key of Object.keys(binding)) {
+      if (NON_TOOL_KEYS.has(key) || !Array.isArray(binding[key])) continue;
+      const tool = key;
+      const checkIds = binding[tool] || [];
+      for (const checkId of checkIds) {
+        if (!reverse.has(tool)) reverse.set(tool, new Map());
+        const toolMap = reverse.get(tool)!;
+        if (!toolMap.has(checkId)) toolMap.set(checkId, []);
+        toolMap.get(checkId)!.push(controlId);
+      }
+    }
+  }
+  return reverse;
+}
+
+/** Resolve CIS Benchmark refs for a set of 800-53 control IDs */
+function loadCisBenchmarkMap(): Map<string, string[]> {
+  const bindingsPath = path.join(NIST_DIR, 'tool-bindings.json');
+  const data = JSON.parse(fs.readFileSync(bindingsPath, 'utf8'));
+  const map = new Map<string, string[]>();
+  for (const [controlId, binding] of Object.entries(data.bindings) as [string, any][]) {
+    if (binding.cis_benchmark && binding.cis_benchmark.length > 0) {
+      map.set(controlId, binding.cis_benchmark);
+    }
+  }
+  return map;
+}
+
+// Cache CIS benchmark map at module level to avoid re-reading per finding
+let _cisBenchmarkMapCache: Map<string, string[]> | null = null;
+
+function resolveCisBenchmarkRefs(controlIds: string[]): string[] {
+  if (!_cisBenchmarkMapCache) _cisBenchmarkMapCache = loadCisBenchmarkMap();
+  const refs = new Set<string>();
+  for (const controlId of controlIds) {
+    for (const ref of _cisBenchmarkMapCache.get(controlId) || []) refs.add(ref);
+  }
+  return [...refs];
+}
+
+// ─── Tool Detection ─────────────────────────────────────────────
+
+function detectTool(toolId: string, command: string): ToolInfo {
+  const binary = command.split(' ')[0];
+  const name = toolId.replace('tool-', '');
+
+  // Check if binary is available
+  const which = spawnSync(['which', binary]);
+  const installed = which.exitCode === 0;
+  let version: string | undefined;
+
+  if (installed) {
+    // Try common version flags
+    for (const flag of ['--version', '-v', 'version']) {
+      try {
+        const proc = spawnSync([binary, flag], { timeout: 5000 });
+        const out = proc.stdout?.toString().trim();
+        if (out && proc.exitCode === 0) {
+          // Extract first line, first version-like pattern
+          const firstLine = out.split('\n')[0];
+          const verMatch = firstLine.match(/\d+\.\d+[\.\d]*/);
+          version = verMatch ? verMatch[0] : firstLine.slice(0, 60);
+          break;
+        }
+      } catch {}
+    }
+  }
+
+  return { id: toolId, name, binary, command, installed, version };
+}
+
+// ─── Tool Execution ─────────────────────────────────────────────
+
+async function runTool(tool: ToolInfo, scanId: string): Promise<Finding[]> {
+  const args = tool.command.split(' ').slice(1);
+  const findings: Finding[] = [];
+
+  try {
+    const proc = Bun.spawn([tool.binary, ...args], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, NO_COLOR: '1' },
+    });
+
+    // Timeout handling
+    const timeout = setTimeout(() => {
+      proc.kill();
+      console.error(`  TIMEOUT: ${tool.name} killed after ${TIMEOUT_MS / 1000}s`);
+    }, TIMEOUT_MS);
+
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    clearTimeout(timeout);
+
+    await proc.exited;
+
+    // Parse JSON output (best-effort)
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(stdout);
+    } catch {
+      // Some tools write JSON to files instead of stdout
+      // Try common output locations
+      for (const outPath of [
+        '/tmp/prowler-out',
+        '/tmp/kics-out/results.json',
+        '/tmp/scoutsuite-out',
+      ]) {
+        try {
+          if (fs.existsSync(outPath)) {
+            const isDir = fs.statSync(outPath).isDirectory();
+            if (isDir) {
+              const files = fs.readdirSync(outPath).filter(f => f.endsWith('.json'));
+              if (files.length > 0) {
+                parsed = JSON.parse(fs.readFileSync(path.join(outPath, files[0]), 'utf8'));
+                break;
+              }
+            } else {
+              parsed = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      if (!parsed) {
+        console.error(`  WARNING: ${tool.name} output not parseable as JSON`);
+        if (stderr.trim()) console.error(`  stderr: ${stderr.slice(0, 200)}`);
+        return findings;
+      }
+    }
+
+    // Normalize findings by tool type
+    const normalized = normalizeTool(tool.name, parsed, scanId);
+    findings.push(...normalized);
+
+  } catch (err: any) {
+    console.error(`  ERROR: ${tool.name} — ${err.message}`);
+  }
+
+  return findings;
+}
+
+// ─── Finding Normalization ──────────────────────────────────────
+
+function normalizeTool(toolName: string, data: any, scanId: string): Finding[] {
+  const findings: Finding[] = [];
+  const reverseBindings = loadReverseBindings();
+  const toolBindings = reverseBindings.get(toolName) || new Map();
+
+  const resolveControls = (checkId: string): string[] => {
+    return toolBindings.get(checkId) || [];
+  };
+
+  const withCisRefs = (controlIds: string[]): string[] => {
+    return resolveCisBenchmarkRefs(controlIds);
+  };
+
+  switch (toolName) {
+    case 'prowler': {
+      // Prowler outputs array of findings or { findings: [...] }
+      const items = Array.isArray(data) ? data : (data.findings || data.Results || []);
+      for (const item of items) {
+        const checkId = item.CheckID || item.check_id || item.CheckTitle || '';
+        const controlIds = resolveControls(checkId);
+        findings.push({
+          tool: 'prowler',
+          check_id: checkId,
+          control_ids: controlIds,
+          cis_benchmark_refs: withCisRefs(controlIds),
+          result: (item.Status === 'PASS' || item.status === 'PASS') ? 'PASS' : 'FAIL',
+          severity: item.Severity || item.severity || 'MEDIUM',
+          resource: item.ResourceId || item.resource_id || '',
+          output: JSON.stringify(item).slice(0, 500),
+          scan_id: scanId,
+        });
+      }
+      break;
+    }
+
+    case 'checkov': {
+      // Checkov: { results: { passed_checks: [...], failed_checks: [...] } }
+      const passed = data?.results?.passed_checks || [];
+      const failed = data?.results?.failed_checks || [];
+      for (const item of passed) {
+        const checkId = item.check_id || '';
+        findings.push({
+          tool: 'checkov', check_id: checkId, control_ids: resolveControls(checkId), cis_benchmark_refs: withCisRefs(resolveControls(checkId)),
+          result: 'PASS', severity: 'LOW', resource: item.resource || '',
+          output: item.check_result?.result || 'PASSED', scan_id: scanId,
+        });
+      }
+      for (const item of failed) {
+        const checkId = item.check_id || '';
+        findings.push({
+          tool: 'checkov', check_id: checkId, control_ids: resolveControls(checkId), cis_benchmark_refs: withCisRefs(resolveControls(checkId)),
+          result: 'FAIL', severity: item.severity || 'HIGH', resource: item.resource || '',
+          output: item.check_result?.result || item.guideline || '', scan_id: scanId,
+        });
+      }
+      break;
+    }
+
+    case 'trivy': {
+      // Trivy: { Results: [{ Vulnerabilities: [...], Misconfigurations: [...] }] }
+      for (const result of (data.Results || [])) {
+        for (const vuln of (result.Vulnerabilities || [])) {
+          findings.push({
+            tool: 'trivy', check_id: vuln.VulnerabilityID || '', control_ids: [], cis_benchmark_refs: [],
+            result: 'FINDING', severity: vuln.Severity || 'MEDIUM',
+            resource: vuln.PkgName || '', output: vuln.Title || '', scan_id: scanId,
+          });
+        }
+        for (const mc of (result.Misconfigurations || [])) {
+          findings.push({
+            tool: 'trivy', check_id: mc.ID || mc.AVDID || '', control_ids: [], cis_benchmark_refs: [],
+            result: mc.Status === 'PASS' ? 'PASS' : 'FINDING',
+            severity: mc.Severity || 'MEDIUM', resource: mc.CauseMetadata?.Resource || '',
+            output: mc.Title || mc.Message || '', scan_id: scanId,
+          });
+        }
+        for (const secret of (result.Secrets || [])) {
+          findings.push({
+            tool: 'trivy', check_id: 'secret-detection', control_ids: [], cis_benchmark_refs: [],
+            result: 'FINDING', severity: secret.Severity || 'CRITICAL',
+            resource: secret.Match || '', output: secret.Title || 'Secret detected', scan_id: scanId,
+          });
+        }
+      }
+      break;
+    }
+
+    case 'semgrep': {
+      // Semgrep: { results: [{ check_id, path, ... }] }
+      for (const item of (data.results || [])) {
+        findings.push({
+          tool: 'semgrep', check_id: item.check_id || '', control_ids: [], cis_benchmark_refs: [],
+          result: 'FINDING', severity: item.extra?.severity || 'MEDIUM',
+          resource: `${item.path}:${item.start?.line || ''}`,
+          output: item.extra?.message || '', scan_id: scanId,
+        });
+      }
+      break;
+    }
+
+    case 'kube-bench': {
+      // kube-bench: { Controls: [{ tests: [{ results: [...] }] }] }
+      for (const control of (data.Controls || [])) {
+        for (const test of (control.tests || [])) {
+          for (const result of (test.results || [])) {
+            findings.push({
+              tool: 'kube-bench', check_id: result.test_number || '', control_ids: [], cis_benchmark_refs: [],
+              result: result.status === 'PASS' ? 'PASS' : 'FAIL',
+              severity: result.scored ? 'HIGH' : 'LOW',
+              resource: result.test_desc || '', output: result.remediation || '', scan_id: scanId,
+            });
+          }
+        }
+      }
+      break;
+    }
+
+    default: {
+      // Generic: try to iterate if array, otherwise log
+      const items = Array.isArray(data) ? data : (data.findings || data.results || []);
+      for (const item of items) {
+        findings.push({
+          tool: toolName, check_id: item.id || item.check_id || 'unknown', control_ids: [], cis_benchmark_refs: [],
+          result: 'FINDING', severity: item.severity || 'MEDIUM',
+          resource: item.resource || '', output: JSON.stringify(item).slice(0, 300), scan_id: scanId,
+        });
+      }
+    }
+  }
+
+  return findings;
+}
+
+// ─── SQLite Writer ──────────────────────────────────────────────
+
+function writeFindings(findings: Finding[], framework: string) {
+  const dbBin = path.join(import.meta.dir, 'comply-db');
+
+  let written = 0;
+  let skipped = 0;
+
+  for (const f of findings) {
+    if (f.control_ids.length === 0) {
+      skipped++;
+      continue;
+    }
+
+    // Write to each mapped control (many-to-many)
+    for (const controlId of f.control_ids) {
+      const proc = spawnSync([
+        'bun', dbBin, 'update-scan',
+        controlId, f.result, f.tool, f.check_id, f.output.slice(0, 200),
+        '--framework', framework,
+      ]);
+      if (proc.exitCode === 0) written++;
+    }
+  }
+
+  return { written, skipped };
+}
+
+// ─── Baseline / Drift ───────────────────────────────────────────
+
+function getDbPath(framework: string): string {
+  const slugBin = path.join(import.meta.dir, 'comply-slug');
+  const slugProc = spawnSync(['bun', slugBin]);
+  const slugMatch = slugProc.stdout?.toString().match(/SLUG=(\S+)/);
+  const slug = slugMatch ? slugMatch[1] : path.basename(process.cwd());
+  return path.join(process.env.HOME ?? '', '.em-dash', 'projects', slug, 'compliance.db');
+}
+
+function createBaseline(framework: string) {
+  const dbBin = path.join(import.meta.dir, 'comply-db');
+  const proc = spawnSync(['bun', dbBin, 'summary', '--framework', framework]);
+  const output = proc.stdout?.toString() || '';
+
+  const totalMatch = output.match(/(\d+) total/);
+  const completeMatch = output.match(/(\d+) complete/);
+  const total = totalMatch ? parseInt(totalMatch[1]) : 0;
+  const complete = completeMatch ? parseInt(completeMatch[1]) : 0;
+  const score = total > 0 ? (complete / total * 100) : 0;
+
+  return { total, passing: complete, failing: total - complete, score };
+}
+
+function saveBaseline(framework: string, baseline: { total: number; passing: number; failing: number; score: number }, toolVersions: Record<string, string>) {
+  try {
+    const { Database } = require('bun:sqlite');
+    const dbPath = getDbPath(framework);
+    if (!fs.existsSync(dbPath)) return;
+    const db = new Database(dbPath);
+
+    // Add cross_framework_scores column if missing
+    try { db.exec('ALTER TABLE compliance_baselines ADD COLUMN cross_framework_scores TEXT'); } catch {}
+
+    // Compute per-framework scores from filter files
+    const crossScores = computeCrossFrameworkScores(db);
+
+    db.prepare(
+      'INSERT INTO compliance_baselines (total_controls, passing, failing, score, tool_versions, cross_framework_scores) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(baseline.total, baseline.passing, baseline.failing, baseline.score, JSON.stringify(toolVersions), JSON.stringify(crossScores));
+    db.close();
+  } catch {}
+}
+
+/** Compute per-framework compliance scores from current check_results */
+function computeCrossFrameworkScores(db: any): Record<string, { total: number; passing: number; score: number }> {
+  const filterDir = path.join(NIST_DIR);
+  const scores: Record<string, { total: number; passing: number; score: number }> = {};
+
+  for (const file of fs.readdirSync(filterDir)) {
+    if (!file.endsWith('-filter.json')) continue;
+    try {
+      const filter = JSON.parse(fs.readFileSync(path.join(filterDir, file), 'utf-8'));
+      const fwName = filter.framework || file.replace('-filter.json', '');
+
+      // Get unique control IDs for this framework
+      const controlIds = new Set<string>();
+      for (const ids of Object.values(filter.mapping) as string[][]) {
+        for (const id of ids) controlIds.add(id);
+      }
+
+      // Check how many of those controls have passing results
+      let passing = 0;
+      for (const controlId of controlIds) {
+        const results = db.prepare('SELECT result FROM check_results WHERE control_id = ?').all(controlId) as any[];
+        if (results.length > 0 && results.every((r: any) => r.result === 'PASS')) passing++;
+      }
+
+      const total = controlIds.size;
+      scores[fwName] = { total, passing, score: total > 0 ? Math.round((passing / total) * 100) : 0 };
+    } catch {}
+  }
+
+  return scores;
+}
+
+function loadBaselines(framework: string): any[] {
+  try {
+    const { Database } = require('bun:sqlite');
+    const dbPath = getDbPath(framework);
+    if (!fs.existsSync(dbPath)) return [];
+    const db = new Database(dbPath, { readonly: true });
+    const rows = db.prepare('SELECT * FROM compliance_baselines ORDER BY snapshot_at DESC LIMIT 10').all();
+    db.close();
+    return rows as any[];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Subcommands ────────────────────────────────────────────────
+
+function detect() {
+  const tools = loadToolEntries();
+  console.log('Tool Detection Report');
+  console.log('═══════════════════════════════════════');
+
+  let available = 0;
+  for (const entry of tools) {
+    const info = detectTool(entry.id, entry.command);
+    const status = info.installed ? `✓ installed (${info.version || 'version unknown'})` : '✗ not found';
+    console.log(`  ${info.name.padEnd(14)} ${status}`);
+    if (info.installed) available++;
+  }
+
+  console.log(`\n${available}/${tools.length} tools available`);
+}
+
+async function scan() {
+  const framework = args.find((_, i) => args[i - 1] === '--framework') || 'hipaa';
+  const scanId = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  console.log(`Compliance Scan — ${framework}`);
+  console.log(`Scan ID: ${scanId}`);
+  console.log('═══════════════════════════════════════');
+
+  // Detect available tools
+  const toolEntries = loadToolEntries();
+  const toolInfos: ToolInfo[] = [];
+  for (const entry of toolEntries) {
+    const info = detectTool(entry.id, entry.command);
+    toolInfos.push(info);
+  }
+
+  const available = toolInfos.filter(t => t.installed);
+  const unavailable = toolInfos.filter(t => !t.installed);
+
+  console.log(`Available: ${available.map(t => t.name).join(', ') || 'none'}`);
+  if (unavailable.length > 0) {
+    console.log(`Skipping:  ${unavailable.map(t => t.name).join(', ')}`);
+  }
+  console.log();
+
+  if (available.length === 0) {
+    console.log('No scanning tools available. Install prowler, checkov, trivy, etc.');
+    process.exit(1);
+  }
+
+  // Run tools in parallel with concurrency limit
+  const allFindings: Finding[] = [];
+  for (let i = 0; i < available.length; i += CONCURRENCY) {
+    const batch = available.slice(i, i + CONCURRENCY);
+    console.log(`Running batch: ${batch.map(t => t.name).join(', ')}`);
+
+    const results = await Promise.allSettled(
+      batch.map(tool => runTool(tool, scanId))
+    );
+
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      const tool = batch[j];
+      if (result.status === 'fulfilled') {
+        console.log(`  ${tool.name}: ${result.value.length} findings`);
+        allFindings.push(...result.value);
+      } else {
+        console.error(`  ${tool.name}: FAILED — ${result.reason}`);
+      }
+    }
+  }
+
+  // Write findings to SQLite
+  console.log(`\nNormalizing ${allFindings.length} findings...`);
+  const { written, skipped } = writeFindings(allFindings, framework);
+
+  console.log(`\nScan Complete`);
+  console.log(`  Findings:   ${allFindings.length} total`);
+  console.log(`  Recorded:   ${written} (mapped to controls)`);
+  console.log(`  Unmapped:   ${skipped} (no control binding)`);
+
+  // Create baseline snapshot and save to SQLite
+  const baseline = createBaseline(framework);
+  const toolVersions: Record<string, string> = {};
+  for (const t of available) {
+    toolVersions[t.name] = t.version || 'unknown';
+  }
+  saveBaseline(framework, baseline, toolVersions);
+  console.log(`  Score:      ${baseline.score.toFixed(1)}% (${baseline.passing}/${baseline.total} controls)`);
+  console.log(`  Baseline saved to SQLite`);
+}
+
+function diff() {
+  const framework = args.find((_, i) => args[i - 1] === '--framework') || 'hipaa';
+  console.log(`Compliance Drift — ${framework}`);
+  console.log('═══════════════════════════════════════');
+
+  const baselines = loadBaselines(framework);
+
+  if (baselines.length === 0) {
+    console.log('No baselines found. Run `comply-orchestrate scan` first.');
+    return;
+  }
+
+  const current = baselines[0];
+  console.log(`Latest:   ${current.score?.toFixed(1)}% (${current.passing}/${current.total_controls}) — ${current.snapshot_at}`);
+
+  if (baselines.length < 2) {
+    console.log('\nOnly 1 baseline. Run another scan to see drift.');
+    return;
+  }
+
+  const previous = baselines[1];
+  console.log(`Previous: ${previous.score?.toFixed(1)}% (${previous.passing}/${previous.total_controls}) — ${previous.snapshot_at}`);
+
+  const scoreDelta = current.score - previous.score;
+  const passDelta = current.passing - previous.passing;
+  const failDelta = current.failing - previous.failing;
+
+  console.log(`\nDrift:`);
+  console.log(`  Score:    ${scoreDelta >= 0 ? '+' : ''}${scoreDelta.toFixed(1)}%`);
+  console.log(`  Passing:  ${passDelta >= 0 ? '+' : ''}${passDelta}`);
+  console.log(`  Failing:  ${failDelta >= 0 ? '+' : ''}${failDelta}`);
+
+  if (scoreDelta < 0) {
+    console.log(`\n  ⚠ REGRESSION: Compliance score dropped by ${Math.abs(scoreDelta).toFixed(1)}%`);
+  } else if (scoreDelta > 0) {
+    console.log(`\n  ✓ IMPROVEMENT: Compliance score increased by ${scoreDelta.toFixed(1)}%`);
+  } else {
+    console.log(`\n  — No change in compliance score`);
+  }
+
+  // Show cross-framework breakdown if available
+  if (current.cross_framework_scores) {
+    try {
+      const currentScores = JSON.parse(current.cross_framework_scores);
+      const previousScores = baselines.length >= 2 && previous.cross_framework_scores ? JSON.parse(previous.cross_framework_scores) : null;
+
+      console.log(`\nPer-Framework Breakdown:`);
+      console.log(`  ${'Framework'.padEnd(12)} ${'Score'.padEnd(8)} ${'Controls'.padEnd(12)} ${previousScores ? 'Delta' : ''}`);
+      console.log(`  ${'─'.repeat(45)}`);
+
+      for (const [fw, data] of Object.entries(currentScores) as [string, any][]) {
+        const delta = previousScores?.[fw] ? data.score - previousScores[fw].score : null;
+        const deltaStr = delta !== null ? `${delta >= 0 ? '+' : ''}${delta}%` : '';
+        console.log(`  ${fw.toUpperCase().padEnd(12)} ${(data.score + '%').padEnd(8)} ${data.passing}/${data.total}${' '.repeat(Math.max(0, 8 - `${data.passing}/${data.total}`.length))} ${deltaStr}`);
+      }
+    } catch {}
+  }
+
+  // Show trend if >2 baselines
+  if (baselines.length > 2) {
+    console.log(`\nTrend (last ${Math.min(baselines.length, 10)} scans):`);
+    for (const b of baselines.slice(0, 10)) {
+      const bar = '█'.repeat(Math.round(b.score / 5)) + '░'.repeat(20 - Math.round(b.score / 5));
+      console.log(`  ${b.snapshot_at}  ${bar}  ${b.score?.toFixed(1)}%`);
+    }
+  }
+}
+
+// ─── Main ───────────────────────────────────────────────────────
+
+switch (subcommand) {
+  case 'detect':
+    detect();
+    break;
+  case 'scan':
+    await scan();
+    break;
+  case 'diff':
+    diff();
+    break;
+  default:
+    console.log('Usage: comply-orchestrate <detect|scan|diff> [--framework hipaa]');
+    console.log('');
+    console.log('Subcommands:');
+    console.log('  detect              List available scanning tools');
+    console.log('  scan [--framework]  Run all available tools, write to SQLite');
+    console.log('  diff [--framework]  Show compliance drift since last baseline');
+    console.log('');
+    console.log('Environment:');
+    console.log('  COMPLY_CONCURRENCY  Max parallel tools (default: 4)');
+    console.log('  COMPLY_TIMEOUT_MS   Per-tool timeout in ms (default: 300000)');
+    process.exit(subcommand ? 1 : 0);
+}

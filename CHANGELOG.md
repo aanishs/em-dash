@@ -1,5 +1,55 @@
 # Changelog
 
+## v3.2.0 — Framework-aware opt-in + security hardening (2026-03-25)
+
+**Framework-aware opt-in.** em-dash now tracks which frameworks you've initialized in SQLite metadata (`active_frameworks`). Dashboard, cross-framework matrix, CLI, and all APIs scope to your active frameworks only. `comply-db frameworks` lists/adds/removes. Cross-framework matrix shows only your frameworks; `--all` flag shows all 6.
+
+**Security hardening.** Framework name validation (prevents path traversal via `--framework`). Scan trigger sentinel fixed (pid -1, spawn error cleanup). DB handle leaks closed with try/finally. NaN guard on LIMIT query param. Division-by-zero guard on compliance score. Input validation on `frameworks --add`.
+
+**Dashboard framework scoping.** Header, NL summary, nav badges, pipeline recommendations, evidence upload dropdown, and charts all scoped to active frameworks. No more showing 6 frameworks when you only need HIPAA. Scan button de-duplicated (no accumulating listeners). Stale `/hipaa-*` command references replaced with `/comply-*`.
+
+**141 tests** across 8 files (up from 137).
+
+## v3.1.0 — ISO 27001 + dashboard SQLite integration + user signatures (2026-03-25)
+
+**ISO/IEC 27001:2022.** Sixth compliance framework. 80 Annex A controls mapped to 49 NIST 800-53 controls. 6 controls (AC-2, AC-3, AC-6, AU-2, SC-28, SC-8) now appear in all 6 frameworks.
+
+**Dashboard SQLite integration.** Frontend now fetches compliance data from SQLite APIs (`/api/compliance`, `/api/compliance/score`, `/api/cross-framework`, `/api/tools`) alongside legacy JSON. Scan trigger button starts `comply-orchestrate` from the dashboard. WebSocket live-reload refreshes both data sources.
+
+**Cross-framework drift tracking.** `comply-orchestrate diff` shows per-framework compliance score breakdown with deltas. Each baseline snapshot stores `cross_framework_scores` for all active frameworks.
+
+**CIS coverage gap report.** `comply-db cis-coverage` compares em-dash's check coverage against 34 CIS AWS Foundations Benchmark v3.0 Level 1 recommendations. Currently 71% covered (24/34). Gaps: Section 4 CloudWatch alarm checks.
+
+**User signature crypto.** `comply-db sign AC-2 --name "Jane Smith" --role "Security Officer"` creates Ed25519 signed user attestations. Binds a named person to evidence with cryptographic proof. Attestations stored in SQLite and as JSON files for audit packets. `comply-attest user-sign` subcommand for standalone attestation creation.
+
+**Evidence redaction.** `comply-audit-packet --redact` strips AWS Account IDs, ARNs, Access Keys, IPs, EC2/VPC/Subnet/SG IDs from text evidence before inclusion in audit packets.
+
+**137 tests** across 8 files (up from 135).
+
+## v3.0.0 — Cross-framework compliance + CIS Controls + orchestrator (2026-03-25)
+
+**CIS Controls v8.1 integration.** Fifth compliance framework. 137 safeguards mapped to 33 NIST 800-53 controls with Implementation Group tiers (IG1/IG2/IG3). CIS Benchmark IDs (CIS AWS Foundations v3.0) cross-referenced in tool-bindings.json. Licensing: OpenSCAP model — IDs only, all descriptions independently written.
+
+**Cross-framework compliance matrix.** Because all 5 frameworks (HIPAA, SOC 2, GDPR, PCI-DSS, CIS) converge on the same 800-53 controls, em-dash now shows which checks satisfy multiple frameworks simultaneously. `bin/comply-db cross-framework` outputs the matrix. 6 controls (AC-2, AC-3, AC-6, AU-2, SC-28, SC-8) appear in all 5 frameworks — fixing one thing improves 5 compliance scores at once.
+
+**Tool orchestrator.** `bin/comply-orchestrate` runs up to 8 external scanning tools (Prowler, Checkov, Trivy, KICS, Semgrep, kube-bench, ScoutSuite, Lynis) in parallel. Findings normalized to NIST 800-53 controls with CIS Benchmark cross-references. Concurrent execution with configurable concurrency and timeout. Compliance drift detection via baseline snapshots.
+
+**60+ automated checks (up from 50).** 19 code-level, 19 AWS cloud, 11 Rego, 8 tool integrations, 10 policy document checks. Policy-doc checks partially automate interview-only controls — finding a doc records evidence and marks the control as 'partial'.
+
+**HIPAA filter v2.0.** Validated against SP 800-66 Rev 2 (Feb 2024). 10 new specs, 14 new controls (64 total). Includes `scripts/validate-hipaa-filter.ts` for authoritative validation with `--fix` mode.
+
+**Multi-cloud Rego expansion.** 15 new Azure/GCP rules across 8 policy files (up from 6). New files: `backup-dr.rego` (disaster recovery), `container-security.rego` (Dockerfile/Docker Compose).
+
+**Dashboard API expansion.** 6 new REST endpoints: compliance score (per-family breakdown), findings (filterable by tool/result), drift (current vs previous scan), tool detection, scan trigger, scan status. Cross-framework matrix visualization with impact badges.
+
+**Trivy AVD IDs.** tool-bindings.json v3.0 adds Trivy vulnerability database IDs (30+ AVD-AWS-* entries) alongside Prowler and Checkov.
+
+**Schema migration.** comply-db now supports backward-compatible column additions and compliance baselines table for drift tracking. Control status derived from check results (complete/partial/pending) instead of hard-set.
+
+**CI compliance job.** GitHub Actions workflow runs compliance checks on PRs — initializes DB, detects available tools, validates tool bindings.
+
+**135 tests** across 8 files (up from 102).
+
 ## v2.0.0 — NIST-first architecture: the LLM reads the actual law (2026-03-24)
 
 **Complete architecture rebuild.** em-dash v2 ships the official NIST 800-53 OSCAL catalog (1,196 controls) unmodified in the repo. The LLM reads the actual NIST control text at runtime — not our interpretation. Three files drive everything: `hipaa-filter.json` (52 HIPAA specs → 50 controls), `tool-bindings.json` (50 controls → em-dash/Prowler/Checkov checks), and `checks-registry.ts` (50 checks, pure execution).

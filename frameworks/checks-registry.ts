@@ -20,7 +20,8 @@ export type CheckCategory =
   | 'data_protection'
   | 'sensitive_data'
   | 'authentication'
-  | 'monitoring';
+  | 'monitoring'
+  | 'policy_doc';
 
 export type CheckType = 'rego' | 'cloud_cli' | 'code_grep' | 'tool_integration';
 export type Provider = 'aws' | 'gcp' | 'azure' | 'code' | 'k8s';
@@ -262,9 +263,192 @@ const REGO_CHECKS: Check[] = [
   { id: 'rego-k8s-non-root', category: 'compute', description: 'K8s containers must run as non-root', type: 'rego', provider: 'k8s', severity_default: 'MEDIUM' },
 ];
 
+// ─── Tool Integration Checks (8 external tools) ────────────────
+//
+// External scanning tools that the orchestrator (bin/comply-orchestrate)
+// can invoke. Each entry defines the tool name, detection command,
+// and scan command. The orchestrator reads these entries to discover
+// which tools are available and how to run them.
+//
+// Finding-to-control mapping is in nist/tool-bindings.json (reverse lookup).
+
+const TOOL_INTEGRATION_CHECKS: Check[] = [
+  {
+    id: 'tool-prowler',
+    category: 'monitoring',
+    description: 'Prowler — AWS security assessment (CIS, HIPAA, PCI-DSS)',
+    type: 'tool_integration',
+    provider: 'aws',
+    command: 'prowler --compliance hipaa --output-modes json --output-directory /tmp/prowler-out',
+    severity_default: 'HIGH',
+  },
+  {
+    id: 'tool-checkov',
+    category: 'monitoring',
+    description: 'Checkov — IaC security scanning (Terraform, CloudFormation, K8s)',
+    type: 'tool_integration',
+    command: 'checkov -d . --framework terraform --output json --quiet',
+    severity_default: 'HIGH',
+  },
+  {
+    id: 'tool-kics',
+    category: 'monitoring',
+    description: 'KICS — IaC security scanner (2400+ queries, Rego-based)',
+    type: 'tool_integration',
+    command: 'kics scan -p . --type terraform,kubernetes,docker,cloudformation -o /tmp/kics-out --report-formats json',
+    severity_default: 'HIGH',
+  },
+  {
+    id: 'tool-trivy',
+    category: 'monitoring',
+    description: 'Trivy — container, IaC, and secret scanning',
+    type: 'tool_integration',
+    command: 'trivy fs . --format json --scanners vuln,misconfig,secret',
+    severity_default: 'HIGH',
+  },
+  {
+    id: 'tool-semgrep',
+    category: 'monitoring',
+    description: 'Semgrep — SAST code security scanning',
+    type: 'tool_integration',
+    provider: 'code',
+    command: 'semgrep --config auto --json --quiet',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'tool-kube-bench',
+    category: 'monitoring',
+    description: 'kube-bench — CIS Kubernetes benchmark scanning',
+    type: 'tool_integration',
+    provider: 'k8s',
+    command: 'kube-bench run --json',
+    severity_default: 'HIGH',
+  },
+  {
+    id: 'tool-scoutsuite',
+    category: 'monitoring',
+    description: 'ScoutSuite — multi-cloud security auditing (AWS/GCP/Azure)',
+    type: 'tool_integration',
+    command: 'python3 -m ScoutSuite --provider aws --report-dir /tmp/scoutsuite-out --result-format json --no-browser',
+    severity_default: 'HIGH',
+  },
+  {
+    id: 'tool-lynis',
+    category: 'monitoring',
+    description: 'Lynis — system security auditing (Linux/macOS)',
+    type: 'tool_integration',
+    command: 'lynis audit system --quick --cronjob --report-file /tmp/lynis-report.dat',
+    severity_default: 'MEDIUM',
+  },
+];
+
+// ─── Policy Document Checks (10 checks) ────────────────────────
+//
+// Partial automation for interview-only controls. These check for the
+// EXISTENCE of policy documents in the project (not in templates/).
+// Finding a doc does NOT auto-pass the control — it records evidence
+// and moves the control to 'partial'. The interview still verifies content.
+//
+// IMPORTANT: Patterns must NOT match files in templates/policies/ directory.
+// The skill running these checks should search project root, docs/, policies/
+// (the Rego dir), and any markdown files — excluding templates/.
+
+const POLICY_DOC_CHECKS: Check[] = [
+  {
+    id: 'policy-doc-incident-response',
+    category: 'policy_doc',
+    description: 'Incident response plan exists in project (not just template)',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'incident.response.plan|incident.response.procedure|security.incident',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-security-policy',
+    category: 'policy_doc',
+    description: 'Information security policy document exists in project',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'information.security.policy|security.policy.statement|hipaa.security.policy',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-access-control',
+    category: 'policy_doc',
+    description: 'Access control policy document exists in project',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'access.control.policy|authorization.policy|least.privilege.policy',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-contingency-plan',
+    category: 'policy_doc',
+    description: 'Business continuity/disaster recovery plan exists in project',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'contingency.plan|disaster.recovery|business.continuity|bcp.plan|dr.plan',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-risk-assessment',
+    category: 'policy_doc',
+    description: 'Risk assessment document exists in project',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'risk.assessment|risk.analysis|threat.assessment|vulnerability.assessment',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-training-records',
+    category: 'policy_doc',
+    description: 'Security awareness training records or program exists',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'training.record|security.awareness|training.completion|training.program',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-media-protection',
+    category: 'policy_doc',
+    description: 'Media protection/data disposal policy exists in project',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'media.protection|data.disposal|media.sanitization|device.disposal',
+    severity_default: 'MEDIUM',
+  },
+  {
+    id: 'policy-doc-contingency-test',
+    category: 'policy_doc',
+    description: 'DR/contingency plan test evidence exists',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'contingency.test|dr.test|disaster.recovery.test|failover.test|backup.test',
+    severity_default: 'LOW',
+  },
+  {
+    id: 'policy-doc-assessment-report',
+    category: 'policy_doc',
+    description: 'Prior security assessment or audit report exists',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'security.assessment|audit.report|compliance.report|pentest.report|vulnerability.scan',
+    severity_default: 'LOW',
+  },
+  {
+    id: 'policy-doc-monitoring-config',
+    category: 'policy_doc',
+    description: 'Continuous monitoring configuration or policy exists',
+    type: 'code_grep',
+    provider: 'code',
+    pattern: 'continuous.monitoring|monitoring.policy|siem.config|log.monitoring|alert.config',
+    severity_default: 'LOW',
+  },
+];
+
 // ─── Export ─────────────────────────────────────────────────────
 
-export const CHECKS: Check[] = [...CODE_CHECKS, ...AWS_CHECKS, ...REGO_CHECKS];
+export const CHECKS: Check[] = [...CODE_CHECKS, ...AWS_CHECKS, ...REGO_CHECKS, ...TOOL_INTEGRATION_CHECKS, ...POLICY_DOC_CHECKS];
 
 /** Get a check by ID */
 export function getCheck(id: string): Check | undefined {

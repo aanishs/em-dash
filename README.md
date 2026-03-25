@@ -1,9 +1,10 @@
 # em-dash
 
-[![Tests](https://img.shields.io/badge/tests-102%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-140%20passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-orange)]()
+[![Version](https://img.shields.io/badge/version-3.2.0-orange)]()
 [![NIST 800-53](https://img.shields.io/badge/NIST%20800--53-1196%20controls-blue)]()
+[![Frameworks](https://img.shields.io/badge/frameworks-6%20supported-blue)]()
 [![Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet)]()
 
 I'm [Aanish](https://github.com/aanishs). I build [CoralEHR](https://coralehr.com), an EHR for behavioral therapists.
@@ -30,29 +31,9 @@ Originally for CoralEHR. Now open source.
 
 Because "pay $10k a year" and "guess" should not be the two main options.
 
-em-dash is Claude Code plus compliance. HIPAA is the first framework — built from real-world experience. The architecture supports multiple frameworks, and early SOC 2 scaffolding is in place, but additional frameworks need domain expertise we don't have yet. Contributors who know SOC 2, GDPR, PCI-DSS, or ISO 27001 are especially welcome.
-
-Our core philosophy is simple: compliance should be human-in-the-loop.
-
-AI is good at finding gaps, drafting fixes, and doing tedious work fast. It is not good at being the final authority on how your company handles sensitive healthcare data.
-
-So em-dash is built to assist, not impersonate judgment. You stay in control. You can inspect everything. You can override everything. Nothing important disappears into a black box and comes back wearing a confidence score.
+em-dash is Claude Code plus compliance. You pick your frameworks. The AI reads the actual law, scans your infrastructure, finds gaps, drafts fixes, and produces cryptographically signed evidence. You stay in control. You can inspect everything. Nothing disappears into a black box.
 
 (Why "em-dash"? The em dash and "delve" are both classic AI tells. LLMs can't stop using them. The Delve scandal pushed us to ship this publicly, so the name just... worked.)
-
-**Who this is for:**
-- You need HIPAA, SOC 2, GDPR, or PCI-DSS compliance and don't have a dedicated compliance team
-- You're a startup founder who thinks compliance should take days, not months
-- You got burned by vendor lock-in ($10-50k/yr for a dashboard) and want to own your compliance
-- You want the AI to read the actual law and tell you exactly what to do — not a simplified checklist someone made up
-
-**What we support:**
-- **HIPAA** — healthcare, patient data (PHI), security rule, privacy rule
-- **SOC 2** — SaaS trust service criteria (security, availability, confidentiality)
-- **GDPR** — EU data protection, privacy rights, breach notification
-- **PCI-DSS** — payment card data security
-
-Run `/comply` and pick your framework. Need multiple? Select them all — controls are shared automatically.
 
 ---
 
@@ -66,7 +47,7 @@ git clone https://github.com/aanishs/em-dash.git
 cd em-dash && ./setup
 ```
 
-To add it to a project (so teammates get it automatically):
+To vendor into a project:
 
 ```bash
 cp -Rf ~/.claude/skills/em-dash .claude/skills/em-dash
@@ -74,278 +55,295 @@ rm -rf .claude/skills/em-dash/.git
 cd .claude/skills/em-dash && ./setup
 ```
 
-Optional scanning tools (recommended, not required):
+---
+
+## How it works
+
+You opt into the frameworks you need. em-dash only shows what you asked for.
 
 ```bash
-pip install prowler        # AWS — 83 HIPAA checks
-brew install trivy         # containers, code, IaC
-pip install checkov        # 1000+ IaC rules with HIPAA framework
-brew install conftest      # runs em-dash's bundled Rego policies
+You:    /hipaa          # → active_frameworks: ["hipaa"]
+You:    /cis            # → active_frameworks: ["hipaa", "cis"]
 ```
 
-em-dash works without any of these. The 19 code-level checks only need grep. Cloud scanning uses native CLI commands.
+Dashboard, CLI, cross-framework matrix, and scan results are all scoped to your active frameworks. Nothing shows up unless you initialized it.
 
-## Demo
+### The mapping chain
 
-```
-You:    /hipaa
-Claude: HIPAA compliance initialized.
-        Imported 50 NIST 800-53 controls.
-        0% complete. 50 controls pending.
-        Run /comply-auto to start.
+Every framework maps its requirements to NIST 800-53 controls. The same controls power all 6 frameworks — so a single infrastructure fix can satisfy requirements across multiple compliance regimes simultaneously.
 
-You:    /comply-auto
-Claude: Working on AC-2: Account Management...
-        NIST says: "Define and document the types of accounts allowed..."
-        Running checks: aws-iam-wildcard ✓ rego-iam-wildcard ✓
-        All checks PASS.
+```mermaid
+flowchart TD
+    A[NIST 800-53 Catalog<br/>1,196 controls · 20 families<br/><i>immutable, ships in repo</i>] --> B
 
-        Working on AC-3: Access Enforcement...
-        Running checks: rbac-existence... FAIL — no RBAC found
-        Fixing: [generates RBAC middleware]
-        Re-scan: rbac-existence ✓ PASS
+    subgraph filters [Framework Filter Files]
+        B1[hipaa-filter.json<br/>64 controls]
+        B2[soc2-filter.json<br/>39 controls]
+        B3[cis-filter.json<br/>33 controls + IG tiers]
+        B4[gdpr-filter.json<br/>22 controls]
+        B5[pci-dss-filter.json<br/>16 controls]
+        B6[iso27001-filter.json<br/>49 controls]
+    end
 
-        Working on RA-3: Risk Assessment...
-        No automated checks. Interview needed:
-        "Have you conducted a formal risk analysis?"
+    B --> filters
 
-You:    Not yet, it's on our list.
+    filters --> C[tool-bindings.json<br/>800-53 control → check IDs<br/><i>em-dash · Prowler · Checkov · Trivy · CIS Benchmark refs</i>]
 
-Claude: Recorded. Moving to next control...
-        [... continues through all 50 controls ...]
+    C --> D[checks-registry.ts<br/>60+ checks<br/><i>pure execution: id → command/pattern</i>]
 
-        Session complete: 21 scanned, 12 passed, 5 fixed, 29 need interviews.
+    D --> E[comply-orchestrate<br/>parallel scanner<br/><i>8 tools · finding normalization · CIS tagging</i>]
 
-You:    /comply-report
-Claude: → Signed audit packet: audit-packet.zip
-        → 50 controls, 42% complete
-        → Ed25519 signed, RFC 8785 canonicalized
+    E --> F[(SQLite<br/>compliance.db<br/><i>controls · evidence<br/>check_results · signatures<br/>baselines</i>)]
+
+    F --> G[Dashboard + Reports<br/><i>cross-framework matrix<br/>impact badges · drift tracking<br/>signed audit packets</i>]
 ```
 
-Need multiple? Run `/hipaa` then `/soc2` — controls are shared automatically.
+### The compliance workflow
 
-## Usage
+```mermaid
+flowchart LR
+    A["/hipaa<br/>/soc2<br/>/cis"] -->|initialize| B[comply-db init]
+    B --> C{"/comply-auto<br/>(autopilot)"}
+    C -->|scan| D[comply-orchestrate<br/>+ code checks<br/>+ Rego policies]
+    C -->|fix| E[comply-fix<br/>generate patches<br/>+ policy docs]
+    C -->|interview| F[comply-assess<br/>one control<br/>at a time]
+    D --> G[(SQLite)]
+    E --> G
+    F --> G
+    G --> H[comply-report<br/>Ed25519 signed<br/>audit packet]
+```
 
-Open Claude Code in any project. Pick your framework:
+### Cross-framework impact
 
-**Start here — pick your framework:**
+Because all frameworks converge on the same 800-53 controls, fixing one thing can satisfy requirements across all your active frameworks at once:
 
-| Command | Framework |
-|---------|-----------|
-| `/hipaa` | **HIPAA** — healthcare, patient data (PHI), security rule |
-| `/soc2` | **SOC 2** — SaaS trust service criteria |
-| `/gdpr` | **GDPR** — EU data protection, privacy rights |
-| `/pci-dss` | **PCI-DSS** — payment card data security |
+```mermaid
+graph LR
+    S3[Fix S3 encryption] --> SC28[NIST SC-28]
+    SC28 --> HIPAA[HIPAA ✓]
+    SC28 --> CIS[CIS ✓]
+    SC28 --> SOC2[SOC 2 ✓]
+    SC28 --> GDPR[GDPR ✓]
+    SC28 --> PCI[PCI-DSS ✓]
+    SC28 --> ISO[ISO 27001 ✓]
 
-Each command initializes the framework and imports the relevant NIST 800-53 controls. Run multiple to track several frameworks at once.
+    style S3 fill:#16a34a,color:#fff
+    style SC28 fill:#2563eb,color:#fff
+```
 
-**Then use these to do the work:**
+```
+$ bin/comply-db cross-framework
+
+Control  CIS       HIPAA     ISO27001  Impact
+──────────────────────────────────────────────
+AC-2       ✓         ✓         ✓       3/3
+SC-28      ✓         ✓         ✓       3/3
+AU-2       ✓         ✓         ✓       3/3
+```
+
+Only your active frameworks appear. Use `--all` to see all 6.
+
+---
+
+## Six frameworks
+
+| Command | Framework | Controls | What it protects |
+|---------|-----------|----------|------------------|
+| `/hipaa` | HIPAA Security Rule | 64 | Patient health data (PHI) |
+| `/soc2` | SOC 2 Type II | 39 | SaaS trust criteria |
+| `/gdpr` | GDPR | 22 | EU personal data |
+| `/pci-dss` | PCI-DSS v4.0 | 16 | Payment card data |
+| `/cis` | CIS Controls v8.1 | 33 | Infrastructure security baseline |
+| `/iso27001` | ISO/IEC 27001:2022 | 49 | Information security management |
+
+Run multiple — each adds to your `active_frameworks` list. Controls are shared automatically.
+
+```bash
+bin/comply-db frameworks              # list active frameworks
+bin/comply-db frameworks --add soc2   # add without full init
+bin/comply-db frameworks --remove cis # remove a framework
+```
+
+---
+
+## Skills (Claude Code slash commands)
 
 | Command | What it does |
 |---------|-------------|
-| `/comply` | Status dashboard across all active frameworks. |
-| `/comply-auto` | **Autopilot.** Scans, fixes, asks questions — one control at a time. |
-| `/comply-assess` | Focused interview. One NIST control at a time. |
-| `/comply-scan` | Focused scan. Runs em-dash + Prowler + Checkov. |
-| `/comply-fix` | Focused remediation. Fix failures, re-scan to verify. |
-| `/comply-report` | Generate compliance report + signed audit packet. |
-| `/comply-breach` | Incident response. Guided breach notification. |
-| `/em-dashboard` | Open the visual compliance dashboard. |
+| `/comply` | Status dashboard — compliance score, next step recommendation |
+| `/comply-auto` | **Autopilot.** Scans, fixes, interviews — one control at a time |
+| `/comply-scan` | Run all available scanning tools in parallel |
+| `/comply-fix` | Remediate failures, generate policy docs, re-scan to verify |
+| `/comply-assess` | Focused interview — one NIST control at a time |
+| `/comply-report` | Compliance report + Ed25519 signed audit packet |
+| `/comply-breach` | Guided incident response and breach notification |
+| `/em-dashboard` | Visual compliance dashboard at localhost:3000 |
 
-### Architecture
+---
 
-The LLM reads the actual NIST 800-53 control text at runtime — not our interpretation.
+## 60+ automated checks
 
-```bash
-bin/comply-db init                  # import 50 HIPAA controls from NIST 800-53
-bin/comply-db status                # compliance status per control
-bin/comply-db control AC-2          # show full NIST prose + evidence for one control
-bin/comply-attest init-keys         # generate Ed25519 signing keypair
-bin/comply-audit-packet \           # generate signed audit packet
-  --attestation-dir ~/.em-dash/projects/$SLUG/attestations \
-  --output audit-packet.zip
+```mermaid
+pie title Check Distribution
+    "Code-level (grep)" : 19
+    "Cloud CLI (AWS)" : 19
+    "Rego policies" : 11
+    "Policy documents" : 10
+    "Tool integrations" : 8
 ```
 
-**4 frameworks supported:** HIPAA (50 controls), SOC 2 (40), GDPR (22), PCI-DSS (16). Adding a framework = one filter file mapping requirements to 800-53 controls. Zero code changes.
+**Code-level (19):** PHI in logs/browser/tests/errors, RBAC, audit logging, encryption, session timeout, password hashing, least privilege, secrets in config, DB security. No tools required.
 
-### Workflow
+**Cloud infrastructure (19):** IAM, MFA, CloudTrail, VPC flow logs, S3/RDS/EBS/DynamoDB encryption, KMS rotation, security groups, GuardDuty, Security Hub.
 
+**Rego policies (11 across 8 files):** Terraform/K8s IaC validation. Multi-cloud: AWS, GCP, Azure. Encryption, access control, audit logging, transmission security, backup/DR, container security, secrets.
+
+**Policy document checks (10):** Partial automation for interview-only controls. Finds evidence of incident response plans, security policies, training records. Finding a doc doesn't auto-pass — it records evidence and marks the control as 'partial'.
+
+**Tool integrations (8):** Orchestrated via `comply-orchestrate`:
+
+| Tool | What it scans |
+|------|---------------|
+| [Prowler](https://github.com/prowler-cloud/prowler) | AWS CIS/HIPAA/PCI-DSS (83+ checks) |
+| [Checkov](https://github.com/bridgecrewio/checkov) | Terraform, CloudFormation, K8s (1000+ rules) |
+| [Trivy](https://github.com/aquasecurity/trivy) | Containers, IaC, secrets, SBOM |
+| [KICS](https://github.com/Checkmarx/kics) | IaC scanning (2400+ Rego queries) |
+| [Semgrep](https://github.com/semgrep/semgrep) | SAST code scanning |
+| [kube-bench](https://github.com/aquasecurity/kube-bench) | CIS Kubernetes Benchmark |
+| [ScoutSuite](https://github.com/nccgroup/ScoutSuite) | Multi-cloud security audit |
+| [Lynis](https://github.com/CISOfy/lynis) | System security auditing |
+
+All optional. em-dash works with just grep. Tools are auto-detected and run in parallel.
+
+---
+
+## Evidence and signing
+
+```mermaid
+flowchart LR
+    A[Scan results] --> B[SHA-256 hash]
+    B --> C[Ed25519 sign]
+    C --> D[SQLite evidence store]
+    D --> E[Audit packet ZIP]
+    E --> F[verify with public key]
+
+    U[User attestation] --> C
+    U -.->|"comply-db sign --name 'Jane Smith'"| D
 ```
-/comply           ──> status + recommend next step
-/comply-auto      ──> scan → fix → assess → next control (autopilot)
-/comply-assess    ──> interview (vendors, risk, training — all NIST-driven)
-/comply-scan      ──> automated checks ──┐
-/comply-fix       ──> remediate failures ├──> /comply-report ──> audit packet
-                                        │
-/comply-breach (standalone — use when things go wrong)
-```
 
-All evidence lives in SQLite: `~/.em-dash/projects/{slug}/compliance.db`
+- **Ed25519 signed attestations** — RFC 8785 JSON canonicalization
+- **User signatures** — named person cryptographically attests evidence accuracy
+- **Evidence redaction** — `--redact` flag strips AWS account IDs, ARNs, IPs from audit packets
+- **Compliance drift** — baseline snapshots track per-framework score changes over time
 
-![em-dash compliance dashboard](docs/screenshots/overview.png)
+---
 
-## What it checks
+## Dashboard
 
-### Code-level checks (always run, no tools required)
-
-| Check | HIPAA Req | What it finds |
-|-------|-----------|---------------|
-| PHI identifiers | §164.514 | Patient names, SSNs, MRNs, DOBs, insurance IDs in code |
-| Health data fields | §164.501 | Diagnosis codes, medications, lab results, clinical notes |
-| PHI in logs | §164.312(b) | `console.log(patient.ssn)` |
-| PHI in browser | §164.312(a)(1) | localStorage, cookies, URL params with PHI |
-| RBAC | §164.312(a)(1) | Missing role checks on PHI endpoints |
-| Audit logging | §164.312(b) | No audit trail for PHI access |
-| Encryption at rest | §164.312(a)(2)(iv) | Unencrypted PHI, missing KMS |
-| Session timeout | §164.312(a)(2)(iii) | No auto-logoff |
-| Password hashing | §164.312(d) | MD5/SHA1 instead of bcrypt/argon2 |
-| PHI in tests | §164.502 | Real SSNs in fixtures |
-| PHI in errors | §164.312(a)(1) | Stack traces leaking PHI |
-| Least privilege | §164.308(a)(4) | Wildcard IAM, hardcoded creds |
-| DB columns | §164.502 | PHI column names in schemas |
-| DB audit logging | §164.312(b) | Missing pgaudit config |
-| DB encryption | §164.312(a)(2)(iv) | No TDE/pgcrypto |
-| DB access | §164.312(a)(1) | GRANT ALL, PUBLIC grants |
-| DB connections | §164.312(e)(1) | sslmode=disable |
-| Push/email PHI | §164.312(a)(1) | PHI on lock screens, unencrypted email |
-| Secrets in config | §164.312(a)(1) | Passwords in .env files |
-
-<details>
-<summary><strong>Cloud infrastructure scanning (AWS/GCP/Azure)</strong></summary>
-
-| Provider | Checks | Coverage |
-|----------|--------|----------|
-| AWS | ~65 CLI commands | IAM, MFA, CloudTrail, VPC flow logs, S3/RDS/EBS encryption, KMS, security groups, GuardDuty, WAF, Config, Macie, Inspector, CloudFront TLS, backup immutability |
-| GCP | ~40 gcloud commands | Cloud SQL, IAM, service account keys, KMS, firewall, GKE, audit logs, VPC Service Controls, Cloud Armor, DLP, Memorystore, Secret Manager |
-| Azure | ~28 az commands | Storage encryption, SQL TDE/auditing, Key Vault, NSG, Defender, App Gateway WAF, Cosmos DB, private endpoints, backup policies |
-
-All commands are read-only.
-
-</details>
-
-<details>
-<summary><strong>IaC and scanning tool integrations</strong></summary>
-
-| Tool | What it does |
-|------|-------------|
-| [Checkov](https://github.com/bridgecrewio/checkov) | 1000+ rules with built-in HIPAA framework. Terraform, CloudFormation, K8s. |
-| [Conftest](https://github.com/open-policy-agent/conftest) | Runs em-dash's 6 bundled Rego policies against IaC files. |
-| [Prowler](https://github.com/prowler-cloud/prowler) | 83 AWS HIPAA-specific checks. |
-| [Trivy](https://github.com/aquasecurity/trivy) | Container, code, and IaC vulnerability scanning. |
-
-All optional. em-dash works with just grep.
-
-</details>
-
-## What it produces
-
-### Dashboard
-
-Run `bun run dashboard` to open the compliance dashboard at localhost:3000.
-
-<!-- TODO: Add dashboard screenshot here -->
-<!-- ![Dashboard](docs/images/dashboard.png) -->
+`bun run dashboard` — visual compliance at localhost:3000.
 
 | Feature | Description |
 |---------|-------------|
-| **NL Summary** | Auto-generated compliance summary: score, open findings, missing BAAs, top risk, next step |
-| **Audit Pipeline** | Visual skill status with timestamps, finding counts, and 1-line summaries |
-| **Requirements Checklist** | 49 HIPAA items, filterable by section, with evidence linking and notes |
-| **Findings** | Expandable rows with severity, description, dates, linked evidence |
-| **Risk Register** | 5x5 likelihood/impact matrix + table view with treatment strategies |
-| **Vendor Tracker** | BAA status, expiry warnings, risk tiers, notes |
-| **Evidence Library** | Drag-and-drop upload, SHA-256 integrity, search, pagination |
-| **Export** | HTML compliance report + CSV findings export |
+| **Cross-Framework Matrix** | Controls shared across your active frameworks with impact badges |
+| **Requirements Checklist** | Filterable by section, evidence linking, notes |
+| **Findings** | Severity, description, dates, linked evidence |
+| **Risk Register** | 5x5 likelihood/impact matrix |
+| **Vendor Tracker** | BAA status, expiry warnings, risk tiers |
+| **Evidence Library** | Drag-and-drop upload, SHA-256 integrity |
+| **Compliance Score** | Per-family breakdown from SQLite |
+| **Scan Trigger** | Start orchestrator scans from the dashboard |
 
-### Reports
+The dashboard is framework-aware — it only shows frameworks you've initialized. Evidence upload dropdown, charts, and NL summary all scope to your active frameworks.
 
-| Report | Description |
-|--------|-------------|
-| **Full Compliance Report** | Every §164 requirement mapped, evidence indexed, corrective action plan |
-| **Executive Summary** | 1 page. Compliance maturity score. For leadership. |
-| **Trust Report** | Shareable with prospects and partners. Verified controls only. SHA-256 evidence hash. |
+---
 
-### Policy documents
+## CLI tools
 
-`/comply-fix` generates these from audited templates, customized for your organization:
+```bash
+# Framework management
+bin/comply-db init --framework hipaa    # initialize HIPAA (adds to active list)
+bin/comply-db frameworks                 # list active + available frameworks
+bin/comply-db frameworks --add cis       # add framework to active list
 
-| Policy |
-|--------|
-| Access Control Policy |
-| Audit Logging Policy |
-| Encryption Policy |
-| Incident Response Plan |
-| Risk Assessment Procedure |
-| Workforce Security Policy |
-| Contingency Plan |
-| Business Associate Agreement (BAA) Template |
+# Compliance operations
+bin/comply-db status                     # compliance status per control
+bin/comply-db control AC-2               # NIST prose + evidence for one control
+bin/comply-db cross-framework            # cross-framework matrix (active only)
+bin/comply-db cross-framework --all      # show all 6 frameworks
+bin/comply-db cis-coverage               # CIS AWS Level 1 coverage gap report
+bin/comply-db sign AC-2 --name "Jane"    # Ed25519 user attestation
 
-Based on [Datica's open-source HIPAA policies](https://github.com/Jowin/policies) (independently audited).
+# Scanning
+bin/comply-orchestrate detect            # list available tools + versions
+bin/comply-orchestrate scan              # run all tools, write to SQLite
+bin/comply-orchestrate diff              # compliance drift with per-framework breakdown
 
-## CI/CD
-
-Scan every PR automatically. Add the `hipaa-scan` label to trigger a compliance check via GitHub Actions.
-
-```yaml
-# .github/workflows/comply-scan.yml is included — just add your API key:
-# Settings → Secrets → ANTHROPIC_API_KEY
+# Signing
+bin/comply-attest init-keys              # generate Ed25519 keypair
+bin/comply-audit-packet --output audit.zip --redact
 ```
 
-See [docs/ci-setup.md](docs/ci-setup.md) for full setup instructions.
+---
+
+## Architecture
+
+```
+em-dash/
+├── nist/                              # IMMUTABLE — official NIST data
+│   ├── NIST_SP-800-53_rev5_catalog.json  # 1,196 controls, 20 families
+│   ├── {hipaa,soc2,gdpr,pci-dss,cis,iso27001}-filter.json  # 6 framework filters
+│   ├── tool-bindings.json             # control → check mappings (v3.0)
+│   └── cross-framework.ts             # shared cross-framework matrix module
+├── frameworks/
+│   ├── checks-registry.ts             # 60+ checks (pure execution)
+│   ├── schema.ts                      # TypeScript interfaces
+│   └── {hipaa,soc2,gdpr,pci-dss,cis,iso27001}.json  # display metadata
+├── policies/                          # 8 Rego policy files (multi-cloud)
+├── bin/                               # 7 CLI utilities
+├── scripts/                           # dashboard server, filter validators
+├── dashboard/                         # visual dashboard (HTML/CSS/JS)
+├── skills/                            # 8 Claude Code skills + 6 framework routers
+└── test/                              # 141 tests across 8 files
+```
+
+**Key design decisions:**
+- **NIST 800-53 is the law** — official catalog ships unmodified
+- **SQLite is the evidence store** — one DB per project, tracks `active_frameworks`
+- **Framework-aware opt-in** — only show what you initialized
+- **checks-registry is pure execution** — no compliance mappings
+- **tool-bindings is the mapping layer** — controls → checks + CIS Benchmark refs
+- **Adding a framework = one filter file** — zero code changes
+
+---
 
 ## How em-dash compares
 
-|  | em-dash | Vanta | Drata | Comp AI |
-|--|---------|-------|-------|---------|
-| **Price** | Free | $10k+/yr | $10k+/yr | Free (open core) |
-| **Open source** | MIT | No | No | Yes |
-| **Runs locally** | Yes | No | No | No |
-| **AI-powered** | Claude Code agent | Dashboard + integrations | Dashboard + integrations | AI agents |
-| **See every action** | Yes (terminal) | No (black box) | No (black box) | Partial |
-| **Code scanning** | 19 checks + Prowler/Trivy/Checkov | Via integrations | Via integrations | Via integrations |
-| **Policy generation** | 9 templates, auto-customized | Templates | Templates | Templates |
-| **Evidence integrity** | SHA-256 hashed | Vendor-managed | Vendor-managed | Self-hosted |
-| **Remediation** | AI generates fixes + Terraform patches | Manual guidance | Manual guidance | AI suggestions |
-| **Multi-framework** | HIPAA (SOC 2 scaffolding, GDPR/PCI-DSS planned) | HIPAA, SOC 2, ISO, GDPR | HIPAA, SOC 2, ISO, GDPR | SOC 2, ISO, HIPAA, GDPR |
+|  | em-dash | Vanta | Drata |
+|--|---------|-------|-------|
+| **Price** | Free (MIT) | $10k+/yr | $10k+/yr |
+| **Frameworks** | 6 (HIPAA, SOC 2, GDPR, PCI-DSS, CIS, ISO 27001) | HIPAA, SOC 2, ISO, GDPR | HIPAA, SOC 2, ISO, GDPR |
+| **Cross-framework** | Yes — shared 800-53 controls, scoped to your selection | No | No |
+| **Runs locally** | Yes | No (SaaS) | No (SaaS) |
+| **Scanning** | 60+ checks + 8 tool integrations | Via integrations | Via integrations |
+| **Evidence integrity** | Ed25519 signed, SHA-256 hashed, user attestations | Vendor-managed | Vendor-managed |
+| **Remediation** | AI generates fixes + re-verifies | Manual guidance | Manual guidance |
+| **See every action** | Yes (terminal + dashboard) | No (black box) | No (black box) |
 
-## Roadmap
+---
 
-HIPAA is shipped and tested against real infrastructure. The multi-framework architecture is in place — a shared checks registry (~50 checks), framework-agnostic Rego policies, and a template engine that generates framework-specific skills from JSON definitions.
+## Contributing
 
-**Multi-framework support:** HIPAA, SOC 2, GDPR, and PCI-DSS filter files exist (`nist/*-filter.json`). Adding a new framework = writing a ~50-line JSON file mapping requirements to 800-53 controls. Same NIST catalog, same tools, zero code changes. Contributors who know SOC 2, GDPR, PCI-DSS, or ISO 27001 can improve the filter accuracy.
+Adding a framework: write `nist/<id>-filter.json`, write `frameworks/<id>.json`, run `bin/comply-db init --framework <id>`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **What we need help with:**
-- **SOC 2** — Trust Service Criteria mappings, assessment questions, checklist refinement
-- **GDPR** — Article 32 technical measures, data subject rights workflows, DPA tracking
-- **PCI-DSS** — Cardholder data environment scoping, SAQ mapping, network segmentation checks
-- **ISO 27001** — Annex A control mapping, ISMS documentation templates
-
-Adding a framework: write `frameworks/<id>.json` (~200 lines of requirement mappings), create skill directories, run `bun run gen:skill-docs`. See [CONTRIBUTING.md](CONTRIBUTING.md) — "Adding a new compliance framework."
+- **SOC 2** — Trust Service Criteria mapping accuracy
+- **GDPR** — Article 32 technical measures, data subject rights
+- **PCI-DSS** — Cardholder data environment scoping
+- **ISO 27001** — Annex A control mapping completeness
 
 ## Disclaimer
 
-> This is technical guidance, not legal advice. It does not constitute HIPAA certification. Consult qualified legal counsel and consider engaging a certified HIPAA auditor for formal compliance verification.
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [docs/guide.md](docs/guide.md) | Visual usage guide with screenshots of every page |
-| [docs/design.md](docs/design.md) | Design system reference (colors, typography, components, Chart.js) |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Project architecture, contribution paths, testing guide |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes |
-| [SECURITY.md](SECURITY.md) | Vulnerability reporting |
-| [CLAUDE.md](CLAUDE.md) | Development reference |
-
-## Troubleshooting
-
-**Skills not showing up?** `cd ~/.claude/skills/em-dash && ./setup`
-
-**Tests failing after pulling?** `bun install && bun run gen:skill-docs`
-
-**Scanning tools not detected?** Verify they're in your PATH: `which prowler`
-
-**Assessment seems stuck?** Say "continue the assessment." It picks up from saved state in `~/.em-dash/`.
+> This is technical guidance, not legal advice. It does not constitute compliance certification. Consult qualified legal counsel for formal compliance verification.
 
 ## License
 

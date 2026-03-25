@@ -79,6 +79,7 @@ let server: ReturnType<typeof Bun.serve>;
 try {
   server = Bun.serve({
   port: PORT,
+  hostname: '127.0.0.1',
 
   fetch(req, server) {
     const url = new URL(req.url);
@@ -87,6 +88,24 @@ try {
     if (url.pathname === '/ws') {
       if (server.upgrade(req)) return;
       return new Response('WebSocket upgrade failed', { status: 400 });
+    }
+
+    // API: active frameworks
+    if (url.pathname === '/api/frameworks' && req.method === 'GET') {
+      const active = getActiveFrameworks();
+      const available = ['hipaa', 'soc2', 'gdpr', 'pci-dss', 'cis', 'iso27001'];
+      return Response.json({ active, available });
+    }
+
+    // API: cross-framework compliance matrix (scoped to active frameworks)
+    if (url.pathname === '/api/cross-framework' && req.method === 'GET') {
+      try {
+        const { buildCrossFrameworkMatrix } = require(path.join(ROOT, 'nist', 'cross-framework.ts'));
+        const active = getActiveFrameworks();
+        return Response.json(buildCrossFrameworkMatrix(active.length > 0 ? active : undefined));
+      } catch (e: any) {
+        return Response.json({ error: e.message }, { status: 500 });
+      }
     }
 
     // API: compliance data from SQLite (v2 architecture)
@@ -149,6 +168,38 @@ try {
     if (url.pathname === '/api/export/report' && req.method === 'GET') {
       const fw = url.searchParams.get('framework') || 'hipaa';
       return handleExportReport(fw);
+    }
+
+    // ─── New Orchestration API ─────────────────────────────────
+
+    // API: compliance score with per-family breakdown
+    if (url.pathname === '/api/compliance/score' && req.method === 'GET') {
+      return handleComplianceScore();
+    }
+
+    // API: active findings from all tools
+    if (url.pathname === '/api/compliance/findings' && req.method === 'GET') {
+      return handleComplianceFindings(url);
+    }
+
+    // API: compliance drift since last baseline
+    if (url.pathname === '/api/compliance/drift' && req.method === 'GET') {
+      return handleComplianceDrift();
+    }
+
+    // API: available scanning tools
+    if (url.pathname === '/api/tools' && req.method === 'GET') {
+      return handleToolsList();
+    }
+
+    // API: trigger orchestrator scan
+    if (url.pathname === '/api/scan/trigger' && req.method === 'POST') {
+      return handleScanTrigger();
+    }
+
+    // API: scan status
+    if (url.pathname === '/api/scan/status' && req.method === 'GET') {
+      return handleScanStatus();
     }
 
     // Static files from dashboard/
@@ -570,14 +621,14 @@ function handleComplianceQuery(url: URL): Response {
     const dbPath = path.join(process.env.HOME ?? '', '.em-dash', 'projects', slug, 'compliance.db');
 
     if (!fs.existsSync(dbPath)) {
-      return Response.json({ error: 'No compliance database. Run: bin/hipaa-db init', controls: [], summary: null }, { status: 404 });
+      return Response.json({ error: 'No compliance database. Run: bin/comply-db init --framework hipaa', controls: [], summary: null }, { status: 404 });
     }
 
     const db = new Database(dbPath, { readonly: true });
     const view = url.searchParams.get('view') || 'summary';
 
     if (view === 'summary') {
-      const controls = db.prepare('SELECT oscal_id, title, family, status, hipaa_refs FROM controls ORDER BY family, oscal_id').all();
+      const controls = db.prepare('SELECT oscal_id, title, family, status, framework_refs FROM controls ORDER BY family, oscal_id').all();
       const total = controls.length;
       const complete = controls.filter((c: any) => c.status === 'complete').length;
       const partial = controls.filter((c: any) => c.status === 'partial').length;
@@ -589,7 +640,7 @@ function handleComplianceQuery(url: URL): Response {
       db.close();
       return Response.json({
         controls,
-        summary: { total, complete, partial, pending, pct: Math.round((complete / total) * 100) },
+        summary: { total, complete, partial, pending, pct: total > 0 ? Math.round((complete / total) * 100) : 0 },
         checks,
         evidence_count: evidenceCount,
         signature_count: sigCount,
@@ -614,9 +665,245 @@ function handleComplianceQuery(url: URL): Response {
   }
 }
 
+// ─── Orchestration API handlers ──────────────────────────────
+
+function getActiveFrameworks(): string[] {
+  const db = openComplianceDb();
+  if (!db) return [];
+  try {
+    const row = db.prepare("SELECT value FROM metadata WHERE key = 'active_frameworks'").get() as any;
+    if (!row) {
+      const legacy = db.prepare("SELECT value FROM metadata WHERE key = 'framework'").get() as any;
+      return legacy ? [legacy.value] : [];
+    }
+    return JSON.parse(row.value);
+  } catch {
+    return [];
+  } finally {
+    try { db.close(); } catch {}
+  }
+}
+
+function openComplianceDb(): any {
+  const { Database } = require('bun:sqlite');
+  const slug = getProjectSlug();
+  const dbPath = path.join(process.env.HOME ?? '', '.em-dash', 'projects', slug, 'compliance.db');
+  if (!fs.existsSync(dbPath)) return null;
+  return new Database(dbPath, { readonly: true });
+}
+
+function handleComplianceScore(): Response {
+  try {
+    const db = openComplianceDb();
+    if (!db) return Response.json({ error: 'No compliance database' }, { status: 404 });
+
+    const controls = db.prepare('SELECT oscal_id, family, status FROM controls').all() as any[];
+    const total = controls.length;
+    const complete = controls.filter((c: any) => c.status === 'complete').length;
+    const score = total > 0 ? Math.round((complete / total) * 100) : 0;
+
+    // Per-family breakdown
+    const families: Record<string, { total: number; complete: number; partial: number; pending: number }> = {};
+    for (const c of controls) {
+      if (!families[c.family]) families[c.family] = { total: 0, complete: 0, partial: 0, pending: 0 };
+      families[c.family].total++;
+      const status = (c.status === 'complete' || c.status === 'partial') ? c.status : 'pending';
+      families[c.family][status]++;
+    }
+
+    db.close();
+    return Response.json({ score, total, complete, families });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+function handleComplianceFindings(url: URL): Response {
+  try {
+    const db = openComplianceDb();
+    if (!db) return Response.json({ error: 'No compliance database' }, { status: 404 });
+
+    const tool = url.searchParams.get('tool');
+    const result = url.searchParams.get('result') || 'FAIL';
+    const limit = parseInt(url.searchParams.get('limit') || '100') || 100;
+
+    let query = 'SELECT cr.*, c.title as control_title, c.family FROM check_results cr JOIN controls c ON cr.control_id = c.oscal_id WHERE cr.result = ?';
+    const params: any[] = [result];
+
+    if (tool) {
+      query += ' AND cr.tool = ?';
+      params.push(tool);
+    }
+
+    query += ' ORDER BY cr.created_at DESC LIMIT ?';
+    params.push(limit);
+
+    const findings = db.prepare(query).all(...params);
+    const totalCount = (db.prepare('SELECT COUNT(*) as cnt FROM check_results WHERE result = ?').get(result) as any)?.cnt || 0;
+
+    db.close();
+    return Response.json({ findings, total: totalCount, filter: { tool, result, limit } });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+function handleComplianceDrift(): Response {
+  try {
+    const db = openComplianceDb();
+    if (!db) return Response.json({ error: 'No compliance database' }, { status: 404 });
+
+    // Get latest two distinct scan timestamps to compare
+    const timestamps = db.prepare(
+      'SELECT DISTINCT substr(created_at, 1, 19) as ts FROM check_results ORDER BY created_at DESC LIMIT 2'
+    ).all() as any[];
+
+    if (timestamps.length < 2) {
+      db.close();
+      return Response.json({ drift: [], message: 'Need at least 2 scans to compute drift' });
+    }
+
+    const [current, previous] = [timestamps[0].ts, timestamps[1].ts];
+
+    // Get results for each scan period
+    const currentResults = db.prepare(
+      'SELECT control_id, tool, check_id, result FROM check_results WHERE created_at >= ?'
+    ).all(current) as any[];
+
+    const previousResults = db.prepare(
+      'SELECT control_id, tool, check_id, result FROM check_results WHERE created_at >= ? AND created_at < ?'
+    ).all(previous, current) as any[];
+
+    // Build maps: control_id → result
+    const currentMap = new Map<string, string>();
+    const previousMap = new Map<string, string>();
+    for (const r of currentResults) currentMap.set(`${r.control_id}:${r.check_id}`, r.result);
+    for (const r of previousResults) previousMap.set(`${r.control_id}:${r.check_id}`, r.result);
+
+    // Compute drift
+    const drift: any[] = [];
+    const allKeys = new Set([...currentMap.keys(), ...previousMap.keys()]);
+    for (const key of allKeys) {
+      const cur = currentMap.get(key);
+      const prev = previousMap.get(key);
+      const [controlId, checkId] = key.split(':');
+
+      if (!prev && cur) {
+        drift.push({ control_id: controlId, check_id: checkId, type: 'NEW', result: cur });
+      } else if (prev === 'PASS' && cur === 'FAIL') {
+        drift.push({ control_id: controlId, check_id: checkId, type: 'REGRESSION', from: prev, to: cur });
+      } else if (prev === 'FAIL' && cur === 'PASS') {
+        drift.push({ control_id: controlId, check_id: checkId, type: 'FIXED', from: prev, to: cur });
+      }
+    }
+
+    // Include cross-framework scores from latest baseline if available
+    let crossFrameworkScores = null;
+    try {
+      const baseline = db.prepare('SELECT cross_framework_scores FROM compliance_baselines ORDER BY snapshot_at DESC LIMIT 1').get() as any;
+      if (baseline?.cross_framework_scores) crossFrameworkScores = JSON.parse(baseline.cross_framework_scores);
+    } catch {}
+
+    db.close();
+    return Response.json({
+      drift,
+      summary: {
+        regressions: drift.filter(d => d.type === 'REGRESSION').length,
+        fixed: drift.filter(d => d.type === 'FIXED').length,
+        new_findings: drift.filter(d => d.type === 'NEW').length,
+      },
+      compared: { current, previous },
+      cross_framework_scores: crossFrameworkScores,
+    });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+function handleToolsList(): Response {
+  try {
+    const tools = ['prowler', 'checkov', 'trivy', 'kics', 'semgrep', 'kube-bench', 'scoutsuite', 'lynis'];
+    const results: any[] = [];
+
+    for (const tool of tools) {
+      const binary = tool === 'scoutsuite' ? 'python3' : tool;
+      const which = spawnSync(binary, ['--version'], { timeout: 5000 });
+      const installed = which.status === 0;
+      const version = installed ? (which.stdout?.toString().trim().split('\n')[0] || 'unknown') : null;
+      results.push({ name: tool, installed, version });
+    }
+
+    return Response.json({ tools: results, available: results.filter(t => t.installed).length });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+// Scan state — tracks active scan PID
+let activeScan: { pid: number; startedAt: string } | null = null;
+
+function handleScanTrigger(): Response {
+  if (activeScan) {
+    // Check if scan is still running
+    try {
+      process.kill(activeScan.pid, 0); // signal 0 = check if process exists
+      return Response.json(
+        { error: 'Scan already in progress', scan: activeScan },
+        { status: 409 }
+      );
+    } catch {
+      // Process no longer running — clear stale state
+      activeScan = null;
+    }
+  }
+
+  try {
+    // Set sentinel immediately to prevent TOCTOU race on concurrent requests
+    const startedAt = new Date().toISOString();
+    activeScan = { pid: -1, startedAt };
+
+    let proc;
+    try {
+      const orchestratorPath = path.join(ROOT, 'bin', 'comply-orchestrate');
+      proc = Bun.spawn(['bun', orchestratorPath, 'scan'], {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        env: { ...process.env, NO_COLOR: '1' },
+      });
+    } catch (spawnErr: any) {
+      activeScan = null;
+      return Response.json({ error: 'Failed to start scan: ' + spawnErr.message }, { status: 500 });
+    }
+
+    activeScan = { pid: proc.pid, startedAt };
+
+    // Clean up when scan finishes
+    proc.exited.then(() => {
+      broadcast('scan_complete', { pid: proc.pid });
+      activeScan = null;
+    });
+
+    return Response.json({ status: 'started', scan: activeScan });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}
+
+function handleScanStatus(): Response {
+  if (activeScan) {
+    try {
+      process.kill(activeScan.pid, 0);
+      return Response.json({ status: 'running', scan: activeScan });
+    } catch {
+      activeScan = null;
+    }
+  }
+  return Response.json({ status: 'idle', scan: null });
+}
+
 function getProjectSlug(): string {
   try {
-    const proc = spawnSync(path.join(ROOT, 'bin', 'hipaa-slug'), { cwd: PROJECT_DIR });
+    const proc = spawnSync(path.join(ROOT, 'bin', 'comply-slug'), { cwd: PROJECT_DIR });
     const match = proc.stdout?.toString().match(/SLUG=(\S+)/);
     if (match) return match[1];
   } catch {}

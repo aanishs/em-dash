@@ -98,3 +98,52 @@ deny[msg] {
         "resource": name,
     }
 }
+
+# Azure — Storage accounts must use encryption
+deny[msg] {
+    resource := input.resource.azurerm_storage_account[name]
+    not resource.enable_https_traffic_only
+    msg := {
+        "msg": sprintf("Azure storage account '%s' does not enforce HTTPS-only traffic", [name]),
+        "check_id": "rego-s3-encryption",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# Azure — Managed disks must be encrypted
+deny[msg] {
+    resource := input.resource.azurerm_managed_disk[name]
+    not resource.disk_encryption_set_id
+    resource.encryption_settings == []
+    msg := {
+        "msg": sprintf("Azure managed disk '%s' is not encrypted with customer-managed key", [name]),
+        "check_id": "rego-rds-encryption",
+        "severity": "MEDIUM",
+        "resource": name,
+    }
+}
+
+# Azure — Key Vault must have soft delete enabled
+deny[msg] {
+    resource := input.resource.azurerm_key_vault[name]
+    resource.soft_delete_retention_days < 7
+    msg := {
+        "msg": sprintf("Azure Key Vault '%s' soft delete retention is less than 7 days", [name]),
+        "check_id": "rego-kms-rotation",
+        "severity": "MEDIUM",
+        "resource": name,
+    }
+}
+
+# GCP — BigQuery datasets must use CMEK
+deny[msg] {
+    resource := input.resource.google_bigquery_dataset[name]
+    not resource.default_encryption_configuration
+    msg := {
+        "msg": sprintf("BigQuery dataset '%s' does not use customer-managed encryption", [name]),
+        "check_id": "rego-s3-encryption",
+        "severity": "MEDIUM",
+        "resource": name,
+    }
+}

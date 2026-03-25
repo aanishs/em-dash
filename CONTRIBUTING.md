@@ -6,36 +6,42 @@
 git clone https://github.com/aanishs/em-dash.git
 cd em-dash
 bun install
-bun test          # ~103 tests, all free, under 3 seconds
+bun test          # ~141 tests, all free, under 4 seconds
 ```
 
-## Architecture (v2 — NIST-first)
+## Architecture (v3 — cross-framework)
 
-em-dash v2 ships the official NIST 800-53 catalog (1,196 controls). The LLM reads the actual law at runtime. Three files drive everything:
+em-dash v3 ships the official NIST 800-53 catalog (1,196 controls). The LLM reads the actual law at runtime. Five framework filter files + tool bindings drive everything:
 
 ```
 nist/
 ├── NIST_SP-800-53_rev5_catalog.json  # official NIST catalog (NEVER modify)
-├── hipaa-filter.json                  # HIPAA → 800-53 control IDs (52 specs → 50 controls)
-├── soc2-filter.json                   # SOC 2 → 800-53 (38 specs → 40 controls)
-├── gdpr-filter.json                   # GDPR → 800-53 (19 articles → 22 controls)
-├── pci-dss-filter.json                # PCI-DSS → 800-53 (20 reqs → 16 controls)
-└── tool-bindings.json                 # 800-53 control → verification tools
+├── hipaa-filter.json                  # HIPAA → 800-53 (64 controls)
+├── soc2-filter.json                   # SOC 2 → 800-53 (39 controls)
+├── gdpr-filter.json                   # GDPR → 800-53 (22 controls)
+├── pci-dss-filter.json                # PCI-DSS → 800-53 (16 controls)
+├── cis-filter.json                    # CIS v8.1 → 800-53 (33 controls, with IG tiers)
+├── tool-bindings.json                 # 800-53 control → verification tools (v3.0)
+└── cross-framework.ts                 # shared cross-framework matrix module
 
-frameworks/checks-registry.ts          # 50 em-dash checks — HOW to execute (pure execution)
-bin/comply-db                           # SQLite compliance database engine
-skills/                                # 7 skills (each processes one NIST control at a time)
-policies/                              # 6 Rego/OPA rules for IaC scanning
+frameworks/checks-registry.ts          # 60+ em-dash checks — HOW to execute (pure execution)
+bin/comply-db                           # SQLite compliance database + cross-framework matrix
+bin/comply-orchestrate                  # parallel tool scanner (Prowler, Checkov, Trivy, etc.)
+skills/                                # 8 skills + 6 framework routers
+policies/                              # 8 Rego/OPA policy files (AWS, GCP, Azure, K8s, Docker)
 templates/policies/                    # Policy document templates
+scripts/validate-*.ts                  # filter validation scripts
 ```
 
 **NIST catalog** is the source of truth. Never modify it.
 **Filter files** map framework requirements to 800-53 control IDs. This is where domain knowledge lives.
-**Tool bindings** map control IDs to em-dash/Prowler/Checkov check IDs. This is our value-add.
+**Tool bindings** map control IDs to em-dash/Prowler/Checkov/Trivy check IDs + CIS Benchmark refs.
 **Checks registry** defines HOW to execute each check (command, pattern). No compliance mappings.
+**Cross-framework module** joins all filter files on 800-53 control IDs for cross-framework impact scoring.
+**Orchestrator** runs external scanning tools in parallel, normalizes findings to 800-53 controls.
 **SQLite** stores all evidence per project: `~/.em-dash/projects/{slug}/compliance.db`
 
-**Policies** are Rego rules that Conftest runs against IaC files.
+**Policies** are Rego rules that Conftest runs against IaC files (8 files, multi-cloud).
 **Templates** are Markdown policy documents that `/comply-fix` customizes for the user.
 
 ## SKILL.md workflow
@@ -46,7 +52,7 @@ SKILL.md files are **generated** — don't edit them directly. They'd be overwri
 2. Run `bun run gen:skill-docs`
 3. Commit both the `.tmpl` and generated `.md` files
 
-**Why generated files?** The 7 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
+**Why generated files?** The 8 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
 
 **Watch mode:** Run `bun run dev:skill` to auto-regenerate and validate on every template save.
 
@@ -483,7 +489,7 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 ## Testing
 
 ```bash
-bun test                  # ~103 tests, free, <3s
+bun test                  # ~135 tests, free, <4s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
 ```
@@ -492,11 +498,13 @@ bun run dev:skill         # watch mode: auto-regen + validate on change
 
 | File                            | Tests  | What it validates                                                                                                            |
 | ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `test/skill-validation.test.ts` | ~40    | 7 skill templates, generated files, frontmatter, bin utilities, Rego policies |
-| `test/rego-policy.test.ts`      | ~22    | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s)                                                                    |
-| `test/bin-smoke.test.ts`        | ~20    | Actually executes bin utilities and validates output format                                                                  |
-| `test/touchfiles.test.ts`       | ~11    | Diff-based test selection logic (glob matching, touchfile maps)                                                              |
-| `test/skill-e2e.test.ts`        | (stub) | E2E skill tests — gated behind EVALS=1                                                                                       |
+| `test/architecture.test.ts`     | ~47    | NIST catalog, all filter files, tool bindings, CIS, cross-framework matrix, SQLite DB |
+| `test/skill-validation.test.ts` | ~40    | skill templates, generated files, frontmatter, bin utilities, Rego policies |
+| `test/rego-policy.test.ts`      | ~22    | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s, Docker)           |
+| `test/framework.test.ts`        | ~10    | checks-registry validation, framework loader                                |
+| `test/bin-smoke.test.ts`        | ~20    | Actually executes bin utilities and validates output format                  |
+| `test/touchfiles.test.ts`       | ~11    | Diff-based test selection logic (glob matching, touchfile maps)              |
+| `test/skill-e2e.test.ts`        | (stub) | E2E skill tests — gated behind EVALS=1                                      |
 
 ### Eval infrastructure (for paid E2E tests)
 
@@ -539,7 +547,7 @@ test("my new check appears in generated scan skill", () => {
 
 Before submitting:
 
-- [ ] `bun test` passes (~103 tests)
+- [ ] `bun test` passes (~141 tests)
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
 - [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)

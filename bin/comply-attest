@@ -323,6 +323,53 @@ function verifyAttestation(): void {
   }
 }
 
+/**
+ * User attestation — a named person cryptographically signs a statement
+ * attesting that specific evidence is accurate. Binds identity to evidence.
+ *
+ * Usage:
+ *   comply-attest user-sign --control-id AC-2
+ *     --name "Jane Smith" --role "Security Officer"
+ *     [--statement "I attest this evidence is accurate and complete."]
+ *     --output PATH
+ */
+function userSign(): void {
+  const controlId = getFlag('control-id');
+  const name = getFlag('name');
+  const role = getFlag('role');
+  const statement = getFlag('statement') || 'I attest that the evidence for this control is accurate and complete.';
+  const output = getFlag('output');
+
+  if (!controlId || !name || !output) {
+    console.error('Usage: comply-attest user-sign --control-id AC-2 --name "Jane Smith" --role "Security Officer" --output PATH');
+    process.exit(1);
+  }
+
+  const privateKey = loadPrivateKey();
+  const publicKey = crypto.createPublicKey(privateKey);
+  const fp = keyFingerprint(publicKey);
+
+  const attestation: Record<string, unknown> = {
+    type: 'user-attestation',
+    version: '1.0',
+    control_id: controlId,
+    statement,
+    attester: {
+      name,
+      role: role || 'unspecified',
+      key_fingerprint: fp,
+    },
+    timestamp: new Date().toISOString(),
+  };
+
+  attestation.signature = signObject(attestation, privateKey);
+
+  const outputDir = path.dirname(output);
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(output, JSON.stringify(attestation, null, 2));
+  console.log(`USER_ATTESTATION_CREATED: ${name} attested ${controlId} → ${output}`);
+}
+
 // ─── Router ─────────────────────────────────────────────────
 
 switch (subcommand) {
@@ -335,11 +382,14 @@ switch (subcommand) {
   case 'session':
     attestSession();
     break;
+  case 'user-sign':
+    userSign();
+    break;
   case 'verify':
     verifyAttestation();
     break;
   default:
     console.error(`Unknown subcommand: ${subcommand}`);
-    console.error('Usage: comply-attest <init-keys|check|session|verify> [args]');
+    console.error('Usage: comply-attest <init-keys|check|session|user-sign|verify> [args]');
     process.exit(1);
 }

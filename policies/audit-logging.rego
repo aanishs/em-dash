@@ -92,3 +92,39 @@ deny[msg] {
         "resource": name,
     }
 }
+
+# Azure — Activity log must have a log profile
+deny[msg] {
+    resource := input.resource.azurerm_monitor_log_profile[name]
+    not resource.retention_policy
+    msg := {
+        "msg": sprintf("Azure log profile '%s' has no retention policy — audit logs may be lost", [name]),
+        "check_id": "rego-cloudtrail-enabled",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# Azure — Diagnostic settings must exist for key resources
+deny[msg] {
+    resource := input.resource.azurerm_monitor_diagnostic_setting[name]
+    resource.retention_policy.enabled == false
+    msg := {
+        "msg": sprintf("Azure diagnostic setting '%s' has retention disabled — audit data not preserved", [name]),
+        "check_id": "rego-cloudtrail-enabled",
+        "severity": "MEDIUM",
+        "resource": name,
+    }
+}
+
+# GCP — Cloud Logging must have log sink for audit logs
+deny[msg] {
+    resource := input.resource.google_logging_project_sink[name]
+    not resource.filter
+    msg := {
+        "msg": sprintf("GCP log sink '%s' has no filter — should target audit-relevant log types", [name]),
+        "check_id": "rego-cloudtrail-enabled",
+        "severity": "LOW",
+        "resource": name,
+    }
+}

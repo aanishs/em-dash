@@ -97,3 +97,54 @@ deny[msg] {
         "resource": name,
     }
 }
+
+# Azure — No Owner at subscription scope
+deny[msg] {
+    resource := input.resource.azurerm_role_assignment[name]
+    resource.role_definition_name == "Owner"
+    contains(resource.scope, "/subscriptions/")
+    not contains(resource.scope, "/resourceGroups/")
+    msg := {
+        "msg": sprintf("Azure role assignment '%s' grants Owner at subscription scope — scope down to resource group", [name]),
+        "check_id": "rego-iam-wildcard",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}
+
+# GCP — Service account keys should not exist (use workload identity)
+deny[msg] {
+    resource := input.resource.google_service_account_key[name]
+    msg := {
+        "msg": sprintf("GCP service account key '%s' exists — prefer workload identity over long-lived keys", [name]),
+        "check_id": "rego-iam-wildcard",
+        "severity": "MEDIUM",
+        "resource": name,
+    }
+}
+
+# GCP — IAM bindings must not use allUsers or allAuthenticatedUsers
+deny[msg] {
+    resource := input.resource.google_project_iam_binding[name]
+    public_members := {"allUsers", "allAuthenticatedUsers"}
+    resource.members[_] == public_members[_]
+    msg := {
+        "msg": sprintf("GCP IAM binding '%s' grants access to %s — public access to project resources", [name, resource.members[_]]),
+        "check_id": "rego-iam-wildcard",
+        "severity": "CRITICAL",
+        "resource": name,
+    }
+}
+
+# Azure — Custom role definitions must not use wildcard actions
+deny[msg] {
+    resource := input.resource.azurerm_role_definition[name]
+    permission := resource.permissions[_]
+    permission.actions[_] == "*"
+    msg := {
+        "msg": sprintf("Azure custom role '%s' uses wildcard actions — violates least privilege", [name]),
+        "check_id": "rego-iam-wildcard",
+        "severity": "HIGH",
+        "resource": name,
+    }
+}

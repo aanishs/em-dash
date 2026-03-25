@@ -31,7 +31,7 @@ Show the user their compliance score. If less than 50% complete, warn:
 
 Query all controls and their evidence from SQLite:
 ```bash
-"$_EMDASH_BIN"/comply-db query "SELECT c.oscal_id, c.title, c.family, c.status, c.hipaa_refs, (SELECT COUNT(*) FROM check_results WHERE control_id = c.oscal_id AND result = 'PASS') as passes, (SELECT COUNT(*) FROM check_results WHERE control_id = c.oscal_id AND result = 'FAIL') as fails, (SELECT COUNT(*) FROM evidence WHERE control_id = c.oscal_id) as evidence_count FROM controls c ORDER BY c.family, c.oscal_id"
+"$_EMDASH_BIN"/comply-db query "SELECT c.oscal_id, c.title, c.family, c.status, c.framework_refs, (SELECT COUNT(*) FROM check_results WHERE control_id = c.oscal_id AND result = 'PASS') as passes, (SELECT COUNT(*) FROM check_results WHERE control_id = c.oscal_id AND result = 'FAIL') as fails, (SELECT COUNT(*) FROM evidence WHERE control_id = c.oscal_id) as evidence_count FROM controls c ORDER BY c.family, c.oscal_id"
 ```
 
 Generate a compliance report with:

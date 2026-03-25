@@ -1,27 +1,33 @@
 # TODOS
 
-## P1: Dashboard Frontend SQLite Integration
+## ~~P1: Dashboard Frontend SQLite Integration~~ DONE
 
-**What:** Update dashboard HTML/JS to fetch from `/api/compliance` endpoint (SQLite) instead of only `/api/dashboard` (JSON).
-**Why:** The dashboard server now has a SQLite API but the frontend still reads legacy JSON.
-**Context:** Server endpoint `GET /api/compliance?view=summary` returns controls, check results, evidence counts from SQLite. Frontend needs to display control-level compliance status.
-**Effort:** L (human: ~2 weeks / CC: ~4 hours)
+Dashboard fetches from SQLite APIs (`/api/compliance`, `/api/cross-framework`, `/api/compliance/score`, `/api/tools`). Scan trigger button. WebSocket live-reload.
 
-## P2: SOC 2 Filter File
+## ~~P2: Cross-Framework Drift Tracking~~ DONE
 
-**What:** Write `nist/soc2-filter.json` mapping SOC 2 Trust Service Criteria to 800-53 controls.
-**Why:** Validates multi-framework architecture. Should work with zero code changes.
-**Context:** AICPA publishes TSC-to-800-53 mappings. Same NIST catalog, different filter.
-**Effort:** M (human: ~1 week / CC: ~2 hours)
+`comply-orchestrate diff` shows per-framework score breakdown. Baselines store `cross_framework_scores`.
 
-## P2: Evidence Sensitivity/Redaction Model
+## ~~P2: CIS Coverage Gap Report~~ DONE
 
-**What:** Add redaction mechanism for audit packets when using `--include-evidence`.
-**Why:** Evidence from AWS scans may contain account IDs, ARNs, IP addresses.
-**Effort:** M (human: ~1 week / CC: ~3 hours)
+`comply-db cis-coverage` — 71% coverage (24/34 CIS AWS Level 1 recommendations). Gaps: Section 4 (CloudWatch alarms) + 2 IAM + 1 Networking.
 
-## P3: User Signature Crypto
+## ~~P2: Evidence Sensitivity/Redaction~~ DONE
 
-**What:** Real Ed25519 user signatures (not just a flag in SQLite). User signs "I attest this evidence is accurate."
-**Why:** Binds a named person to the evidence with cryptographic proof.
-**Effort:** M (human: ~1 week / CC: ~1 hour)
+`comply-audit-packet --redact` handles AWS Account IDs, ARNs, Access Keys, IPs, EC2/VPC/Subnet/SG IDs.
+
+## ~~P3: User Signature Crypto~~ DONE
+
+`comply-db sign AC-2 --name "Jane Smith" --role "Security Officer"` — Ed25519 signed user attestation stored in SQLite + file-based attestation for audit packets.
+
+## ~~P3: ISO 27001 Framework~~ DONE
+
+6th framework. `nist/iso27001-filter.json` maps 80 Annex A controls → 49 NIST 800-53 controls. `frameworks/iso27001.json` display metadata. SC-28 now appears in all 6 frameworks.
+
+---
+
+No open TODOs. Consider:
+- Improve CIS AWS coverage from 71% → 90%+ (add Section 4 CloudWatch alarm checks)
+- HITRUST CSF framework filter
+- FedRAMP framework filter (NIST publishes baselines)
+- Auditor co-signing (multi-party attestation)

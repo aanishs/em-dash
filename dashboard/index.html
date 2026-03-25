@@ -115,6 +115,14 @@
               </div>
             </div>
           </div>
+          <div class="section" id="scan-section">
+            <div class="section-header">
+              <h2>Scanning Tools</h2>
+              <button class="btn btn-sm" id="scan-trigger-btn">Run Scan</button>
+            </div>
+            <div id="tools-list"></div>
+            <div id="scan-status"></div>
+          </div>
           <div class="section" id="gaps-section">
             <h2>Evidence Gaps</h2>
             <div class="gaps-list" id="gaps-list"></div>
@@ -162,7 +170,7 @@
               <p>Drop files here or <label for="file-input" class="upload-link">browse</label></p>
               <input type="file" id="file-input" multiple hidden>
               <div class="upload-meta" id="upload-meta">
-                <select id="upload-framework"><option value="hipaa">HIPAA</option><option value="soc2">SOC 2</option><option value="gdpr">GDPR</option><option value="pci_dss">PCI-DSS</option><option value="iso27001">ISO 27001</option></select>
+                <select id="upload-framework"></select>
                 <input type="text" id="upload-requirement" placeholder="Requirement (e.g., 164.314(a))">
                 <select id="upload-type">
                   <option value="baa">BAA</option>
@@ -206,6 +214,17 @@
               <button class="btn btn-sm" id="add-vendor-btn">+ Add Vendor</button>
             </div>
             <div class="vendor-list" id="vendor-list"></div>
+          </div>
+        </section>
+
+        <!-- NIST Controls / Cross-Framework -->
+        <section class="page" id="page-nist-controls">
+          <div class="section">
+            <div class="section-header">
+              <h2>Cross-Framework Compliance</h2>
+            </div>
+            <p class="section-desc">Controls shared across multiple frameworks. Higher impact = fixing this check improves more compliance scores simultaneously.</p>
+            <div id="cross-framework-matrix"></div>
           </div>
         </section>
 

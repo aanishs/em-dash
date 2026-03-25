@@ -44,8 +44,8 @@ describe('HIPAA framework definition', () => {
 });
 
 describe('Checks registry', () => {
-  test('has 50 checks', () => {
-    expect(CHECKS.length).toBe(50);
+  test('has at least 50 checks', () => {
+    expect(CHECKS.length).toBeGreaterThanOrEqual(50);
   });
 
   test('no duplicate IDs', () => {
