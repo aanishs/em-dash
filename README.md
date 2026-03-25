@@ -81,6 +81,16 @@ em-dash works without any of these. The 19 code-level checks only need grep. Clo
 
 ```
 You:    /comply
+Claude: Welcome to em-dash. Which compliance framework are you working on?
+
+        A) HIPAA — healthcare, handling patient data (PHI)
+        B) SOC 2 — SaaS, service organization trust criteria
+        C) GDPR — European data protection regulation
+        D) PCI-DSS — payment card data security
+        E) Multiple — I need more than one framework
+
+You:    A
+
 Claude: Imported 50 NIST 800-53 controls for HIPAA.
         0% complete. 50 controls pending.
         Run /comply-auto to start.
@@ -113,9 +123,22 @@ Claude: → Signed audit packet: audit-packet.zip
         → Ed25519 signed, RFC 8785 canonicalized
 ```
 
+Need multiple frameworks? Choose E and select which ones — controls are shared automatically (AC-2 satisfies both HIPAA and SOC 2).
+
+## Supported Frameworks
+
+| Framework | Controls | Filter file | What it covers |
+|-----------|----------|-------------|----------------|
+| **HIPAA** | 50 | `nist/hipaa-filter.json` | Healthcare — PHI protection, security rule, privacy rule |
+| **SOC 2** | 40 | `nist/soc2-filter.json` | SaaS — trust service criteria (security, availability, confidentiality) |
+| **GDPR** | 22 | `nist/gdpr-filter.json` | EU data protection — privacy rights, data processing, breach notification |
+| **PCI-DSS** | 16 | `nist/pci-dss-filter.json` | Payment cards — cardholder data protection, network security |
+
+All frameworks use the same NIST 800-53 catalog (1,196 controls). Many controls overlap — scanning AC-2 for HIPAA also satisfies SOC 2 CC5.2. Adding a new framework = writing a ~50-line JSON file mapping requirements to 800-53 control IDs. Zero code changes.
+
 ## Usage
 
-Open Claude Code in any project that handles PHI.
+Open Claude Code in any project.
 
 | Command | What it does |
 |---------|-------------|
