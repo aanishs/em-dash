@@ -1,6 +1,6 @@
 # em-dash
 
-[![Tests](https://img.shields.io/badge/tests-140%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-141-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-3.2.0-orange)]()
 [![NIST 800-53](https://img.shields.io/badge/NIST%20800--53-1196%20controls-blue)]()
@@ -66,56 +66,71 @@ You:    /hipaa          # → active_frameworks: ["hipaa"]
 You:    /cis            # → active_frameworks: ["hipaa", "cis"]
 ```
 
-Dashboard, CLI, cross-framework matrix, and scan results are all scoped to your active frameworks. Nothing shows up unless you initialized it.
+Dashboard, CLI, cross-framework matrix, and scan results are all scoped to your active frameworks.
 
-### The mapping chain
-
-Every framework maps its requirements to NIST 800-53 controls. The same controls power all 6 frameworks — so a single infrastructure fix can satisfy requirements across multiple compliance regimes simultaneously.
+### What happens when you type `/hipaa`
 
 ```mermaid
 flowchart TD
-    A[NIST 800-53 Catalog<br/>1,196 controls · 20 families<br/><i>immutable, ships in repo</i>] --> B
-
-    subgraph filters [Framework Filter Files]
-        B1[hipaa-filter.json<br/>64 controls]
-        B2[soc2-filter.json<br/>39 controls]
-        B3[cis-filter.json<br/>33 controls + IG tiers]
-        B4[gdpr-filter.json<br/>22 controls]
-        B5[pci-dss-filter.json<br/>16 controls]
-        B6[iso27001-filter.json<br/>49 controls]
-    end
-
-    B --> filters
-
-    filters --> C[tool-bindings.json<br/>800-53 control → check IDs<br/><i>em-dash · Prowler · Checkov · Trivy · CIS Benchmark refs</i>]
-
-    C --> D[checks-registry.ts<br/>60+ checks<br/><i>pure execution: id → command/pattern</i>]
-
-    D --> E[comply-orchestrate<br/>parallel scanner<br/><i>8 tools · finding normalization · CIS tagging</i>]
-
-    E --> F[(SQLite<br/>compliance.db<br/><i>controls · evidence<br/>check_results · signatures<br/>baselines</i>)]
-
-    F --> G[Dashboard + Reports<br/><i>cross-framework matrix<br/>impact badges · drift tracking<br/>signed audit packets</i>]
+    A["You type /hipaa"] --> B["em-dash imports 59 HIPAA controls\nfrom the NIST 800-53 catalog"]
+    B --> C["You type /comply-auto"]
+    C --> D{For each control}
+    D -->|has automated checks| E["Scans your code + cloud infra"]
+    D -->|interview only| F["Asks you a plain-English question"]
+    E -->|PASS| G["Evidence recorded in SQLite"]
+    E -->|FAIL| H["AI suggests a fix\nYou approve → applied → re-scanned"]
+    F --> I["Your answer recorded as evidence"]
+    H --> G
+    I --> G
+    G --> J{More controls?}
+    J -->|yes| D
+    J -->|done| K["/comply-report → signed audit packet"]
 ```
 
-### The compliance workflow
+### How the scanning actually works
 
 ```mermaid
-flowchart LR
-    A["/hipaa<br/>/soc2<br/>/cis"] -->|initialize| B[comply-db init]
-    B --> C{"/comply-auto<br/>(autopilot)"}
-    C -->|scan| D[comply-orchestrate<br/>+ code checks<br/>+ Rego policies]
-    C -->|fix| E[comply-fix<br/>generate patches<br/>+ policy docs]
-    C -->|interview| F[comply-assess<br/>one control<br/>at a time]
-    D --> G[(SQLite)]
-    E --> G
-    F --> G
-    G --> H[comply-report<br/>Ed25519 signed<br/>audit packet]
+flowchart TD
+    subgraph law ["What the law requires"]
+        A1["HIPAA §164.312(a)(2)(iv)\n'encrypt ePHI at rest'"]
+        A2["CIS Safeguard 3.1\n'classify sensitive data'"]
+        A3["SOC 2 CC6.1\n'logical access security'"]
+    end
+
+    subgraph nist ["NIST 800-53 (shared control)"]
+        B["SC-28\nProtection of Information at Rest"]
+    end
+
+    subgraph bindings ["tool-bindings.json (what to check)"]
+        C1["em-dash: rego-s3-encryption,\naws-s3-encryption, ..."]
+        C2["Prowler: s3_bucket_default_encryption"]
+        C3["Checkov: CKV_AWS_18"]
+        C4["Trivy: AVD-AWS-0088"]
+        C5["CIS Benchmark: 2.1.1\n<i>(auditor-facing label only —\nnot part of execution)</i>"]
+    end
+
+    subgraph execution ["comply-orchestrate (run in parallel)"]
+        D1["grep patterns\n(no tools needed)"]
+        D2["Prowler scan"]
+        D3["Checkov scan"]
+        D4["Trivy scan"]
+    end
+
+    A1 & A2 & A3 --> B
+    B --> C1 & C2 & C3 & C4
+    B -.->|metadata only| C5
+    C1 --> D1
+    C2 --> D2
+    C3 --> D3
+    C4 --> D4
+    D1 & D2 & D3 & D4 --> E[(SQLite\nfindings tagged with\ncontrol IDs + CIS refs)]
 ```
+
+Key: CIS Benchmark IDs (like "2.1.1") are **labels attached to findings after the scan**, not routing. They give auditors a recognizable reference point. The actual execution is driven by tool-bindings mapping controls directly to Prowler/Checkov/Trivy/em-dash check IDs.
 
 ### Cross-framework impact
 
-Because all frameworks converge on the same 800-53 controls, fixing one thing can satisfy requirements across all your active frameworks at once:
+All frameworks are peers — they all map to the same NIST 800-53 controls. Fixing one thing satisfies requirements across every active framework:
 
 ```mermaid
 graph LR
@@ -149,8 +164,8 @@ Only your active frameworks appear. Use `--all` to see all 6.
 
 | Command | Framework | Controls | Maturity | What it protects |
 |---------|-----------|----------|----------|------------------|
-| `/hipaa` | HIPAA Security Rule | 64 | **Alpha** — domain-specific checks, validated against SP 800-66r2 | Patient health data (PHI) |
-| `/soc2` | SOC 2 Type II | 39 | Community — filter file, needs TSC expert review | SaaS trust criteria |
+| `/hipaa` | HIPAA Security Rule | 59 | **Alpha** — domain-specific checks, validated against SP 800-66r2 | Patient health data (PHI) |
+| `/soc2` | SOC 2 Type II | 40 | Community — filter file, needs TSC expert review | SaaS trust criteria |
 | `/gdpr` | GDPR | 22 | Community — filter file, needs DPO review | EU personal data |
 | `/pci-dss` | PCI-DSS v4.0 | 16 | Community — filter file, needs QSA review | Payment card data |
 | `/cis` | CIS Controls v8.1 | 33 | Community — filter file with IG tiers, 71% AWS Level 1 coverage | Infrastructure security baseline |
@@ -185,24 +200,21 @@ bin/comply-db frameworks --remove cis # remove a framework
 
 ---
 
-## 60+ automated checks
+## 68 automated checks
 
 ```mermaid
 pie title Check Distribution
-    "Code-level (grep)" : 19
-    "Cloud CLI (AWS)" : 19
+    "Code-level (grep)" : 29
+    "Cloud CLI (AWS)" : 20
     "Rego policies" : 11
-    "Policy documents" : 10
     "Tool integrations" : 8
 ```
 
-**Code-level (19):** PHI in logs/browser/tests/errors, RBAC, audit logging, encryption, session timeout, password hashing, least privilege, secrets in config, DB security. No tools required.
+**Code-level (29):** PHI detection, RBAC, audit logging, encryption, session timeout, password hashing, least privilege, secrets in config, DB security, plus 10 policy document checks that partially automate interview-only controls. No tools required.
 
-**Cloud infrastructure (19):** IAM, MFA, CloudTrail, VPC flow logs, S3/RDS/EBS/DynamoDB encryption, KMS rotation, security groups, GuardDuty, Security Hub.
+**Cloud infrastructure (20):** IAM, MFA, CloudTrail, VPC flow logs, S3/RDS/EBS/DynamoDB encryption, KMS rotation, security groups, GuardDuty, Security Hub, Config.
 
 **Rego policies (11 across 8 files):** Terraform/K8s IaC validation. Multi-cloud: AWS, GCP, Azure. Encryption, access control, audit logging, transmission security, backup/DR, container security, secrets.
-
-**Policy document checks (10):** Partial automation for interview-only controls. Finds evidence of incident response plans, security policies, training records. Finding a doc doesn't auto-pass — it records evidence and marks the control as 'partial'.
 
 **Tool integrations (8):** Orchestrated via `comply-orchestrate`:
 
@@ -299,14 +311,14 @@ em-dash/
 │   ├── tool-bindings.json             # control → check mappings (v3.0)
 │   └── cross-framework.ts             # shared cross-framework matrix module
 ├── frameworks/
-│   ├── checks-registry.ts             # 60+ checks (pure execution)
+│   ├── checks-registry.ts             # 68 checks (pure execution)
 │   ├── schema.ts                      # TypeScript interfaces
-│   └── {hipaa,soc2,gdpr,pci-dss,cis,iso27001}.json  # display metadata
+│   └── {hipaa,cis,iso27001}.json      # display metadata (soc2/gdpr/pci-dss need community contributions)
 ├── policies/                          # 8 Rego policy files (multi-cloud)
 ├── bin/                               # 7 CLI utilities
 ├── scripts/                           # dashboard server, filter validators
 ├── dashboard/                         # visual dashboard (HTML/CSS/JS)
-├── skills/                            # 8 Claude Code skills + 6 framework routers
+├── skills/                            # 8 skills + 4 framework routers + em-dashboard
 └── test/                              # 141 tests across 8 files
 ```
 
@@ -328,7 +340,7 @@ em-dash/
 | **Frameworks** | 6 (HIPAA, SOC 2, GDPR, PCI-DSS, CIS, ISO 27001) | HIPAA, SOC 2, ISO, GDPR | HIPAA, SOC 2, ISO, GDPR |
 | **Cross-framework** | Yes — shared 800-53 controls, scoped to your selection | No | No |
 | **Runs locally** | Yes | No (SaaS) | No (SaaS) |
-| **Scanning** | 60+ checks + 8 tool integrations | Via integrations | Via integrations |
+| **Scanning** | 68 checks + 8 tool integrations | Via integrations | Via integrations |
 | **Evidence integrity** | Ed25519 signed, SHA-256 hashed, user attestations | Vendor-managed | Vendor-managed |
 | **Remediation** | AI generates fixes + re-verifies | Manual guidance | Manual guidance |
 | **See every action** | Yes (terminal + dashboard) | No (black box) | No (black box) |

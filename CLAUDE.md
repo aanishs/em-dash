@@ -7,8 +7,8 @@ NIST 800-53 is the source of truth. The LLM reads the actual law at runtime. Use
 ```
 nist/
 ├── NIST_SP-800-53_rev5_catalog.json  # official NIST catalog (1,196 controls, never modify)
-├── hipaa-filter.json                  # HIPAA → 800-53 (64 controls)
-├── soc2-filter.json                   # SOC 2 → 800-53 (39 controls)
+├── hipaa-filter.json                  # HIPAA → 800-53 (59 controls)
+├── soc2-filter.json                   # SOC 2 → 800-53 (40 controls)
 ├── gdpr-filter.json                   # GDPR → 800-53 (22 controls)
 ├── pci-dss-filter.json                # PCI-DSS → 800-53 (16 controls)
 ├── cis-filter.json                    # CIS v8.1 → 800-53 (33 controls, with IG tiers)
@@ -40,11 +40,11 @@ em-dash/
 │   ├── tool-bindings.json             # control → tool check mapping (v3.0)
 │   └── cross-framework.ts             # shared cross-framework matrix module
 ├── frameworks/
-│   ├── checks-registry.ts            # 60+ checks — HOW to execute (pure execution, no compliance mappings)
-│   ├── {hipaa,soc2,gdpr,pci-dss,cis,iso27001}.json  # display metadata
+│   ├── checks-registry.ts            # 68 checks — HOW to execute (pure execution, no compliance mappings)
+│   ├── {hipaa,cis,iso27001}.json      # display metadata (soc2/gdpr/pci-dss need contributions)
 │   ├── schema.ts                      # TypeScript interfaces
 │   └── index.ts                       # framework loader
-├── skills/                            # 8 skills + 6 framework routers
+├── skills/                            # 8 skills + 4 framework routers + em-dashboard
 │   ├── hipaa/ soc2/ gdpr/ pci-dss/ cis/ iso27001/  # framework routers
 │   ├── comply-auto/                    # autopilot: scan → fix → ask → next
 │   ├── comply-assess/                  # focused interview

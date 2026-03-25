@@ -1,6 +1,6 @@
 {
   "name": "em-dash",
-  "version": "2.0.0",
+  "version": "3.2.0",
   "description": "Open-source compliance audit suite for Claude Code. HIPAA interview assessments + automated cloud/code scanning + policy-as-code + actionable remediation.",
   "license": "MIT",
   "repository": {
