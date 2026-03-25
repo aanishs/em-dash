@@ -494,7 +494,7 @@ Write the report using the Write tool.
 # Findings count = number of risk factors rated MEDIUM or HIGH
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
-"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
+"$_EMDASH_BIN"/comply-db write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
 ```
 
 Replace `PLACEHOLDER_FINDINGS` with the actual count of risk factors rated MEDIUM or HIGH (0-4).
@@ -519,7 +519,7 @@ CRITICAL REMINDERS
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
-"$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
+"$_EMDASH_BIN"/comply-db dashboard "$SLUG"
 ```
 
 ---

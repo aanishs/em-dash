@@ -142,7 +142,9 @@ function detectTool(toolId: string, command: string): ToolInfo {
           version = verMatch ? verMatch[0] : firstLine.slice(0, 60);
           break;
         }
-      } catch {}
+      } catch (e: any) {
+        // Version detection failed — tool may exist but not respond to --version
+      }
     }
   }
 
@@ -200,7 +202,9 @@ async function runTool(tool: ToolInfo, scanId: string): Promise<Finding[]> {
               break;
             }
           }
-        } catch {}
+        } catch (e: any) {
+          console.error(`  WARNING: Failed to read output file: ${e.message}`);
+        }
       }
 
       if (!parsed) {
@@ -425,7 +429,9 @@ function saveBaseline(framework: string, baseline: { total: number; passing: num
       'INSERT INTO compliance_baselines (total_controls, passing, failing, score, tool_versions, cross_framework_scores) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(baseline.total, baseline.passing, baseline.failing, baseline.score, JSON.stringify(toolVersions), JSON.stringify(crossScores));
     db.close();
-  } catch {}
+  } catch (e: any) {
+    console.error(`  WARNING: Failed to save baseline: ${e.message}`);
+  }
 }
 
 /** Compute per-framework compliance scores from current check_results */
@@ -454,7 +460,9 @@ function computeCrossFrameworkScores(db: any): Record<string, { total: number; p
 
       const total = controlIds.size;
       scores[fwName] = { total, passing, score: total > 0 ? Math.round((passing / total) * 100) : 0 };
-    } catch {}
+    } catch (e: any) {
+      console.error(`  WARNING: Failed to compute score for ${file}: ${e.message}`);
+    }
   }
 
   return scores;
@@ -619,7 +627,9 @@ function diff() {
         const deltaStr = delta !== null ? `${delta >= 0 ? '+' : ''}${delta}%` : '';
         console.log(`  ${fw.toUpperCase().padEnd(12)} ${(data.score + '%').padEnd(8)} ${data.passing}/${data.total}${' '.repeat(Math.max(0, 8 - `${data.passing}/${data.total}`.length))} ${deltaStr}`);
       }
-    } catch {}
+    } catch (e: any) {
+      console.error(`  WARNING: Failed to parse cross-framework scores: ${e.message}`);
+    }
   }
 
   // Show trend if >2 baselines

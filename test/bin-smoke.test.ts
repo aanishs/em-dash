@@ -25,7 +25,7 @@ async function run(
   return { stdout: stdout.trim(), stderr: stderr.trim(), exitCode };
 }
 
-describe('Bin smoke: hipaa-slug', () => {
+describe('Bin smoke: comply-slug', () => {
   let tmpDir: string;
 
   beforeAll(() => {

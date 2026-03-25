@@ -50,8 +50,8 @@ const COMPLIANCE_ERROR_PATTERNS = [
   /PHI.*stored.*unencrypted/i,
   /evidence.*hash.*failed/i,
   /conftest.*policy.*error/i,
-  /hipaa-review-log.*error/i,
-  /hipaa-tool-detect.*error/i,
+  /comply-db.*error/i,
+  /comply-orchestrate.*error/i,
 ];
 
 // --- Testable NDJSON parser ---

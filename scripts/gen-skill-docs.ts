@@ -57,10 +57,10 @@ _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
 # Detect bin directory (global install or project-level install)
 _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 echo "SLUG: \${SLUG:-unknown}"
 mkdir -p ~/.em-dash/projects/"\${SLUG:-unknown}"
-_TOOLS=$("$_EMDASH_BIN"/hipaa-tool-detect 2>/dev/null || true)
+_TOOLS=$("$_EMDASH_BIN"/comply-orchestrate detect 2>/dev/null || true)
 echo "$_TOOLS"
 # Check for updates
 "$_EMDASH_BIN"/../bin/emdash-update-check 2>/dev/null || true
@@ -170,7 +170,7 @@ function generateReviewLogging(ctx: TemplateContext): string {
 After completing a skill, log the outcome:
 \`\`\`bash
 _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
-"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "${ctx.skillName}" "<STATUS>" <FINDINGS_COUNT>
+"$_EMDASH_BIN"/comply-db write "$SLUG" "${ctx.skillName}" "<STATUS>" <FINDINGS_COUNT>
 \`\`\``;
 }
 
@@ -241,7 +241,7 @@ function generateComplianceDashboard(ctx: TemplateContext): string {
 Display the current compliance status by running:
 \`\`\`bash
 _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
-"$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
+"$_EMDASH_BIN"/comply-db dashboard "$SLUG"
 \`\`\`
 
 If no prior reviews exist, show:
@@ -257,7 +257,7 @@ function generateToolDetection(ctx: TemplateContext): string {
 Run tool detection to understand what's available:
 \`\`\`bash
 _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
-"$_EMDASH_BIN"/hipaa-tool-detect
+"$_EMDASH_BIN"/comply-orchestrate detect
 \`\`\`
 
 **Interpret the results:**

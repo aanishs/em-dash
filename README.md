@@ -145,16 +145,20 @@ Only your active frameworks appear. Use `--all` to see all 6.
 
 ---
 
-## Six frameworks
+## Frameworks
 
-| Command | Framework | Controls | What it protects |
-|---------|-----------|----------|------------------|
-| `/hipaa` | HIPAA Security Rule | 64 | Patient health data (PHI) |
-| `/soc2` | SOC 2 Type II | 39 | SaaS trust criteria |
-| `/gdpr` | GDPR | 22 | EU personal data |
-| `/pci-dss` | PCI-DSS v4.0 | 16 | Payment card data |
-| `/cis` | CIS Controls v8.1 | 33 | Infrastructure security baseline |
-| `/iso27001` | ISO/IEC 27001:2022 | 49 | Information security management |
+| Command | Framework | Controls | Maturity | What it protects |
+|---------|-----------|----------|----------|------------------|
+| `/hipaa` | HIPAA Security Rule | 64 | **Alpha** — domain-specific checks, validated against SP 800-66r2 | Patient health data (PHI) |
+| `/soc2` | SOC 2 Type II | 39 | Community — filter file, needs TSC expert review | SaaS trust criteria |
+| `/gdpr` | GDPR | 22 | Community — filter file, needs DPO review | EU personal data |
+| `/pci-dss` | PCI-DSS v4.0 | 16 | Community — filter file, needs QSA review | Payment card data |
+| `/cis` | CIS Controls v8.1 | 33 | Community — filter file with IG tiers, 71% AWS Level 1 coverage | Infrastructure security baseline |
+| `/iso27001` | ISO/IEC 27001:2022 | 49 | Community — filter file, needs auditor review | Information security management |
+
+**What "alpha" means:** HIPAA has the most depth — PHI-specific code checks, a validation script against the official NIST guidance (SP 800-66r2), and assessment questions tailored to the Security Rule. It still hasn't been validated by a compliance professional. Everything is early.
+
+**What "community" means:** The filter file maps framework requirements to NIST 800-53 controls. The mapping is plausible (AI-generated from official crosswalks) but unverified by a domain expert. The framework shares all the same scanning infrastructure as HIPAA — it just hasn't been reviewed by someone who knows the specific regulation. **[Help wanted: Issues #25-29](https://github.com/aanishs/em-dash/issues)**
 
 Run multiple — each adds to your `active_frameworks` list. Controls are shared automatically.
 

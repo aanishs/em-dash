@@ -1,4 +1,5 @@
 ---
+
 name: comply-assess
 version: 2.0.0
 description: |
@@ -13,6 +14,11 @@ allowed-tools:
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->
+
+## DISCLAIMER
+
+> **IMPORTANT:** This tool provides technical guidance for implementing compliance controls. It is NOT legal advice and does not constitute certification. Consult qualified legal counsel for formal compliance verification.
+
 
 # /comply-assess — Compliance Interview
 

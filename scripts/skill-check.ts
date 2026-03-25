@@ -80,7 +80,7 @@ for (const dir of skillDirs) {
 // ─── Bin Utilities ──────────────────────────────────────────
 
 console.log('\n  Bin Utilities:');
-const EXPECTED_BINS = ['hipaa-slug', 'hipaa-config', 'hipaa-tool-detect', 'hipaa-evidence-hash', 'hipaa-review-log'];
+const EXPECTED_BINS = ['comply-slug', 'comply-db', 'comply-attest', 'comply-verify', 'comply-evidence-hash', 'comply-audit-packet', 'comply-orchestrate'];
 const binDir = path.join(ROOT, 'bin');
 
 for (const bin of EXPECTED_BINS) {
@@ -114,12 +114,14 @@ for (const bin of EXPECTED_BINS) {
 
 console.log('\n  Rego Policies:');
 const EXPECTED_REGO = [
-  'hipaa-encryption-at-rest.rego',
-  'hipaa-transmission-security.rego',
-  'hipaa-access-control.rego',
-  'hipaa-audit-logging.rego',
-  'hipaa-k8s-security.rego',
-  'hipaa-secrets.rego',
+  'encryption-at-rest.rego',
+  'transmission-security.rego',
+  'access-control.rego',
+  'audit-logging.rego',
+  'k8s-security.rego',
+  'secrets.rego',
+  'backup-dr.rego',
+  'container-security.rego',
 ];
 const policyDir = path.join(ROOT, 'policies');
 

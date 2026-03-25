@@ -30,10 +30,10 @@ _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
 # Detect bin directory (global install or project-level install)
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-source <("$_EMDASH_BIN"/hipaa-slug 2>/dev/null || true)
+source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
 echo "SLUG: ${SLUG:-unknown}"
 mkdir -p ~/.em-dash/projects/"${SLUG:-unknown}"
-_TOOLS=$("$_EMDASH_BIN"/hipaa-tool-detect 2>/dev/null || true)
+_TOOLS=$("$_EMDASH_BIN"/comply-orchestrate detect 2>/dev/null || true)
 echo "$_TOOLS"
 # Check for updates
 "$_EMDASH_BIN"/../bin/emdash-update-check 2>/dev/null || true
@@ -121,7 +121,7 @@ When collecting evidence, always:
 After completing a skill, log the outcome:
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "comply-breach" "<STATUS>" <FINDINGS_COUNT>
+"$_EMDASH_BIN"/comply-db write "$SLUG" "comply-breach" "<STATUS>" <FINDINGS_COUNT>
 ```
 
 ## Dashboard Sync
@@ -637,7 +637,7 @@ Write the report using the Write tool.
 # Findings count = number of risk factors rated MEDIUM or HIGH
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
-"$_EMDASH_BIN"/hipaa-review-log write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
+"$_EMDASH_BIN"/comply-db write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
 ```
 
 Replace `PLACEHOLDER_FINDINGS` with the actual count of risk factors rated MEDIUM or HIGH (0-4).
@@ -662,7 +662,7 @@ CRITICAL REMINDERS
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
-"$_EMDASH_BIN"/hipaa-review-log dashboard "$SLUG"
+"$_EMDASH_BIN"/comply-db dashboard "$SLUG"
 ```
 
 ---
