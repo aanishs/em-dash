@@ -8,7 +8,7 @@ deny[msg] {
     not resource.is_multi_region_trail
     msg := {
         "msg": sprintf("CloudTrail '%s' is not configured as multi-region", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-aws-cloudtrail-multiregion",
         "severity": "HIGH",
         "resource": name,
     }
@@ -20,7 +20,7 @@ deny[msg] {
     not resource.enable_log_file_validation
     msg := {
         "msg": sprintf("CloudTrail '%s' does not have log file validation enabled — logs may be tampered", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-aws-cloudtrail-logvalidation",
         "severity": "HIGH",
         "resource": name,
     }
@@ -32,7 +32,7 @@ deny[msg] {
     not resource.kms_key_id
     msg := {
         "msg": sprintf("CloudTrail '%s' is not encrypted with KMS — audit logs should be encrypted at rest", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-aws-cloudtrail-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -44,7 +44,7 @@ deny[msg] {
     not flow_log_exists(name)
     msg := {
         "msg": sprintf("VPC '%s' does not have flow logs enabled — network activity is not being recorded", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-aws-vpc-flowlogs",
         "severity": "HIGH",
         "resource": name,
     }
@@ -61,7 +61,7 @@ deny[msg] {
     resource.retention_in_days < 365
     msg := {
         "msg": sprintf("CloudWatch log group '%s' has retention of %d days — compliance requires >= 365 days", [name, resource.retention_in_days]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-aws-cloudwatch-retention",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -73,7 +73,7 @@ deny[msg] {
     not resource.retention_in_days
     msg := {
         "msg": sprintf("CloudWatch log group '%s' has no retention policy set — set to >= 365 days", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-aws-cloudwatch-no-retention",
         "severity": "LOW",
         "resource": name,
     }
@@ -87,7 +87,7 @@ deny[msg] {
     count(audit_log.exempted_members) > 0
     msg := {
         "msg": sprintf("GCP audit config '%s' exempts members from DATA_READ logging — all sensitive data access must be logged", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-gcp-audit-logging",
         "severity": "HIGH",
         "resource": name,
     }
@@ -99,7 +99,7 @@ deny[msg] {
     not resource.retention_policy
     msg := {
         "msg": sprintf("Azure log profile '%s' has no retention policy — audit logs may be lost", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-azure-monitor-logprofile",
         "severity": "HIGH",
         "resource": name,
     }
@@ -111,7 +111,7 @@ deny[msg] {
     resource.retention_policy.enabled == false
     msg := {
         "msg": sprintf("Azure diagnostic setting '%s' has retention disabled — audit data not preserved", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-azure-monitor-diagnostic",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -123,7 +123,7 @@ deny[msg] {
     not resource.filter
     msg := {
         "msg": sprintf("GCP log sink '%s' has no filter — should target audit-relevant log types", [name]),
-        "check_id": "rego-cloudtrail-enabled",
+        "check_id": "rego-gcp-logging-sink",
         "severity": "LOW",
         "resource": name,
     }

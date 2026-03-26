@@ -8,7 +8,7 @@ deny[msg] {
     resource.backup_retention_period == 0
     msg := {
         "msg": sprintf("RDS instance '%s' has automated backups disabled (retention = 0)", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-aws-rds-backup",
         "severity": "HIGH",
         "resource": name,
     }
@@ -21,7 +21,7 @@ deny[msg] {
     resource.backup_retention_period < 7
     msg := {
         "msg": sprintf("RDS instance '%s' backup retention is %d days — should be >= 7", [name, resource.backup_retention_period]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-aws-rds-backup-retention",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -33,7 +33,7 @@ deny[msg] {
     resource.versioning_configuration.status != "Enabled"
     msg := {
         "msg": sprintf("S3 bucket versioning '%s' is not enabled — data cannot be recovered if overwritten", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-aws-s3-versioning",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -46,7 +46,7 @@ deny[msg] {
     not point_in_time.enabled
     msg := {
         "msg": sprintf("DynamoDB table '%s' does not have point-in-time recovery enabled", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-aws-dynamodb-backup",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -58,7 +58,7 @@ deny[msg] {
     not resource.lifecycle_policy
     msg := {
         "msg": sprintf("EFS file system '%s' has no lifecycle/backup policy configured", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-aws-efs-backup",
         "severity": "LOW",
         "resource": name,
     }
@@ -72,7 +72,7 @@ deny[msg] {
     not backup.enabled
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' does not have automated backups enabled", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-gcp-cloudsql-backup",
         "severity": "HIGH",
         "resource": name,
     }
@@ -84,7 +84,7 @@ deny[msg] {
     not resource.long_term_retention_policy
     msg := {
         "msg": sprintf("Azure SQL Database '%s' has no long-term retention policy", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-azure-sql-backup",
         "severity": "MEDIUM",
         "resource": name,
     }

@@ -113,7 +113,7 @@ When the skill completes, report one of:
 
 When collecting evidence, always:
 1. Write raw tool output to `~/.em-dash/projects/$SLUG/evidence/{phase}-{datetime}/`
-2. Hash evidence files: `_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin) && "$_EMDASH_BIN"/hipaa-evidence-hash <evidence-directory>`
+2. Hash evidence files: `_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin) && "$_EMDASH_BIN"/comply-evidence-hash <evidence-directory>`
 3. Never store actual PHI — only configuration states, scan results, and metadata
 
 ## Review Logging
@@ -121,7 +121,7 @@ When collecting evidence, always:
 After completing a skill, log the outcome:
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-"$_EMDASH_BIN"/comply-db write "$SLUG" "comply-breach" "<STATUS>" <FINDINGS_COUNT>
+"$_EMDASH_BIN"/comply-db update-scan "$SLUG" "<OSCAL_ID>" "<STATUS>" emdash "comply-breach"
 ```
 
 ## Dashboard Sync
@@ -152,17 +152,7 @@ if [ -f .em-dash/dashboard.json ]; then
 fi
 ```
 
-**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use `hipaa-dashboard-update` to update individual checklist items based on actual results:
-
-```bash
-_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
-# Mark a checklist item as complete with a note:
-"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
-# Mark as pending with an evidence gap:
-"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
-# Add evidence file to an item:
-"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
-```
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Update the compliance dashboard via `PUT /api/dashboard` or the dashboard UI.
 
 
 
@@ -637,7 +627,7 @@ Write the report using the Write tool.
 # Findings count = number of risk factors rated MEDIUM or HIGH
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 source <("$_EMDASH_BIN"/comply-slug 2>/dev/null || true)
-"$_EMDASH_BIN"/comply-db write "$SLUG" "hipaa-breach" "complete" "PLACEHOLDER_FINDINGS"
+"$_EMDASH_BIN"/comply-db summary --framework hipaa
 ```
 
 Replace `PLACEHOLDER_FINDINGS` with the actual count of risk factors rated MEDIUM or HIGH (0-4).

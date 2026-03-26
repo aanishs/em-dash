@@ -247,23 +247,98 @@ const AWS_CHECKS: Check[] = [
   { id: 'aws-dynamodb-encryption', category: 'encryption', description: 'DynamoDB tables use customer-managed KMS keys (not default)', type: 'cloud_cli', provider: 'aws', command: 'aws dynamodb list-tables --output json', severity_default: 'MEDIUM' },
 ];
 
-// ─── Rego Policy Checks (11 checks) ────────────────────────────
+// ─── Rego Policy Checks (68 unique checks) ─────────────────────
 
 const REGO_CHECKS: Check[] = [
-  { id: 'rego-iam-wildcard', category: 'access_control', description: 'Terraform IAM policies must not use Action:* and Resource:*', type: 'rego', severity_default: 'HIGH' },
+  // ── Kept unique (no rename needed) ──
   { id: 'rego-mfa-required', category: 'authentication', description: 'IAM users must have MFA enabled', type: 'rego', severity_default: 'HIGH' },
-  { id: 'rego-cloudtrail-enabled', category: 'audit', description: 'CloudTrail must be enabled with multi-region and log validation', type: 'rego', severity_default: 'HIGH' },
-  { id: 'rego-s3-encryption', category: 'encryption', description: 'S3 buckets must have server-side encryption configured', type: 'rego', severity_default: 'HIGH' },
-  { id: 'rego-rds-encryption', category: 'encryption', description: 'RDS instances must have storage_encrypted = true', type: 'rego', severity_default: 'HIGH' },
-  { id: 'rego-security-group-open', category: 'transmission', description: 'Security groups must not allow 0.0.0.0/0 ingress on all ports', type: 'rego', severity_default: 'HIGH' },
   { id: 'rego-rds-public', category: 'access_control', description: 'RDS instances must not be publicly accessible', type: 'rego', severity_default: 'CRITICAL' },
-  { id: 'rego-no-hardcoded-secrets', category: 'secrets', description: 'No hardcoded credentials or API keys in Terraform', type: 'rego', severity_default: 'CRITICAL' },
-  { id: 'rego-kms-rotation', category: 'encryption', description: 'KMS keys must have automatic rotation enabled', type: 'rego', severity_default: 'MEDIUM' },
   { id: 'rego-k8s-rbac-wildcard', category: 'access_control', description: 'K8s RBAC must not use wildcard verbs or resources', type: 'rego', provider: 'k8s', severity_default: 'HIGH' },
-  { id: 'rego-k8s-non-root', category: 'compute', description: 'K8s containers must run as non-root', type: 'rego', provider: 'k8s', severity_default: 'MEDIUM' },
+
+  // ── encryption-at-rest.rego (was rego-s3-encryption / rego-rds-encryption / rego-kms-rotation) ──
+  { id: 'rego-aws-rds-encryption', category: 'encryption', description: 'RDS instances must have storage_encrypted = true', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-s3-encryption', category: 'encryption', description: 'S3 buckets must have server-side encryption configured', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-ebs-encryption', category: 'encryption', description: 'EBS volumes must be encrypted', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-kms-rotation', category: 'encryption', description: 'KMS keys must have automatic rotation enabled', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-sns-encryption', category: 'encryption', description: 'SNS topics must use KMS encryption', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-gcp-cloudsql-encryption', category: 'encryption', description: 'Cloud SQL instances must use customer-managed encryption key', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-gcp-gcs-encryption', category: 'encryption', description: 'GCS buckets must have customer-managed encryption', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-sqs-encryption', category: 'encryption', description: 'SQS queues must use KMS encryption', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-azure-storage-https', category: 'encryption', description: 'Azure storage accounts must enforce HTTPS-only traffic', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-azure-disk-encryption', category: 'encryption', description: 'Azure managed disks must be encrypted with customer-managed key', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-azure-keyvault-softdelete', category: 'encryption', description: 'Azure Key Vault must have soft delete retention >= 7 days', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-gcp-bigquery-encryption', category: 'encryption', description: 'BigQuery datasets must use customer-managed encryption', type: 'rego', severity_default: 'MEDIUM' },
+
+  // ── backup-dr.rego (was rego-rds-encryption / rego-s3-encryption) ──
+  { id: 'rego-aws-rds-backup', category: 'data_protection', description: 'RDS instances must have automated backups enabled', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-rds-backup-retention', category: 'data_protection', description: 'RDS backup retention must be >= 7 days', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-s3-versioning', category: 'data_protection', description: 'S3 buckets must have versioning enabled for data recovery', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-dynamodb-backup', category: 'data_protection', description: 'DynamoDB tables must have point-in-time recovery enabled', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-efs-backup', category: 'data_protection', description: 'EFS file systems must have lifecycle/backup policy configured', type: 'rego', severity_default: 'LOW' },
+  { id: 'rego-gcp-cloudsql-backup', category: 'data_protection', description: 'Cloud SQL instances must have automated backups enabled', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-azure-sql-backup', category: 'data_protection', description: 'Azure SQL databases must have long-term retention policy', type: 'rego', severity_default: 'MEDIUM' },
+
+  // ── transmission-security.rego (was rego-security-group-open) ──
+  { id: 'rego-aws-sg-rule-open', category: 'transmission', description: 'Security group rules must not allow 0.0.0.0/0 on sensitive ports', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-sg-open', category: 'transmission', description: 'Security groups must not allow 0.0.0.0/0 ingress on sensitive port ranges', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-lb-https', category: 'transmission', description: 'ALB/NLB listeners must use HTTPS or TLS protocol', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-rds-sg-open', category: 'transmission', description: 'RDS instances must have parameter group enforcing SSL', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-gcp-sql-authorized-networks', category: 'transmission', description: 'Cloud SQL instances must require SSL for connections', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-gcp-sql-public-ip', category: 'transmission', description: 'Cloud SQL instances must not have public IPv4 enabled', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-gcp-firewall-open', category: 'transmission', description: 'GCP firewall rules must not allow 0.0.0.0/0 on sensitive ports', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-azure-nsg-open', category: 'transmission', description: 'Azure NSG rules must not allow inbound * on sensitive ports', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-azure-appservice-https', category: 'transmission', description: 'Azure App Service must enforce HTTPS-only', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-gcp-cloudrun-public', category: 'transmission', description: 'Cloud Run must not allow unauthenticated (allUsers) invocations', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-docker-expose-all', category: 'transmission', description: 'Dockerfiles must not expose sensitive ports directly', type: 'rego', severity_default: 'MEDIUM' },
+
+  // ── audit-logging.rego (was rego-cloudtrail-enabled) ──
+  { id: 'rego-aws-cloudtrail-multiregion', category: 'audit', description: 'CloudTrail must be configured as multi-region', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-cloudtrail-logvalidation', category: 'audit', description: 'CloudTrail must have log file validation enabled', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-cloudtrail-encryption', category: 'audit', description: 'CloudTrail must be encrypted with KMS', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-vpc-flowlogs', category: 'audit', description: 'VPCs must have flow logs enabled', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-cloudwatch-retention', category: 'audit', description: 'CloudWatch log groups must have retention >= 365 days', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-cloudwatch-no-retention', category: 'audit', description: 'CloudWatch log groups must have a retention policy set', type: 'rego', severity_default: 'LOW' },
+  { id: 'rego-gcp-audit-logging', category: 'audit', description: 'GCP audit configs must not exempt members from DATA_READ logging', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-azure-monitor-logprofile', category: 'audit', description: 'Azure log profiles must have retention policy configured', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-azure-monitor-diagnostic', category: 'audit', description: 'Azure diagnostic settings must have retention enabled', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-gcp-logging-sink', category: 'audit', description: 'GCP log sinks must have a filter targeting audit-relevant log types', type: 'rego', severity_default: 'LOW' },
+
+  // ── access-control.rego (was rego-iam-wildcard) ──
+  { id: 'rego-aws-iam-wildcard-action', category: 'access_control', description: 'IAM policies must not grant wildcard Action and Resource (string form)', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-iam-wildcard-resource', category: 'access_control', description: 'IAM policies must not grant wildcard Action and Resource (array form)', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-aws-iam-admin-policy', category: 'access_control', description: 'IAM role inline policies must not use wildcard actions', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-gcp-iam-primitive-role', category: 'access_control', description: 'GCP service accounts must not have roles/owner', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-gcp-iam-alluser-binding', category: 'access_control', description: 'GCP service accounts must not have roles/editor — use granular roles', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-azure-role-subscription-scope', category: 'access_control', description: 'Azure Contributor must not be assigned at subscription scope', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-azure-role-wildcard-scope', category: 'access_control', description: 'Azure Owner must not be assigned at subscription scope', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-gcp-sa-key-rotation', category: 'access_control', description: 'GCP service account keys should not exist — use workload identity', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-gcp-iam-allauthenticated', category: 'access_control', description: 'GCP IAM bindings must not grant access to allUsers or allAuthenticatedUsers', type: 'rego', severity_default: 'CRITICAL' },
+  { id: 'rego-azure-role-wildcard-actions', category: 'access_control', description: 'Azure custom role definitions must not use wildcard actions', type: 'rego', severity_default: 'HIGH' },
+
+  // ── secrets.rego (was rego-no-hardcoded-secrets) ──
+  { id: 'rego-aws-provider-hardcoded-key', category: 'secrets', description: 'AWS provider must not have hardcoded access_key', type: 'rego', severity_default: 'CRITICAL' },
+  { id: 'rego-aws-provider-hardcoded-secret', category: 'secrets', description: 'AWS provider must not have hardcoded secret_key', type: 'rego', severity_default: 'CRITICAL' },
+  { id: 'rego-tf-sensitive-default', category: 'secrets', description: 'Terraform password variables must not have default values', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-tf-secret-var-default', category: 'secrets', description: 'Terraform secret/key/token variables must not have default values', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-k8s-secret-in-env', category: 'secrets', description: 'K8s env vars with secret names must use secretKeyRef, not inline values', type: 'rego', severity_default: 'HIGH' },
+
+  // ── container-security.rego (was rego-k8s-non-root / rego-no-hardcoded-secrets / rego-security-group-open) ──
+  { id: 'rego-docker-nonroot-user', category: 'compute', description: 'Dockerfiles must not set USER root', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-docker-latest-tag', category: 'compute', description: 'Dockerfiles must not use :latest tag — pin to specific version', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-docker-add-url', category: 'compute', description: 'Dockerfiles must not use ADD with remote URLs — use COPY + curl', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-compose-readonly', category: 'compute', description: 'Docker Compose services must not run in privileged mode', type: 'rego', severity_default: 'CRITICAL' },
+
+  // ── k8s-security.rego (was rego-k8s-non-root / rego-no-hardcoded-secrets) ──
+  { id: 'rego-k8s-deploy-nonroot', category: 'compute', description: 'Deployment containers must not run as root (UID 0)', type: 'rego', provider: 'k8s', severity_default: 'HIGH' },
+  { id: 'rego-k8s-deploy-seccontext', category: 'compute', description: 'Deployment containers must set runAsNonRoot in securityContext', type: 'rego', provider: 'k8s', severity_default: 'MEDIUM' },
+  { id: 'rego-k8s-deploy-nonprivileged', category: 'compute', description: 'Deployment containers must not run in privileged mode', type: 'rego', provider: 'k8s', severity_default: 'CRITICAL' },
+  { id: 'rego-k8s-namespace-netpolicy', category: 'compute', description: 'Namespaces labeled for sensitive data must have NetworkPolicy', type: 'rego', provider: 'k8s', severity_default: 'HIGH' },
+  { id: 'rego-k8s-deploy-approved-registry', category: 'compute', description: 'Deployment containers must use images from approved registries', type: 'rego', provider: 'k8s', severity_default: 'MEDIUM' },
+  { id: 'rego-k8s-deploy-secret-env', category: 'secrets', description: 'Deployment env vars with secret names must use secretKeyRef', type: 'rego', provider: 'k8s', severity_default: 'HIGH' },
+  { id: 'rego-k8s-statefulset-nonroot', category: 'compute', description: 'StatefulSet containers must not run in privileged mode', type: 'rego', provider: 'k8s', severity_default: 'CRITICAL' },
 ];
 
-// ─── Tool Integration Checks (8 external tools) ────────────────
+// ─── Tool Integration Checks (8 external tools) ─────────────────
 //
 // External scanning tools that the orchestrator (bin/comply-orchestrate)
 // can invoke. Each entry defines the tool name, detection command,

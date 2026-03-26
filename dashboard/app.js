@@ -266,8 +266,14 @@
     const legacyFrameworks = Object.keys(dashboard.frameworks || {});
     const allFrameworks = activeFrameworkList.length > 0 ? activeFrameworkList : legacyFrameworks;
 
+    const maturity = frameworksData?.maturity || {};
+    const fwLabels = allFrameworks.map(f => {
+      const tier = maturity[f];
+      const badge = tier && tier !== 'unknown' ? ` (${tier})` : '';
+      return f.toUpperCase() + badge;
+    }).join(', ') || 'No frameworks';
     el.textContent = proj.name
-      ? `${proj.name} \u2014 ${allFrameworks.map(f => f.toUpperCase()).join(', ') || 'No frameworks'}`
+      ? `${proj.name} \u2014 ${fwLabels}`
       : 'No project configured. Run /hipaa to get started.';
 
     // Score: prefer SQLite compliance score, fall back to legacy checklist
@@ -1064,7 +1070,7 @@
     const risks = dashboard.risk_register || [];
 
     if (risks.length === 0) {
-      const emptyHtml = '<div class="empty-state">No risks in the register yet.<br>Run <code>/hipaa-risk</code> for a guided risk assessment, or add risks manually.</div>';
+      const emptyHtml = '<div class="empty-state">No risks in the register yet.<br>Run <code>/comply-assess</code> for a guided risk assessment, or add risks manually.</div>';
       matrixEl.innerHTML = risksView === 'matrix' ? emptyHtml : '';
       tableEl.innerHTML = risksView === 'table' ? emptyHtml : '';
       matrixEl.hidden = risksView !== 'matrix';
@@ -1336,13 +1342,13 @@
     try {
       const res = await fetch('/api/compliance?view=summary');
       if (!res.ok) {
-        el.innerHTML = '<div class="empty-state">No compliance database found. Run: <code>bin/hipaa-db init</code></div>';
+        el.innerHTML = '<div class="empty-state">No compliance database found. Run: <code>bin/comply-db init --framework hipaa</code></div>';
         return;
       }
       const data = await res.json();
 
       if (!data.controls || data.controls.length === 0) {
-        el.innerHTML = '<div class="empty-state">No controls imported. Run: <code>bin/hipaa-db init</code></div>';
+        el.innerHTML = '<div class="empty-state">No controls imported. Run: <code>bin/comply-db init --framework hipaa</code></div>';
         return;
       }
 

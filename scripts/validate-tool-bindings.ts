@@ -191,13 +191,43 @@ if (missingChecks.length > 0) {
 
 console.log();
 
+// 4. Checkov & Trivy ID format validation
+console.log('4. Checkov & Trivy ID Format Validation');
+console.log('────────────────────────────────────────');
+
+let checkovValid = 0, checkovInvalid = 0;
+let trivyValid = 0, trivyInvalid = 0;
+
+for (const [controlId, tools] of Object.entries(bindings.bindings) as [string, any][]) {
+  for (const id of tools.checkov || []) {
+    if (/^CKV_[A-Z]+_\d+$/.test(id)) {
+      checkovValid++;
+    } else {
+      checkovInvalid++;
+      console.log(`  INVALID Checkov ID: ${id} in ${controlId} (expected CKV_[A-Z]+_[0-9]+)`);
+    }
+  }
+  for (const id of tools.trivy || []) {
+    if (/^AVD-[A-Z]+-\d{4}$/.test(id)) {
+      trivyValid++;
+    } else {
+      trivyInvalid++;
+      console.log(`  INVALID Trivy ID: ${id} in ${controlId} (expected AVD-[A-Z]+-[0-9]{4})`);
+    }
+  }
+}
+
+console.log(`  Checkov: ${checkovValid} valid, ${checkovInvalid} invalid`);
+console.log(`  Trivy:   ${trivyValid} valid, ${trivyInvalid} invalid`);
+console.log();
+
 // Summary
 console.log('──────────────────────────────────────────────────────────');
-const totalIssues = errors + cisMismatch;
+const totalIssues = errors + cisMismatch + checkovInvalid + trivyInvalid;
 if (totalIssues === 0 && warnings === 0) {
-  console.log('PASS — All Prowler mappings verified against CIS compliance data');
+  console.log('PASS — All tool mappings verified');
 } else if (totalIssues === 0) {
   console.log(`PASS with ${warnings} warning(s) — some checks may be framework-specific (not CIS)`);
 } else {
-  console.log(`${cisMismatch} mismatch(es) found — consider adding missing Prowler checks to tool-bindings.json`);
+  console.log(`ISSUES FOUND: ${cisMismatch} CIS mismatch(es), ${checkovInvalid} invalid Checkov ID(s), ${trivyInvalid} invalid Trivy ID(s)`);
 }

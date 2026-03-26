@@ -66,6 +66,63 @@ describe('Bin smoke: comply-slug', () => {
   });
 });
 
+describe('Bin smoke: comply-db update-scan', () => {
+  let tmpDir: string;
+  let dbPath: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'emdash-scan-'));
+    const emDashDir = path.join(tmpDir, '.em-dash', 'projects', 'test-project');
+    fs.mkdirSync(emDashDir, { recursive: true });
+    dbPath = path.join(emDashDir, 'compliance.db');
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('persists severity, resource, and scan_id', async () => {
+    // Init a DB first
+    await run('comply-db', ['init', '--framework', 'hipaa'], { cwd: tmpDir });
+
+    // Update scan with all new fields
+    const { exitCode } = await run('comply-db', [
+      'update-scan', 'SC-28', 'PASS', 'prowler', 's3_bucket_default_encryption',
+      'test output data',
+      '--severity', 'HIGH',
+      '--resource', 'arn:aws:s3:::my-bucket',
+      '--scan-id', 'scan-001',
+      '--framework', 'hipaa',
+    ], { cwd: tmpDir });
+    expect(exitCode).toBe(0);
+
+    // Query back via comply-db control
+    const { stdout } = await run('comply-db', ['control', 'SC-28', '--framework', 'hipaa'], { cwd: tmpDir });
+    expect(stdout).toContain('PASS');
+    expect(stdout).toContain('prowler:s3_bucket_default_encryption');
+    expect(stdout).toContain('[HIGH]');
+    expect(stdout).toContain('arn:aws:s3:::my-bucket');
+    expect(stdout).toContain('scan:scan-001');
+  });
+
+  test('stores output longer than 200 chars', async () => {
+    const longOutput = 'A'.repeat(500);
+    const { exitCode } = await run('comply-db', [
+      'update-scan', 'SC-28', 'FAIL', 'checkov', 'CKV_AWS_19',
+      longOutput,
+      '--framework', 'hipaa',
+    ], { cwd: tmpDir });
+    expect(exitCode).toBe(0);
+
+    // Query raw via comply-db query to verify full output stored
+    const { stdout } = await run('comply-db', [
+      'query', `SELECT output FROM check_results WHERE check_id = 'CKV_AWS_19' ORDER BY created_at DESC LIMIT 1`,
+      '--framework', 'hipaa',
+    ], { cwd: tmpDir });
+    expect(stdout.length).toBeGreaterThanOrEqual(500);
+  });
+});
+
 describe('Bin smoke: hipaa-evidence-hash', () => {
   let tmpDir: string;
 

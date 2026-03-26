@@ -134,6 +134,11 @@ describe('Framework Filters (all)', () => {
         }
       }
     });
+
+    test(`${name}: has a maturity field`, () => {
+      expect(filter.maturity).toBeDefined();
+      expect(['alpha', 'community', 'stub', 'production']).toContain(filter.maturity);
+    });
   }
 });
 
@@ -328,6 +333,22 @@ describe('Tool Bindings', () => {
   test('control IDs are valid 800-53 format', () => {
     for (const id of Object.keys(bindings.bindings)) {
       expect(id).toMatch(/^[A-Z]{2}-\d+$/);
+    }
+  });
+
+  test('all Checkov IDs match CKV pattern', () => {
+    for (const [controlId, tools] of Object.entries(bindings.bindings)) {
+      for (const id of (tools as any).checkov || []) {
+        expect(id).toMatch(/^CKV_[A-Z]+_\d+$/);
+      }
+    }
+  });
+
+  test('all Trivy IDs match AVD pattern', () => {
+    for (const [controlId, tools] of Object.entries(bindings.bindings)) {
+      for (const id of (tools as any).trivy || []) {
+        expect(id).toMatch(/^AVD-[A-Z]+-\d{4}$/);
+      }
     }
   });
 });

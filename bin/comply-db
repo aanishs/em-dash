@@ -6,12 +6,11 @@
  * control-state.json, dashboard.json evidence, attestations/*.json
  *
  * Subcommands:
- *   init                    Create DB + import HIPAA controls from NIST catalog
+ *   init                    Create DB + import controls from NIST catalog
  *   status                  Show compliance progress per control
  *   control <oscal_id>      Show full detail for one control (NIST prose + evidence)
- *   update-scan <id> <result>  Record scan result
- *   update-interview <id>      Record interview completion
- *   link-evidence <id> <file>  Link evidence document
+ *   update-scan <id> <result>  Record scan result [--severity X] [--resource X] [--scan-id X]
+ *   update-interview <id>      Record interview completion (planned — WP-1.1)
  *   sign <id>                  Record user signature
  *   summary                    Overall compliance score
  *   cross-framework            Show cross-framework compliance matrix
@@ -272,7 +271,13 @@ function init() {
   console.log(`DB_INITIALIZED: ${getDbPath()}`);
   console.log(`  Imported: ${imported} controls from NIST 800-53`);
   if (missing > 0) console.log(`  Missing:  ${missing} controls not found in catalog`);
-  console.log(`  HIPAA specs: ${Object.keys(filter.mapping).length}`);
+  console.log(`  Filter specs: ${Object.keys(filter.mapping).length} (${FRAMEWORK})`);
+  if (filter.maturity === 'community' || filter.maturity === 'stub') {
+    console.log(`  WARNING: ${FRAMEWORK} mapping is community-maintained and has not been validated by a domain expert.`);
+  }
+  if (filter.structural_limitations) {
+    console.log(`  NOTE: ${filter.structural_limitations.slice(0, 200)}${filter.structural_limitations.length > 200 ? '...' : ''}`);
+  }
 }
 
 function status() {
@@ -328,7 +333,14 @@ function controlDetail() {
 
   if (checks.length > 0) {
     console.log(`\nCheck Results (${checks.length}):`);
-    for (const c of checks) console.log(`  ${c.result.padEnd(6)} ${c.tool}:${c.check_id} (${c.created_at})`);
+    for (const c of checks) {
+      let line = `  ${c.result.padEnd(6)} ${c.tool}:${c.check_id}`;
+      if (c.severity) line += ` [${c.severity}]`;
+      if (c.resource) line += ` ${c.resource}`;
+      line += ` (${c.created_at})`;
+      if (c.scan_id) line += ` scan:${c.scan_id}`;
+      console.log(line);
+    }
   }
 
   if (evidence.length > 0) {
@@ -370,11 +382,14 @@ function updateScan() {
   const tool = args[3] || 'emdash';
   const checkId = args[4] || oscalId;
   const output = args[5] || '';
+  const severity = getFlag('severity') || '';
+  const resource = getFlag('resource') || '';
+  const scanId = getFlag('scan-id') || '';
 
-  if (!oscalId || !result) { console.error('Usage: comply-db update-scan <oscal_id> <PASS|FAIL> [tool] [check_id] [output]'); process.exit(1); }
+  if (!oscalId || !result) { console.error('Usage: comply-db update-scan <oscal_id> <PASS|FAIL> [tool] [check_id] [output] [--severity X] [--resource X] [--scan-id X]'); process.exit(1); }
 
   const db = openDb();
-  db.prepare('INSERT INTO check_results (control_id, tool, check_id, result, output, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(oscalId, tool, checkId, result, output, new Date().toISOString());
+  db.prepare('INSERT INTO check_results (control_id, tool, check_id, result, output, severity, resource, scan_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(oscalId, tool, checkId, result, output, severity, resource, scanId, new Date().toISOString());
 
   // Derive control status from check results instead of hard-setting to 'partial'
   const results = db.prepare('SELECT result FROM check_results WHERE control_id = ?').all(oscalId) as any[];

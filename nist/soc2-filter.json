@@ -3,6 +3,7 @@
   "name": "SOC 2 Type II — Trust Service Criteria",
   "source": "AICPA TSC 2017 → NIST 800-53 mapping",
   "version": "1.0",
+  "maturity": "community",
   "note": "Maps SOC 2 Trust Service Criteria to NIST 800-53 controls. Based on AICPA's published mapping of TSC to COSO + 800-53.",
   "mapping": {
     "CC1.1": ["AC-1", "AT-1", "PL-1"],

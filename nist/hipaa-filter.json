@@ -3,6 +3,7 @@
   "name": "HIPAA Security Rule",
   "source": "SP 800-66r2 + NIST CPRT",
   "version": "2.0",
+  "maturity": "alpha",
   "note": "Validated against SP 800-66r2 Section 5 + NIST CPRT. Includes all HIPAA Security Rule standards and implementation specifications.",
   "mapping": {
     "164.308(a)(1)(i)": [

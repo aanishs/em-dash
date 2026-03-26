@@ -84,7 +84,7 @@ describe('AWS encryption at rest', () => {
     expect(messages.some(m => m.includes('SQS queue'))).toBe(true);
 
     for (const f of failures) {
-      expect(['rego-s3-encryption', 'rego-rds-encryption', 'rego-kms-rotation']).toContain(f.metadata.check_id);
+      expect(['rego-aws-s3-encryption', 'rego-aws-ebs-encryption', 'rego-aws-rds-encryption', 'rego-aws-kms-rotation', 'rego-aws-sns-encryption', 'rego-aws-sqs-encryption']).toContain(f.metadata.check_id);
     }
   });
 
@@ -112,7 +112,7 @@ describe('AWS transmission security', () => {
     expect(messages.some(m => m.includes('publicly accessible'))).toBe(true);
 
     for (const f of failures) {
-      expect(['rego-security-group-open', 'rego-rds-public']).toContain(f.metadata.check_id);
+      expect(['rego-aws-sg-rule-open', 'rego-aws-sg-open', 'rego-aws-lb-https', 'rego-aws-rds-sg-open', 'rego-rds-public']).toContain(f.metadata.check_id);
     }
   });
 
@@ -166,7 +166,7 @@ describe('AWS audit logging', () => {
     expect(messages.some(m => m.includes('no retention policy'))).toBe(true);
 
     for (const f of failures) {
-      expect(f.metadata.check_id).toBe('rego-cloudtrail-enabled');
+      expect(['rego-aws-cloudtrail-multiregion', 'rego-aws-cloudtrail-logvalidation', 'rego-aws-cloudtrail-encryption', 'rego-aws-vpc-flowlogs', 'rego-aws-cloudwatch-retention', 'rego-aws-cloudwatch-no-retention']).toContain(f.metadata.check_id);
     }
   });
 
@@ -249,7 +249,7 @@ describe('Azure controls', () => {
     const failures = getFailures(results, 'compliance.access_control');
     expect(failures.length).toBe(1);
     expect(failures[0].msg).toContain('Contributor at subscription scope');
-    expect(failures[0].metadata.check_id).toBe('rego-iam-wildcard');
+    expect(failures[0].metadata.check_id).toBe('rego-azure-role-subscription-scope');
   });
 
   test('passes resource-group-scoped assignment', () => {
@@ -314,6 +314,22 @@ describe('Kubernetes security', () => {
   });
 });
 
+// ─── Check ID Uniqueness ────────────────────────────────────
+
+describe('Check ID uniqueness', () => {
+  test('every Rego deny rule has a unique check_id', () => {
+    const checkIds: string[] = [];
+    const regoDir = path.join(ROOT, 'policies');
+    for (const file of fs.readdirSync(regoDir).filter(f => f.endsWith('.rego'))) {
+      const content = fs.readFileSync(path.join(regoDir, file), 'utf-8');
+      const matches = content.matchAll(/"check_id":\s*"([^"]+)"/g);
+      for (const m of matches) checkIds.push(m[1]);
+    }
+    const duplicates = checkIds.filter((id, i) => checkIds.indexOf(id) !== i);
+    expect(duplicates).toEqual([]);
+  });
+});
+
 // ─── Cross-Policy Coverage ──────────────────────────────────
 
 describe('Cross-policy coverage', () => {
@@ -358,10 +374,39 @@ describe('Cross-policy coverage', () => {
     if (skipIfNoConftest()) return;
 
     const validCheckIds = new Set([
-      'rego-iam-wildcard', 'rego-mfa-required', 'rego-cloudtrail-enabled',
-      'rego-s3-encryption', 'rego-rds-encryption', 'rego-kms-rotation',
-      'rego-security-group-open', 'rego-rds-public', 'rego-no-hardcoded-secrets',
-      'rego-k8s-rbac-wildcard', 'rego-k8s-non-root',
+      // Kept unique
+      'rego-mfa-required', 'rego-rds-public', 'rego-k8s-rbac-wildcard',
+      // encryption-at-rest.rego
+      'rego-aws-rds-encryption', 'rego-aws-s3-encryption', 'rego-aws-ebs-encryption',
+      'rego-aws-kms-rotation', 'rego-aws-sns-encryption', 'rego-gcp-cloudsql-encryption',
+      'rego-gcp-gcs-encryption', 'rego-aws-sqs-encryption', 'rego-azure-storage-https',
+      'rego-azure-disk-encryption', 'rego-azure-keyvault-softdelete', 'rego-gcp-bigquery-encryption',
+      // backup-dr.rego
+      'rego-aws-rds-backup', 'rego-aws-rds-backup-retention', 'rego-aws-s3-versioning',
+      'rego-aws-dynamodb-backup', 'rego-aws-efs-backup', 'rego-gcp-cloudsql-backup', 'rego-azure-sql-backup',
+      // transmission-security.rego
+      'rego-aws-sg-rule-open', 'rego-aws-sg-open', 'rego-aws-lb-https', 'rego-aws-rds-sg-open',
+      'rego-gcp-sql-authorized-networks', 'rego-gcp-sql-public-ip', 'rego-gcp-firewall-open',
+      'rego-azure-nsg-open', 'rego-azure-appservice-https', 'rego-gcp-cloudrun-public',
+      // audit-logging.rego
+      'rego-aws-cloudtrail-multiregion', 'rego-aws-cloudtrail-logvalidation', 'rego-aws-cloudtrail-encryption',
+      'rego-aws-vpc-flowlogs', 'rego-aws-cloudwatch-retention', 'rego-aws-cloudwatch-no-retention',
+      'rego-gcp-audit-logging', 'rego-azure-monitor-logprofile', 'rego-azure-monitor-diagnostic', 'rego-gcp-logging-sink',
+      // access-control.rego
+      'rego-aws-iam-wildcard-action', 'rego-aws-iam-wildcard-resource', 'rego-aws-iam-admin-policy',
+      'rego-gcp-iam-primitive-role', 'rego-gcp-iam-alluser-binding',
+      'rego-azure-role-subscription-scope', 'rego-azure-role-wildcard-scope',
+      'rego-gcp-sa-key-rotation', 'rego-gcp-iam-allauthenticated', 'rego-azure-role-wildcard-actions',
+      // secrets.rego
+      'rego-aws-provider-hardcoded-key', 'rego-aws-provider-hardcoded-secret',
+      'rego-tf-sensitive-default', 'rego-tf-secret-var-default', 'rego-k8s-secret-in-env',
+      // container-security.rego
+      'rego-docker-nonroot-user', 'rego-docker-latest-tag', 'rego-docker-add-url',
+      'rego-docker-expose-all', 'rego-compose-readonly',
+      // k8s-security.rego
+      'rego-k8s-deploy-nonroot', 'rego-k8s-deploy-seccontext', 'rego-k8s-deploy-nonprivileged',
+      'rego-k8s-namespace-netpolicy', 'rego-k8s-deploy-approved-registry',
+      'rego-k8s-deploy-secret-env', 'rego-k8s-statefulset-nonroot',
     ]);
 
     const badFixtures = fs.readdirSync(FIXTURES_DIR).filter(f => f.startsWith('bad-'));

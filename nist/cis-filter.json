@@ -3,6 +3,7 @@
   "name": "CIS Controls v8.1",
   "source": "CIS Controls v8.1 Mapping to NIST SP 800-53 Rev 5 (Low and Moderate Baselines)",
   "version": "1.0",
+  "maturity": "alpha",
   "note": "Maps CIS Controls v8.1 safeguards to NIST 800-53 controls. Source: official CIS published Excel crosswalk. All descriptions independently written (OpenSCAP model). CIS safeguards that map only to 800-53 controls outside em-dash's tracked set are included for completeness but will show no automated checks in the cross-framework matrix.",
   "mapping": {
     "1.1":  ["CM-8"],

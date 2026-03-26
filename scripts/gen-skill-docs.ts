@@ -160,7 +160,7 @@ function generateEvidenceSection(ctx: TemplateContext): string {
 
 When collecting evidence, always:
 1. Write raw tool output to \`~/.em-dash/projects/$SLUG/evidence/{phase}-{datetime}/\`
-2. Hash evidence files: \`_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir}) && "$_EMDASH_BIN"/hipaa-evidence-hash <evidence-directory>\`
+2. Hash evidence files: \`_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir}) && "$_EMDASH_BIN"/comply-evidence-hash <evidence-directory>\`
 3. Never store actual PHI — only configuration states, scan results, and metadata`;
 }
 
@@ -170,7 +170,7 @@ function generateReviewLogging(ctx: TemplateContext): string {
 After completing a skill, log the outcome:
 \`\`\`bash
 _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
-"$_EMDASH_BIN"/comply-db write "$SLUG" "${ctx.skillName}" "<STATUS>" <FINDINGS_COUNT>
+"$_EMDASH_BIN"/comply-db update-scan "$SLUG" "<OSCAL_ID>" "<STATUS>" emdash "${ctx.skillName}"
 \`\`\``;
 }
 
@@ -205,17 +205,7 @@ if [ -f .em-dash/dashboard.json ]; then
 fi
 \`\`\`
 
-**Checklist updates** are handled inline by each skill as it discovers findings — not here. Use \`hipaa-dashboard-update\` to update individual checklist items based on actual results:
-
-\`\`\`bash
-_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})
-# Mark a checklist item as complete with a note:
-"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(a)(1)" complete "RBAC found in src/auth.ts"
-# Mark as pending with an evidence gap:
-"$_EMDASH_BIN"/hipaa-dashboard-update "164.312(b)" pending --gap "No audit logging found"
-# Add evidence file to an item:
-"$_EMDASH_BIN"/hipaa-dashboard-update "164.314(a)(1)" complete --evidence "baa-aws.pdf"
-\`\`\``;
+**Checklist updates** are handled inline by each skill as it discovers findings — not here. Update the compliance dashboard via \`PUT /api/dashboard\` or the dashboard UI.`;
 }
 
 // ─── Composed Preamble ──────────────────────────────────────
@@ -247,7 +237,7 @@ _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinD
 If no prior reviews exist, show:
 \`\`\`
 No prior compliance work found for this project.
-Recommended: Start with /hipaa-assess for an organizational assessment.
+Recommended: Start with /comply-assess for an organizational assessment.
 \`\`\``;
 }
 
@@ -578,7 +568,7 @@ mkdir -p "$_EVIDENCE_DIR"
 
 **After collecting evidence, hash for integrity:**
 \`\`\`bash
-_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir}) && "$_EMDASH_BIN"/hipaa-evidence-hash "$_EVIDENCE_DIR"
+_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir}) && "$_EMDASH_BIN"/comply-evidence-hash "$_EVIDENCE_DIR"
 \`\`\`
 
 **Evidence index:** Append to master index:
@@ -1440,28 +1430,7 @@ function generateDashboardUpdates(ctx: TemplateContext): string {
 
   const updateUsage = `**How to update the dashboard:**
 
-\`\`\`bash
-${binDetect}
-# Checklist: mark an item as complete with reasoning
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete "<your reasoning>"
-# Checklist: mark as pending with an evidence gap
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" pending --gap "<what's missing>"
-# Checklist: attach evidence file
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "<id>" complete --evidence "<filename>"
-
-# Finding: add a new finding
-"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "<title>" --severity <critical|high|medium|low> --requirement "<id>" --source "<skill>"
-# Finding: resolve a finding
-"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "<title>"
-
-# Vendor: add a vendor/BA
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "<name>" --service "<service>" --baa-status <signed|pending|none> --risk-tier <low|medium|high|critical>
-# Vendor: update BAA status
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor update --name "<name>" --baa-status signed
-
-# Risk: add a risk
-"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "<desc>" --likelihood <1-5> --impact <1-5> --treatment <mitigate|accept|transfer|avoid> --owner "<owner>" --requirement "<ids>"
-\`\`\``;
+Update the compliance dashboard via \`PUT /api/dashboard\` or the dashboard UI. The API accepts JSON payloads for checklist updates, findings, vendor tracking, and risk management.`;
 
   const maps: Record<string, string> = {
     'hipaa-assess': `## Dashboard Checklist Updates
@@ -1486,23 +1455,11 @@ As you conduct the interview, update the dashboard after each meaningful answer.
 
 **Beyond checklist — you also write vendors and risks:**
 
-When the user mentions third-party services that handle PHI, add them as vendors:
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud hosting" --baa-status signed --risk-tier high
-\`\`\`
+When the user mentions third-party services that handle PHI, add them as vendors via \`PUT /api/dashboard\` or the dashboard UI.
 
-When you identify organizational risks from interview answers, add them:
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "Phishing risk — no MFA enforced" --likelihood 4 --impact 4 --treatment mitigate --owner "Security Officer"
-\`\`\`
+When you identify organizational risks from interview answers, add them via \`PUT /api/dashboard\` or the dashboard UI.
 
-For vendors without BAAs, also create evidence gaps:
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.314(a)(1)" pending --gap "No BAA with Stripe"
-\`\`\`
+For vendors without BAAs, also create evidence gaps via \`PUT /api/dashboard\` or the dashboard UI.
 
 **Examples of good judgment:**
 
@@ -1563,28 +1520,15 @@ As you complete each scan check, update the dashboard based on your **interpreta
 - S3 bucket has encryption but \`PublicAccessBlock\` is not set → **partial**: encryption complete but access control needs work
 
 **Evidence linking — connect checklist items to proof:**
-When marking a checklist item complete or partial, always attach the relevant evidence file:
-\`\`\`bash
-${binDetect}
-# Link scan evidence to checklist items when marking them
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.312(e)(1)" complete "TLS 1.2 verified" --evidence "scan-evidence/aws-tls-check.json"
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.312(b)" complete "CloudTrail active, multi-region" --evidence "scan-evidence/prowler-results.json"
-\`\`\`
-**Rule:** Every checklist item marked during scanning MUST include an \`--evidence\` reference to the scan output file that proves it. Use the evidence directory path from the Raw Evidence Preservation step.
+When marking a checklist item complete or partial, always attach the relevant evidence file. Update the compliance dashboard via \`PUT /api/dashboard\` or the dashboard UI, including the evidence file reference.
+
+**Rule:** Every checklist item marked during scanning MUST include an evidence reference to the scan output file that proves it. Use the evidence directory path from the Raw Evidence Preservation step.
 
 **Findings — your main output:**
-Every scan issue becomes a finding. Add them as you discover them:
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update finding add --title "S3 bucket has public ACL" --severity critical --requirement "164.312(a)(1)" --source scan
-\`\`\`
+Every scan issue becomes a finding. Add them as you discover them via \`PUT /api/dashboard\` or the dashboard UI.
 
 **Vendor detection:**
-If you detect AWS/GCP/Azure in use (from CLI checks or code imports), add as vendor if not already present:
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud infrastructure" --baa-status pending --risk-tier high
-\`\`\`
+If you detect AWS/GCP/Azure in use (from CLI checks or code imports), add as vendor if not already present via \`PUT /api/dashboard\` or the dashboard UI.
 
 ${updateUsage}`,
 
@@ -1621,11 +1565,7 @@ As you generate policy documents and apply code fixes, update the dashboard. Pol
 - Generated BAA template → complete 164.314(a)(1) ONLY if user confirms they'll sign it with vendors. Otherwise: note "BAA template generated — needs signing with [vendors]"
 
 **Findings — resolve as you fix:**
-After each successful remediation, resolve the corresponding finding:
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update finding resolve --title "RDS instance lacks encryption at rest"
-\`\`\`
+After each successful remediation, resolve the corresponding finding via \`PUT /api/dashboard\` or the dashboard UI.
 
 ${updateUsage}`,
 
@@ -1695,18 +1635,10 @@ As you discover vendors and confirm BAA status, update the dashboard in real tim
 - \`checklist ... --gap\` — for vendors missing BAAs
 
 **Vendor detection → dashboard:**
-After confirming each vendor's status, immediately update so the dashboard reflects progress:
-
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update vendor add --name "AWS" --service "Cloud infrastructure" --baa-status signed --risk-tier high --baa-expiry "2027-01-15"
-\`\`\`
+After confirming each vendor's status, immediately update so the dashboard reflects progress via \`PUT /api/dashboard\` or the dashboard UI.
 
 **BAA gaps:**
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.314(a)(1)" pending --gap "No BAA with Stripe"
-\`\`\`
+Update BAA gap status via \`PUT /api/dashboard\` or the dashboard UI.
 
 ${updateUsage}`;
 
@@ -1719,17 +1651,10 @@ As you identify and score risks with the user, update the dashboard in real time
 - \`checklist\` — 164.308(a)(1)(ii)(A) Risk Analysis, 164.308(a)(1)(ii)(B) Risk Management
 
 **After each confirmed risk:**
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update risk add --description "Unencrypted PHI at rest" --likelihood 4 --impact 5 --treatment mitigate --owner "Engineering" --requirement "164.312(a)(2)(iv)"
-\`\`\`
+Update the compliance dashboard via \`PUT /api/dashboard\` or the dashboard UI with risk details (description, likelihood, impact, treatment, owner, requirement).
 
 **After completing the full assessment:**
-\`\`\`bash
-${binDetect}
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.308(a)(1)(ii)(A)" complete "Risk analysis completed — N risks identified"
-"$_EMDASH_BIN"/hipaa-dashboard-update checklist "164.308(a)(1)(ii)(B)" complete "Risk treatment plan established"
-\`\`\`
+Update checklist items 164.308(a)(1)(ii)(A) and 164.308(a)(1)(ii)(B) via \`PUT /api/dashboard\` or the dashboard UI.
 
 ${updateUsage}`;
 

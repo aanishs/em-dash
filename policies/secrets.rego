@@ -8,7 +8,7 @@ deny[msg] {
     resource.access_key
     msg := {
         "msg": sprintf("AWS provider '%s' has hardcoded access_key — use environment variables or IAM roles", [name]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-aws-provider-hardcoded-key",
         "severity": "CRITICAL",
         "resource": name,
     }
@@ -20,7 +20,7 @@ deny[msg] {
     resource.secret_key
     msg := {
         "msg": sprintf("AWS provider '%s' has hardcoded secret_key — use environment variables or IAM roles", [name]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-aws-provider-hardcoded-secret",
         "severity": "CRITICAL",
         "resource": name,
     }
@@ -34,7 +34,7 @@ deny[msg] {
     resource.default != ""
     msg := {
         "msg": sprintf("Terraform variable '%s' has a default value — password variables must not have defaults", [name]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-tf-sensitive-default",
         "severity": "HIGH",
         "resource": name,
     }
@@ -49,7 +49,7 @@ deny[msg] {
     resource.default != ""
     msg := {
         "msg": sprintf("Terraform variable '%s' has a default value — secret variables must not have defaults", [name]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-tf-secret-var-default",
         "severity": "HIGH",
         "resource": name,
     }
@@ -67,7 +67,7 @@ deny[msg] {
     not env.valueFrom
     msg := {
         "msg": sprintf("Container '%s' env var '%s' uses inline value — must use secretKeyRef", [container.name, env.name]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-k8s-secret-in-env",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }

@@ -168,7 +168,7 @@ Only your active frameworks appear. Use `--all` to see all 6.
 | `/soc2` | SOC 2 Type II | 40 | Community — filter file, needs TSC expert review | SaaS trust criteria |
 | `/gdpr` | GDPR | 22 | Community — filter file, needs DPO review | EU personal data |
 | `/pci-dss` | PCI-DSS v4.0 | 16 | Community — filter file, needs QSA review | Payment card data |
-| `/cis` | CIS Controls v8.1 | 33 | Community — filter file with IG tiers, 71% AWS Level 1 coverage | Infrastructure security baseline |
+| `/cis` | CIS Controls v8.1 | 33 | **Alpha** — filter file with IG tiers, validated against CIS crosswalk, 71% AWS Level 1 coverage | Infrastructure security baseline |
 | `/iso27001` | ISO/IEC 27001:2022 | 49 | Community — filter file, needs auditor review | Information security management |
 
 **What "alpha" means:** HIPAA has the most depth — PHI-specific code checks, a validation script against the official NIST guidance (SP 800-66r2), and assessment questions tailored to the Security Rule. It still hasn't been validated by a compliance professional. Everything is early.

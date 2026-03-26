@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.3.0 — Trust foundation: scan persistence, check accuracy, maturity labels (2026-03-27)
+
+**Scan persistence fix.** `comply-db update-scan` now accepts `--severity`, `--resource`, and `--scan-id` flags and persists them to SQLite. Output truncation raised from 200 to 4,000 chars. Prowler normalizer produces structured JSON instead of raw stringify. Auditors can now see which specific resource a finding refers to.
+
+**Tool-binding accuracy.** Fixed 3 mismapped Checkov IDs (CKV_AWS_18, CKV_AWS_17, CKV_AWS_145) and removed 1 invalid Prowler ID (iam_password_policy_lockout). Extended `validate-tool-bindings.ts` with Checkov and Trivy pattern validation. Added regression tests for all check ID formats.
+
+**Rego check_id taxonomy.** Split 8 reused Rego check_ids (69 usages across 8 policy files) into 68 unique IDs following `rego-{provider}-{resource}-{category}` convention. Each deny rule now produces a distinguishable finding in evidence. Updated checks-registry.ts and tool-bindings.json.
+
+**Framework maturity labels.** All 6 filter files now have machine-readable `maturity` field (`alpha` or `community`). GDPR and PCI-DSS include `structural_limitations` documenting what the NIST mapping cannot cover. `/api/frameworks` returns maturity metadata. Dashboard shows maturity tier. `comply-db init` warns on community-tier frameworks.
+
+**Drift cleanup.** Fixed stale command references across dashboard, skill templates, demo, and CLI: `bin/hipaa-db init` → `bin/comply-db init`, `/hipaa-risk` → `/comply-assess`, `hipaa-dashboard-update` → dashboard API guidance, `hipaa-evidence-hash` → `comply-evidence-hash`. All generated SKILL.md files regenerated.
+
+**152 tests** across 8 files (up from 140).
+
 ## v3.2.0 — Framework-aware opt-in + security hardening (2026-03-25)
 
 **Framework-aware opt-in.** em-dash now tracks which frameworks you've initialized in SQLite metadata (`active_frameworks`). Dashboard, cross-framework matrix, CLI, and all APIs scope to your active frameworks only. `comply-db frameworks` lists/adds/removes. Cross-framework matrix shows only your frameworks; `--all` flag shows all 6.

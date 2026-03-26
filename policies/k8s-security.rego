@@ -9,7 +9,7 @@ deny[msg] {
     container.securityContext.runAsUser == 0
     msg := {
         "msg": sprintf("Container '%s' in Deployment runs as root (UID 0)", [container.name]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-k8s-deploy-nonroot",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -23,7 +23,7 @@ deny[msg] {
     not container.securityContext.runAsUser
     msg := {
         "msg": sprintf("Container '%s' in Deployment does not set runAsNonRoot — may run as root", [container.name]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-k8s-deploy-seccontext",
         "severity": "MEDIUM",
         "resource": input.metadata.name,
     }
@@ -36,7 +36,7 @@ deny[msg] {
     container.securityContext.privileged == true
     msg := {
         "msg": sprintf("Container '%s' in Deployment runs in privileged mode", [container.name]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-k8s-deploy-nonprivileged",
         "severity": "CRITICAL",
         "resource": input.metadata.name,
     }
@@ -50,7 +50,7 @@ deny[msg] {
     phi_labels[key]
     msg := {
         "msg": sprintf("Namespace '%s' is labeled for sensitive data but should have NetworkPolicy resources applied", [input.metadata.name]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-k8s-namespace-netpolicy",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -77,7 +77,7 @@ deny[msg] {
     not approved_registry(container.image)
     msg := {
         "msg": sprintf("Container '%s' uses image '%s' from unapproved registry", [container.name, container.image]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-k8s-deploy-approved-registry",
         "severity": "MEDIUM",
         "resource": input.metadata.name,
     }
@@ -104,7 +104,7 @@ deny[msg] {
     not env.valueFrom
     msg := {
         "msg": sprintf("Container '%s' has env var '%s' with inline value — use secretKeyRef instead", [container.name, env.name]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-k8s-deploy-secret-env",
         "severity": "HIGH",
         "resource": input.metadata.name,
     }
@@ -117,7 +117,7 @@ deny[msg] {
     container.securityContext.privileged == true
     msg := {
         "msg": sprintf("Container '%s' in StatefulSet runs in privileged mode", [container.name]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-k8s-statefulset-nonroot",
         "severity": "CRITICAL",
         "resource": input.metadata.name,
     }

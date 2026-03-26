@@ -8,7 +8,7 @@ deny[msg] {
     not resource.storage_encrypted
     msg := {
         "msg": sprintf("RDS instance '%s' does not have storage encryption enabled", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-aws-rds-encryption",
         "severity": "HIGH",
         "resource": name,
     }
@@ -20,7 +20,7 @@ deny[msg] {
     not resource.server_side_encryption_configuration
     msg := {
         "msg": sprintf("S3 bucket '%s' does not have server-side encryption configured", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-aws-s3-encryption",
         "severity": "HIGH",
         "resource": name,
     }
@@ -32,7 +32,7 @@ deny[msg] {
     not resource.encrypted
     msg := {
         "msg": sprintf("EBS volume '%s' is not encrypted", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-aws-ebs-encryption",
         "severity": "HIGH",
         "resource": name,
     }
@@ -44,7 +44,7 @@ deny[msg] {
     not resource.enable_key_rotation
     msg := {
         "msg": sprintf("KMS key '%s' does not have automatic key rotation enabled", [name]),
-        "check_id": "rego-kms-rotation",
+        "check_id": "rego-aws-kms-rotation",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -56,7 +56,7 @@ deny[msg] {
     not resource.kms_master_key_id
     msg := {
         "msg": sprintf("SNS topic '%s' is not encrypted with KMS", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-aws-sns-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -69,7 +69,7 @@ deny[msg] {
     not settings.disk_encryption_key_name
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' does not use customer-managed encryption key (CMEK)", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-gcp-cloudsql-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -81,7 +81,7 @@ deny[msg] {
     not resource.encryption
     msg := {
         "msg": sprintf("GCS bucket '%s' does not have a customer-managed encryption configuration", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-gcp-gcs-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -93,7 +93,7 @@ deny[msg] {
     not resource.kms_master_key_id
     msg := {
         "msg": sprintf("SQS queue '%s' is not encrypted with KMS", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-aws-sqs-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -105,7 +105,7 @@ deny[msg] {
     not resource.enable_https_traffic_only
     msg := {
         "msg": sprintf("Azure storage account '%s' does not enforce HTTPS-only traffic", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-azure-storage-https",
         "severity": "HIGH",
         "resource": name,
     }
@@ -118,7 +118,7 @@ deny[msg] {
     resource.encryption_settings == []
     msg := {
         "msg": sprintf("Azure managed disk '%s' is not encrypted with customer-managed key", [name]),
-        "check_id": "rego-rds-encryption",
+        "check_id": "rego-azure-disk-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -130,7 +130,7 @@ deny[msg] {
     resource.soft_delete_retention_days < 7
     msg := {
         "msg": sprintf("Azure Key Vault '%s' soft delete retention is less than 7 days", [name]),
-        "check_id": "rego-kms-rotation",
+        "check_id": "rego-azure-keyvault-softdelete",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -142,7 +142,7 @@ deny[msg] {
     not resource.default_encryption_configuration
     msg := {
         "msg": sprintf("BigQuery dataset '%s' does not use customer-managed encryption", [name]),
-        "check_id": "rego-s3-encryption",
+        "check_id": "rego-gcp-bigquery-encryption",
         "severity": "MEDIUM",
         "resource": name,
     }
