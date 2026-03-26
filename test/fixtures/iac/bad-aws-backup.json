@@ -1,0 +1,14 @@
+{
+  "resource": {
+    "aws_db_instance": {
+      "db_no_backups": {
+        "backup_retention_period": 0,
+        "storage_encrypted": true
+      },
+      "db_short_retention": {
+        "backup_retention_period": 14,
+        "storage_encrypted": true
+      }
+    }
+  }
+}

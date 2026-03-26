@@ -22,7 +22,7 @@
     "CP-2":  { "emdash": ["policy-doc-contingency-plan"], "prowler": [], "checkov": [], "trivy": [], "description": "Contingency plan — doc check + interview" },
     "CM-8":  { "emdash": [], "prowler": [], "checkov": [], "trivy": [], "interview_only": true, "description": "System component inventory — device/media accountability" },
     "CP-4":  { "emdash": ["policy-doc-contingency-test"], "prowler": [], "checkov": [], "trivy": [], "description": "Contingency plan testing — test evidence check + interview" },
-    "CP-9":  { "emdash": [], "prowler": ["rds_instance_backup_enabled", "dynamodb_table_pitr_enabled"], "checkov": ["CKV_AWS_133"], "trivy": ["AVD-AWS-0077", "AVD-AWS-0128"], "cis_benchmark": ["2.3.2"] },
+    "CP-9":  { "emdash": ["rego-rds-backup-retention"], "prowler": ["rds_instance_backup_enabled", "dynamodb_table_pitr_enabled"], "checkov": ["CKV_AWS_133"], "trivy": ["AVD-AWS-0077", "AVD-AWS-0128"], "cis_benchmark": ["2.3.2"] },
     "CP-10": { "emdash": [], "prowler": ["rds_instance_backup_enabled"], "checkov": [], "trivy": ["AVD-AWS-0077"], "description": "System recovery and reconstitution" },
     "IA-2":  { "emdash": ["password-hashing", "aws-iam-password-policy", "aws-iam-mfa", "rego-mfa-required"], "prowler": ["iam_user_mfa_enabled_console_access", "iam_root_mfa_enabled", "iam_password_policy_minimum_length_14"], "checkov": ["CKV_AWS_9", "CKV_AWS_10"], "trivy": ["AVD-AWS-0145", "AVD-AWS-0142"], "lynis": ["AUTH-9262", "AUTH-9286"], "cis_benchmark": ["1.5", "1.6", "1.10"] },
     "IA-4":  { "emdash": [], "prowler": ["iam_user_mfa_enabled_console_access"], "checkov": [], "trivy": [], "description": "Identifier management — unique user IDs" },

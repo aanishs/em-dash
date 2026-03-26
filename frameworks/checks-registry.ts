@@ -255,6 +255,7 @@ const REGO_CHECKS: Check[] = [
   { id: 'rego-cloudtrail-enabled', category: 'audit', description: 'CloudTrail must be enabled with multi-region and log validation', type: 'rego', severity_default: 'HIGH' },
   { id: 'rego-s3-encryption', category: 'encryption', description: 'S3 buckets must have server-side encryption configured', type: 'rego', severity_default: 'HIGH' },
   { id: 'rego-rds-encryption', category: 'encryption', description: 'RDS instances must have storage_encrypted = true', type: 'rego', severity_default: 'HIGH' },
+  { id: 'rego-rds-backup-retention', category: 'data_protection', description: 'RDS instances must keep automated backups for at least 35 days', type: 'rego', severity_default: 'MEDIUM' },
   { id: 'rego-security-group-open', category: 'transmission', description: 'Security groups must not allow 0.0.0.0/0 ingress on all ports', type: 'rego', severity_default: 'HIGH' },
   { id: 'rego-rds-public', category: 'access_control', description: 'RDS instances must not be publicly accessible', type: 'rego', severity_default: 'CRITICAL' },
   { id: 'rego-no-hardcoded-secrets', category: 'secrets', description: 'No hardcoded credentials or API keys in Terraform', type: 'rego', severity_default: 'CRITICAL' },

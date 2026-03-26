@@ -96,6 +96,25 @@ describe('AWS encryption at rest', () => {
   });
 });
 
+// ─── AWS Backup / Disaster Recovery ─────────────────────────
+
+describe('AWS backup and disaster recovery', () => {
+  test('denies disabled backups and retention below 35 days', () => {
+    if (skipIfNoConftest()) return;
+    const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-backup.json'));
+    const failures = getFailures(results, 'compliance.backup_dr');
+    expect(failures.length).toBe(2);
+
+    const messages = failures.map(f => f.msg);
+    expect(messages.some(m => m.includes('automated backups disabled'))).toBe(true);
+    expect(messages.some(m => m.includes('should be >= 35'))).toBe(true);
+
+    for (const f of failures) {
+      expect(f.metadata.check_id).toBe('rego-rds-backup-retention');
+    }
+  });
+});
+
 // ─── AWS Transmission Security ──────────────────────────────
 
 describe('AWS transmission security', () => {
@@ -359,7 +378,7 @@ describe('Cross-policy coverage', () => {
 
     const validCheckIds = new Set([
       'rego-iam-wildcard', 'rego-mfa-required', 'rego-cloudtrail-enabled',
-      'rego-s3-encryption', 'rego-rds-encryption', 'rego-kms-rotation',
+      'rego-s3-encryption', 'rego-rds-encryption', 'rego-rds-backup-retention', 'rego-kms-rotation',
       'rego-security-group-open', 'rego-rds-public', 'rego-no-hardcoded-secrets',
       'rego-k8s-rbac-wildcard', 'rego-k8s-non-root',
     ]);
