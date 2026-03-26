@@ -80,6 +80,14 @@ describe('Checks registry', () => {
       expect(c.command).toBeTruthy();
     }
   });
+
+  test('container image signing check is registered as a code-level compute check', () => {
+    const check = getCheck('container-image-signing');
+    expect(check).toBeDefined();
+    expect(check?.type).toBe('code_grep');
+    expect(check?.category).toBe('compute');
+    expect(check?.provider).toBe('k8s');
+  });
 });
 
 describe('NIST ↔ Tool binding consistency', () => {
@@ -103,5 +111,9 @@ describe('NIST ↔ Tool binding consistency', () => {
     for (const id of Object.keys(bindings.bindings)) {
       expect(filterControls.has(id)).toBe(true);
     }
+  });
+
+  test('SI-7 includes the container image signing check', () => {
+    expect(bindings.bindings['SI-7'].emdash).toContain('container-image-signing');
   });
 });

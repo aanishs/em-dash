@@ -220,6 +220,15 @@ const CODE_CHECKS: Check[] = [
     pattern: 'password\\s*=|api_key\\s*=|secret\\s*=|AWS_SECRET',
     severity_default: 'CRITICAL',
   },
+  {
+    id: 'container-image-signing',
+    category: 'compute',
+    description: 'Container images are signed or verified before deployment',
+    type: 'code_grep',
+    provider: 'k8s',
+    pattern: 'cosign|notary|DOCKER_CONTENT_TRUST|imagePullPolicy.*Always',
+    severity_default: 'HIGH',
+  },
 ];
 
 // ─── AWS Cloud Checks (19 checks) ──────────────────────────────
