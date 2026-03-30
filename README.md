@@ -11,23 +11,13 @@ I'm [Aanish](https://github.com/aanishs). I build [CoralEHR](https://coralehr.co
 
 We needed HIPAA compliance.
 
-What we found was an industry that treats compliance like a badge. A nice logo. A dashboard. A procurement accessory. Something to wave around as temporary emotional support.
-
-That would be fine if compliance were decorative. It is not.
-
-It matters because healthcare data is deeply personal. Because one bad workflow, one missing control, one lazy assumption can create a very real mess for very real people. And when that happens, the vendor does not spiritually absorb the consequences on your behalf. They just invoice annually.
+What we found was an industry that treats compliance like a procurement accessory. Healthcare data is deeply personal, and the vendors selling the *feeling* of compliance mostly just invoice annually.
 
 [Vanta](https://www.vanta.com/) wants $10k a year. We almost paid [Delve](https://delve.co/). They raised millions. Then [got accused of fabricating compliance evidence](https://techcrunch.com/2026/03/22/delve-accused-of-misleading-customers-with-fake-compliance/). Which is, admittedly, a bold approach to compliance.
 
-But this is not just about one company acting insane in public. It points to a bigger problem. The market got very good at selling the *feeling* of compliance. Much less good at helping teams do the work.
+So we built em-dash. Originally for CoralEHR, now open source — because "pay $10k/year" and "guess" should not be the two main options.
 
-So we built em-dash.
-
-Originally for CoralEHR. Now open source.
-
-Because "pay $10k a year" and "guess" should not be the two main options.
-
-em-dash is Claude Code plus compliance. You pick your frameworks. The AI reads the actual law, scans your infrastructure, finds gaps, drafts fixes, and produces cryptographically signed evidence. You stay in control. You can inspect everything. Nothing disappears into a black box.
+em-dash is Claude Code plus compliance. You pick your frameworks. The AI reads the actual law, scans your infrastructure, finds gaps, drafts fixes, and produces signed evidence. You stay in control. Nothing disappears into a black box.
 
 (Why "em-dash"? The em dash and "delve" are both classic AI tells. LLMs can't stop using them. The Delve scandal pushed us to ship this publicly, so the name just... worked.)
 
