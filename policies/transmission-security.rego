@@ -11,7 +11,7 @@ deny[msg] {
     sensitive_ports[resource.from_port]
     msg := {
         "msg": sprintf("Security group rule '%s' allows 0.0.0.0/0 on sensitive port %d", [name, resource.from_port]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-aws-sg-rule-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -28,7 +28,7 @@ deny[msg] {
     port <= ingress.to_port
     msg := {
         "msg": sprintf("Security group '%s' allows 0.0.0.0/0 ingress on port %d", [name, port]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-aws-sg-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -41,7 +41,7 @@ deny[msg] {
     resource.protocol != "TLS"
     msg := {
         "msg": sprintf("Load balancer listener '%s' uses protocol '%s' instead of HTTPS/TLS", [name, resource.protocol]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-aws-lb-https",
         "severity": "HIGH",
         "resource": name,
     }
@@ -65,7 +65,7 @@ deny[msg] {
     not resource.parameter_group_name
     msg := {
         "msg": sprintf("RDS instance '%s' may not enforce SSL — verify parameter group requires ssl", [name]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-aws-rds-sg-open",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -79,7 +79,7 @@ deny[msg] {
     not ip_config.require_ssl
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' does not require SSL for connections", [name]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-gcp-sql-authorized-networks",
         "severity": "HIGH",
         "resource": name,
     }
@@ -93,7 +93,7 @@ deny[msg] {
     ip_config.ipv4_enabled == true
     msg := {
         "msg": sprintf("Cloud SQL instance '%s' has public IPv4 enabled — use private IP only", [name]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-gcp-sql-public-ip",
         "severity": "HIGH",
         "resource": name,
     }
@@ -109,7 +109,7 @@ deny[msg] {
     allowed.ports[_] == sensitive_ports[_]
     msg := {
         "msg": sprintf("GCP firewall rule '%s' allows 0.0.0.0/0 on sensitive port", [name]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-gcp-firewall-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -125,7 +125,7 @@ deny[msg] {
     resource.destination_port_range == sensitive_ports[_]
     msg := {
         "msg": sprintf("Azure NSG rule '%s' allows inbound * on sensitive port %s", [name, resource.destination_port_range]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-azure-nsg-open",
         "severity": "HIGH",
         "resource": name,
     }
@@ -137,7 +137,7 @@ deny[msg] {
     not resource.https_only
     msg := {
         "msg": sprintf("Azure App Service '%s' does not enforce HTTPS-only", [name]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-azure-appservice-https",
         "severity": "HIGH",
         "resource": name,
     }
@@ -149,7 +149,7 @@ deny[msg] {
     resource.member == "allUsers"
     msg := {
         "msg": sprintf("Cloud Run IAM binding '%s' allows unauthenticated access", [name]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-gcp-cloudrun-public",
         "severity": "HIGH",
         "resource": name,
     }

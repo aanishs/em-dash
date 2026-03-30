@@ -11,7 +11,7 @@ deny[msg] {
     statement.Resource == "*"
     msg := {
         "msg": sprintf("IAM policy '%s' grants wildcard Action and Resource — violates least privilege", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-aws-iam-wildcard-action",
         "severity": "HIGH",
         "resource": name,
     }
@@ -26,7 +26,7 @@ deny[msg] {
     statement.Resource[_] == "*"
     msg := {
         "msg": sprintf("IAM policy '%s' grants wildcard Action and Resource (array form) — violates least privilege", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-aws-iam-wildcard-resource",
         "severity": "HIGH",
         "resource": name,
     }
@@ -40,7 +40,7 @@ deny[msg] {
     statement.Action == "*"
     msg := {
         "msg": sprintf("IAM role policy '%s' grants wildcard Action — violates least privilege", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-aws-iam-admin-policy",
         "severity": "HIGH",
         "resource": name,
     }
@@ -65,7 +65,7 @@ deny[msg] {
     resource.role == "roles/owner"
     msg := {
         "msg": sprintf("GCP IAM binding '%s' grants roles/owner to a service account", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-gcp-iam-primitive-role",
         "severity": "HIGH",
         "resource": name,
     }
@@ -78,7 +78,7 @@ deny[msg] {
     resource.role == "roles/editor"
     msg := {
         "msg": sprintf("GCP IAM binding '%s' grants roles/editor to a service account — use granular roles", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-gcp-iam-alluser-binding",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -92,7 +92,7 @@ deny[msg] {
     not contains(resource.scope, "/resourceGroups/")
     msg := {
         "msg": sprintf("Azure role assignment '%s' grants Contributor at subscription scope — scope down to resource group", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-azure-role-subscription-scope",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -106,7 +106,7 @@ deny[msg] {
     not contains(resource.scope, "/resourceGroups/")
     msg := {
         "msg": sprintf("Azure role assignment '%s' grants Owner at subscription scope — scope down to resource group", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-azure-role-wildcard-scope",
         "severity": "HIGH",
         "resource": name,
     }
@@ -117,7 +117,7 @@ deny[msg] {
     resource := input.resource.google_service_account_key[name]
     msg := {
         "msg": sprintf("GCP service account key '%s' exists — prefer workload identity over long-lived keys", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-gcp-sa-key-rotation",
         "severity": "MEDIUM",
         "resource": name,
     }
@@ -130,7 +130,7 @@ deny[msg] {
     resource.members[_] == public_members[_]
     msg := {
         "msg": sprintf("GCP IAM binding '%s' grants access to %s — public access to project resources", [name, resource.members[_]]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-gcp-iam-allauthenticated",
         "severity": "CRITICAL",
         "resource": name,
     }
@@ -143,7 +143,7 @@ deny[msg] {
     permission.actions[_] == "*"
     msg := {
         "msg": sprintf("Azure custom role '%s' uses wildcard actions — violates least privilege", [name]),
-        "check_id": "rego-iam-wildcard",
+        "check_id": "rego-azure-role-wildcard-actions",
         "severity": "HIGH",
         "resource": name,
     }

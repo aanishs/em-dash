@@ -32,7 +32,7 @@ and see what a real compliance scan looks like — without touching production i
 cd demo/hipaa-demo-app
 
 # Run em-dash against this project:
-/hipaa-scan
+/comply-scan
 ```
 
 em-dash will find 15+ violations across code, infrastructure, and missing policies.

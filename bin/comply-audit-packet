@@ -217,7 +217,7 @@ const summary = `<!DOCTYPE html>
     <p>This packet is cryptographically signed. To verify:</p>
     <ol>
       <li>Extract the ZIP archive</li>
-      <li>Install em-dash: <code>git clone https://github.com/user/hipaa-audit && cd hipaa-audit && ./setup</code></li>
+      <li>Install em-dash: <code>git clone https://github.com/aanishs/em-dash && cd em-dash && bun install</code></li>
       <li>Run: <code>bin/comply-verify --attestation-dir attestations/ --public-key public-key.pub</code></li>
     </ol>
     <p>Or verify manually: each attestation JSON contains a <code>signature</code> field.

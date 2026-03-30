@@ -90,11 +90,18 @@ try {
       return new Response('WebSocket upgrade failed', { status: 400 });
     }
 
-    // API: active frameworks
+    // API: active frameworks (with maturity metadata)
     if (url.pathname === '/api/frameworks' && req.method === 'GET') {
       const active = getActiveFrameworks();
       const available = ['hipaa', 'soc2', 'gdpr', 'pci-dss', 'cis', 'iso27001'];
-      return Response.json({ active, available });
+      const maturity: Record<string, string> = {};
+      for (const fw of available) {
+        try {
+          const filter = JSON.parse(fs.readFileSync(path.join(ROOT, 'nist', `${fw}-filter.json`), 'utf-8'));
+          maturity[fw] = filter.maturity || 'unknown';
+        } catch { maturity[fw] = 'unknown'; }
+      }
+      return Response.json({ active, available, maturity });
     }
 
     // API: cross-framework compliance matrix (scoped to active frameworks)

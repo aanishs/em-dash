@@ -3,6 +3,8 @@
   "name": "PCI DSS v4.0 — Payment Card Industry Data Security Standard",
   "source": "PCI SSC PCI-DSS-to-800-53 mapping",
   "version": "1.0",
+  "maturity": "community",
+  "structural_limitations": "PCI-DSS v4.0 has 300+ sub-requirements across 12 requirements. This filter maps 20 requirements to 16 NIST 800-53 controls. Requirements 5 (anti-malware), 6 (secure development), 9 (physical access), 11 (security testing), and 12 (security policies) are entirely unmapped. Quarterly ASV scans, annual pentests, and network segmentation testing are process requirements outside 800-53 scope.",
   "note": "Maps PCI DSS v4.0 requirements to NIST 800-53 controls. PCI DSS is more prescriptive than HIPAA — specific technical requirements like TLS 1.2+, AES-256, etc.",
   "mapping": {
     "1.3.1":  ["SC-7", "SC-8"],

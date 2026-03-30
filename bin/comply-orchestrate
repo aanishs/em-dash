@@ -255,7 +255,13 @@ function normalizeTool(toolName: string, data: any, scanId: string): Finding[] {
           result: (item.Status === 'PASS' || item.status === 'PASS') ? 'PASS' : 'FAIL',
           severity: item.Severity || item.severity || 'MEDIUM',
           resource: item.ResourceId || item.resource_id || '',
-          output: JSON.stringify(item).slice(0, 500),
+          output: JSON.stringify({
+            title: item.CheckTitle || item.check_title || '',
+            detail: item.StatusExtended || item.status_extended || '',
+            resource_arn: item.ResourceArn || item.resource_arn || '',
+            region: item.Region || item.region || '',
+            recommendation: (item.Recommendation?.Text || item.recommendation || ''),
+          }).slice(0, 4000),
           scan_id: scanId,
         });
       }
@@ -351,7 +357,7 @@ function normalizeTool(toolName: string, data: any, scanId: string): Finding[] {
         findings.push({
           tool: toolName, check_id: item.id || item.check_id || 'unknown', control_ids: [], cis_benchmark_refs: [],
           result: 'FINDING', severity: item.severity || 'MEDIUM',
-          resource: item.resource || '', output: JSON.stringify(item).slice(0, 300), scan_id: scanId,
+          resource: item.resource || '', output: JSON.stringify(item).slice(0, 4000), scan_id: scanId,
         });
       }
     }
@@ -378,7 +384,10 @@ function writeFindings(findings: Finding[], framework: string) {
     for (const controlId of f.control_ids) {
       const proc = spawnSync([
         'bun', dbBin, 'update-scan',
-        controlId, f.result, f.tool, f.check_id, f.output.slice(0, 200),
+        controlId, f.result, f.tool, f.check_id, f.output.slice(0, 4000),
+        '--severity', f.severity || '',
+        '--resource', f.resource || '',
+        '--scan-id', f.scan_id || '',
         '--framework', framework,
       ]);
       if (proc.exitCode === 0) written++;

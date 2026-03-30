@@ -10,7 +10,7 @@ deny[msg] {
     instruction.value == "root"
     msg := {
         "msg": "Dockerfile sets USER root — containers should not run as root",
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-docker-nonroot-user",
         "severity": "HIGH",
         "resource": "Dockerfile",
     }
@@ -24,7 +24,7 @@ deny[msg] {
     endswith(instruction.value, ":latest")
     msg := {
         "msg": sprintf("Dockerfile uses ':latest' tag in FROM '%s' — pin to a specific version", [instruction.value]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-docker-latest-tag",
         "severity": "MEDIUM",
         "resource": "Dockerfile",
     }
@@ -38,7 +38,7 @@ deny[msg] {
     startswith(instruction.value, "http")
     msg := {
         "msg": sprintf("Dockerfile uses ADD with URL '%s' — use COPY or RUN curl for transparency", [instruction.value]),
-        "check_id": "rego-no-hardcoded-secrets",
+        "check_id": "rego-docker-add-url",
         "severity": "MEDIUM",
         "resource": "Dockerfile",
     }
@@ -53,7 +53,7 @@ deny[msg] {
     instruction.value == sensitive_ports[_]
     msg := {
         "msg": sprintf("Dockerfile exposes sensitive port %s — database/SSH ports should not be exposed directly", [instruction.value]),
-        "check_id": "rego-security-group-open",
+        "check_id": "rego-docker-expose-all",
         "severity": "MEDIUM",
         "resource": "Dockerfile",
     }
@@ -66,7 +66,7 @@ deny[msg] {
     service.privileged == true
     msg := {
         "msg": sprintf("Docker Compose service '%s' runs in privileged mode", [name]),
-        "check_id": "rego-k8s-non-root",
+        "check_id": "rego-compose-readonly",
         "severity": "CRITICAL",
         "resource": name,
     }

@@ -11,20 +11,20 @@ bun test          # ~141 tests, all free, under 4 seconds
 
 ## Architecture (v3 — cross-framework)
 
-em-dash v3 ships the official NIST 800-53 catalog (1,196 controls). The LLM reads the actual law at runtime. Five framework filter files + tool bindings drive everything:
+em-dash v3 ships the official NIST 800-53 catalog (1,196 controls). The LLM reads the actual law at runtime. Six framework filter files + tool bindings drive everything:
 
 ```
 nist/
 ├── NIST_SP-800-53_rev5_catalog.json  # official NIST catalog (NEVER modify)
-├── hipaa-filter.json                  # HIPAA → 800-53 (64 controls)
-├── soc2-filter.json                   # SOC 2 → 800-53 (39 controls)
+├── hipaa-filter.json                  # HIPAA → 800-53 (59 controls)
+├── soc2-filter.json                   # SOC 2 → 800-53 (40 controls)
 ├── gdpr-filter.json                   # GDPR → 800-53 (22 controls)
 ├── pci-dss-filter.json                # PCI-DSS → 800-53 (16 controls)
 ├── cis-filter.json                    # CIS v8.1 → 800-53 (33 controls, with IG tiers)
 ├── tool-bindings.json                 # 800-53 control → verification tools (v3.0)
 └── cross-framework.ts                 # shared cross-framework matrix module
 
-frameworks/checks-registry.ts          # 60+ em-dash checks — HOW to execute (pure execution)
+frameworks/checks-registry.ts          # 68 em-dash checks — HOW to execute (pure execution)
 bin/comply-db                           # SQLite compliance database + cross-framework matrix
 bin/comply-orchestrate                  # parallel tool scanner (Prowler, Checkov, Trivy, etc.)
 skills/                                # 8 skills + 6 framework routers
