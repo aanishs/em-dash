@@ -96,6 +96,25 @@ describe('AWS encryption at rest', () => {
   });
 });
 
+// ─── AWS Backup / Disaster Recovery ─────────────────────────
+
+describe('AWS backup and disaster recovery', () => {
+  test('denies disabled backups and retention below 35 days', () => {
+    if (skipIfNoConftest()) return;
+    const results = runConftest(path.join(FIXTURES_DIR, 'bad-aws-backup.json'));
+    const failures = getFailures(results, 'compliance.backup_dr');
+    expect(failures.length).toBe(2);
+
+    const messages = failures.map(f => f.msg);
+    expect(messages.some(m => m.includes('automated backups disabled'))).toBe(true);
+    expect(messages.some(m => m.includes('should be >= 35'))).toBe(true);
+
+    const checkIds = failures.map(f => f.metadata.check_id);
+    expect(checkIds).toContain('rego-aws-rds-backup');
+    expect(checkIds).toContain('rego-aws-rds-backup-retention');
+  });
+});
+
 // ─── AWS Transmission Security ──────────────────────────────
 
 describe('AWS transmission security', () => {

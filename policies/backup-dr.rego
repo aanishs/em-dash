@@ -14,13 +14,13 @@ deny[msg] {
     }
 }
 
-# AWS — RDS backup retention must be >= 7 days
+# AWS — RDS backup retention must be >= 35 days
 deny[msg] {
     resource := input.resource.aws_db_instance[name]
     resource.backup_retention_period > 0
-    resource.backup_retention_period < 7
+    resource.backup_retention_period < 35
     msg := {
-        "msg": sprintf("RDS instance '%s' backup retention is %d days — should be >= 7", [name, resource.backup_retention_period]),
+        "msg": sprintf("RDS instance '%s' backup retention is %d days — should be >= 35", [name, resource.backup_retention_period]),
         "check_id": "rego-aws-rds-backup-retention",
         "severity": "MEDIUM",
         "resource": name,

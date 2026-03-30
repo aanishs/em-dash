@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.3.1 — Community contributions: Azure KV rotation, container signing, backup retention (2026-03-29)
+
+**Azure Key Vault rotation check.** New `azure-keyvault-rotation` cloud CLI check verifies rotation policies on Key Vault keys. Bound to SC-28 (encryption at rest). (PR #40 — @weedorflow)
+
+**Container image signing check.** New `container-image-signing` code grep check detects cosign, notary, DOCKER_CONTENT_TRUST, or strict imagePullPolicy in deployment configs. Bound to SI-7 (software integrity). (PR #39 — @weedorflow)
+
+**RDS backup retention tightened.** `rego-aws-rds-backup-retention` threshold raised from 7 → 35 days. Mapped to CP-9 (information system backup). New test fixture `bad-aws-backup.json` with regression tests. (PR #38 — @weedorflow)
+
+**158 tests** across 8 files (up from 152).
+
 ## v3.3.0 — Trust foundation: scan persistence, check accuracy, maturity labels (2026-03-27)
 
 **Scan persistence fix.** `comply-db update-scan` now accepts `--severity`, `--resource`, and `--scan-id` flags and persists them to SQLite. Output truncation raised from 200 to 4,000 chars. Prowler normalizer produces structured JSON instead of raw stringify. Auditors can now see which specific resource a finding refers to.

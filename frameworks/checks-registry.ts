@@ -220,6 +220,15 @@ const CODE_CHECKS: Check[] = [
     pattern: 'password\\s*=|api_key\\s*=|secret\\s*=|AWS_SECRET',
     severity_default: 'CRITICAL',
   },
+  {
+    id: 'container-image-signing',
+    category: 'compute',
+    description: 'Container images are signed or verified before deployment',
+    type: 'code_grep',
+    provider: 'k8s',
+    pattern: 'cosign|notary|DOCKER_CONTENT_TRUST|imagePullPolicy.*Always',
+    severity_default: 'HIGH',
+  },
 ];
 
 // ─── AWS Cloud Checks (19 checks) ──────────────────────────────
@@ -236,6 +245,7 @@ const AWS_CHECKS: Check[] = [
   { id: 'aws-s3-public-access', category: 'access_control', description: 'S3 public access block configured at account and bucket level', type: 'cloud_cli', provider: 'aws', command: 'aws s3api get-public-access-block --bucket BUCKET', severity_default: 'HIGH' },
   { id: 'aws-rds-encryption', category: 'encryption', description: 'RDS instances have storage encryption enabled', type: 'cloud_cli', provider: 'aws', command: 'aws rds describe-db-instances --query "DBInstances[*].{ID:DBInstanceIdentifier,Encrypted:StorageEncrypted}" --output json', severity_default: 'HIGH' },
   { id: 'aws-kms-rotation', category: 'encryption', description: 'KMS keys have automatic rotation enabled', type: 'cloud_cli', provider: 'aws', command: 'aws kms get-key-rotation-status --key-id KEY_ID', severity_default: 'MEDIUM' },
+  { id: 'azure-keyvault-rotation', category: 'encryption', description: 'Azure Key Vault keys have rotation policy configured', type: 'cloud_cli', provider: 'azure', command: 'az keyvault key list --vault-name VAULT --query "[].{name:name,rotationPolicy:rotationPolicy}" -o json', severity_default: 'MEDIUM' },
   { id: 'aws-security-groups', category: 'transmission', description: 'No security groups with 0.0.0.0/0 ingress on sensitive ports', type: 'cloud_cli', provider: 'aws', command: 'aws ec2 describe-security-groups --filters "Name=ip-permission.cidr,Values=0.0.0.0/0" --output json', severity_default: 'HIGH' },
   { id: 'aws-guardduty', category: 'monitoring', description: 'GuardDuty threat detection enabled', type: 'cloud_cli', provider: 'aws', command: 'aws guardduty list-detectors --output json', severity_default: 'HIGH' },
   { id: 'aws-security-hub', category: 'monitoring', description: 'Security Hub enabled for centralized findings', type: 'cloud_cli', provider: 'aws', command: 'aws securityhub describe-hub --output json', severity_default: 'MEDIUM' },
@@ -271,7 +281,7 @@ const REGO_CHECKS: Check[] = [
 
   // ── backup-dr.rego (was rego-rds-encryption / rego-s3-encryption) ──
   { id: 'rego-aws-rds-backup', category: 'data_protection', description: 'RDS instances must have automated backups enabled', type: 'rego', severity_default: 'HIGH' },
-  { id: 'rego-aws-rds-backup-retention', category: 'data_protection', description: 'RDS backup retention must be >= 7 days', type: 'rego', severity_default: 'MEDIUM' },
+  { id: 'rego-aws-rds-backup-retention', category: 'data_protection', description: 'RDS backup retention must be >= 35 days', type: 'rego', severity_default: 'MEDIUM' },
   { id: 'rego-aws-s3-versioning', category: 'data_protection', description: 'S3 buckets must have versioning enabled for data recovery', type: 'rego', severity_default: 'MEDIUM' },
   { id: 'rego-aws-dynamodb-backup', category: 'data_protection', description: 'DynamoDB tables must have point-in-time recovery enabled', type: 'rego', severity_default: 'MEDIUM' },
   { id: 'rego-aws-efs-backup', category: 'data_protection', description: 'EFS file systems must have lifecycle/backup policy configured', type: 'rego', severity_default: 'LOW' },

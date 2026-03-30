@@ -80,6 +80,21 @@ describe('Checks registry', () => {
       expect(c.command).toBeTruthy();
     }
   });
+  test('azure key vault rotation check is registered as an Azure cloud encryption check', () => {
+    const check = getCheck('azure-keyvault-rotation');
+    expect(check).toBeDefined();
+    expect(check?.type).toBe('cloud_cli');
+    expect(check?.category).toBe('encryption');
+    expect(check?.provider).toBe('azure');
+  });
+
+  test('container image signing check is registered as a code-level compute check', () => {
+    const check = getCheck('container-image-signing');
+    expect(check).toBeDefined();
+    expect(check?.type).toBe('code_grep');
+    expect(check?.category).toBe('compute');
+    expect(check?.provider).toBe('k8s');
+  });
 });
 
 describe('NIST ↔ Tool binding consistency', () => {
@@ -103,5 +118,17 @@ describe('NIST ↔ Tool binding consistency', () => {
     for (const id of Object.keys(bindings.bindings)) {
       expect(filterControls.has(id)).toBe(true);
     }
+  });
+
+  test('SC-28 includes the Azure Key Vault rotation check', () => {
+    expect(bindings.bindings['SC-28'].emdash).toContain('azure-keyvault-rotation');
+  });
+
+  test('SI-7 includes the container image signing check', () => {
+    expect(bindings.bindings['SI-7'].emdash).toContain('container-image-signing');
+  });
+
+  test('CP-9 includes the RDS backup retention check', () => {
+    expect(bindings.bindings['CP-9'].emdash).toContain('rego-aws-rds-backup-retention');
   });
 });
