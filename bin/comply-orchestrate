@@ -663,6 +663,13 @@ switch (subcommand) {
   case 'diff':
     diff();
     break;
+  case 'normalize-test': {
+    const tool = args[1];
+    const input = JSON.parse(fs.readFileSync('/dev/stdin', 'utf8'));
+    const findings = normalizeTool(tool, input, 'test-scan');
+    console.log(JSON.stringify(findings));
+    break;
+  }
   default:
     console.log('Usage: comply-orchestrate <detect|scan|diff> [--framework hipaa]');
     console.log('');

@@ -1,0 +1,24 @@
+[
+  {
+    "CheckID": "s3_bucket_default_encryption",
+    "CheckTitle": "S3 Bucket Default Encryption",
+    "Status": "PASS",
+    "Severity": "HIGH",
+    "ResourceId": "my-bucket",
+    "ResourceArn": "arn:aws:s3:::my-bucket",
+    "Region": "us-east-1",
+    "StatusExtended": "Bucket has default encryption enabled",
+    "Recommendation": { "Text": "Enable default encryption" }
+  },
+  {
+    "CheckID": "iam_user_mfa_enabled_console_access",
+    "CheckTitle": "IAM User MFA",
+    "Status": "FAIL",
+    "Severity": "CRITICAL",
+    "ResourceId": "admin-user",
+    "ResourceArn": "arn:aws:iam::123456789012:user/admin-user",
+    "Region": "global",
+    "StatusExtended": "User does not have MFA enabled",
+    "Recommendation": { "Text": "Enable MFA for all console users" }
+  }
+]

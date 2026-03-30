@@ -26,7 +26,17 @@ Dashboard fetches from SQLite APIs (`/api/compliance`, `/api/cross-framework`, `
 
 ---
 
-No open TODOs. Consider:
+## ~~P1: Grading Algorithm Specification~~ WON'T DO
+
+HIPAA has no scoring system. Compliance is per-requirement, not a letter grade. The made-up weighted formula (`100 - 25×Critical - 10×Major`) created false confidence. Removed `comply-db grade` subcommand. Kept per-control PASS/FAIL/PENDING + % complete in dashboard.
+
+## P2: Multi-Framework Audit Skills
+
+Create /soc2-audit, /gdpr-audit, /pci-dss-audit using the same 7-phase structure. `bin/comply-audit --framework <name>` handles the orchestration. Each framework needs: reverse-map logic (CFR-prefix equivalent for that framework's regulation) and framework-appropriate interview question selection. Depends on /hipaa-audit shipping first.
+
+---
+
+Consider:
 - Improve CIS AWS coverage from 71% → 90%+ (add Section 4 CloudWatch alarm checks)
 - HITRUST CSF framework filter
 - FedRAMP framework filter (NIST publishes baselines)

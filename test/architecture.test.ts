@@ -425,15 +425,15 @@ describe('Signing & Verification', () => {
 
 // ═══ Skills ═════════════════════════════════════════════════
 
-describe('Skills (12 total)', () => {
-  test('exactly 12 skill directories', () => {
+describe('Skills (13 total)', () => {
+  test('exactly 13 skill directories', () => {
     const skills = fs.readdirSync(path.join(ROOT, 'skills'))
       .filter((d: string) => fs.statSync(path.join(ROOT, 'skills', d)).isDirectory());
-    expect(skills.length).toBe(12);
+    expect(skills.length).toBe(13);
   });
 
   test('expected skills present', () => {
-    const expected = ['comply', 'comply-auto', 'comply-assess', 'comply-scan', 'comply-fix', 'comply-report', 'comply-breach', 'em-dashboard', 'hipaa', 'soc2', 'gdpr', 'pci-dss'];
+    const expected = ['comply', 'comply-auto', 'comply-assess', 'comply-scan', 'comply-fix', 'comply-report', 'comply-breach', 'em-dashboard', 'hipaa', 'hipaa-audit', 'soc2', 'gdpr', 'pci-dss'];
     const skills = fs.readdirSync(path.join(ROOT, 'skills'))
       .filter((d: string) => fs.statSync(path.join(ROOT, 'skills', d)).isDirectory());
     for (const s of expected) expect(skills).toContain(s);

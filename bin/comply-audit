@@ -1,0 +1,499 @@
+#!/usr/bin/env bun
+/**
+ * comply-audit — Interactive audit simulation orchestrator.
+ *
+ * Manages the 7-phase audit state machine. The LLM (via SKILL.md) calls
+ * individual subcommands; this binary handles data, not presentation.
+ *
+ * All SQLite operations go through comply-db (via Bun.spawn) — no direct
+ * DB access. This matches the comply-orchestrate pattern.
+ *
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │                  AUDIT PHASE FLOW                               │
+ * │                                                                 │
+ * │  start ──► phase2 ──► phase3 ──► phase4 ──► phase5 ──► phase7  │
+ * │  (scope)   (docs)    (scan)     (interview) (findings) (report) │
+ * │                                                                 │
+ * │  Phase 6 (entity response) handled via comply-db record-response│
+ * │  Resume: comply-audit resume                                    │
+ * └─────────────────────────────────────────────────────────────────┘
+ *
+ * Subcommands:
+ *   start --type <ocr-desk|customer-questionnaire|comprehensive>
+ *   phase2 --snapshot-id <N>          Document request checklist
+ *   phase3 --snapshot-id <N>          Technical verification (runs scans)
+ *   phase4 --snapshot-id <N>          Interview questions
+ *   phase5 --snapshot-id <N>          Compile findings
+ *   phase7 --snapshot-id <N>          Final report + findings + checklist
+ *   resume                            Find in-progress audit
+ *   diff --id1 <N> --id2 <N>         Compare two audit snapshots
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const args = process.argv.slice(2);
+const subcommand = args[0];
+const BIN_DIR = import.meta.dir;
+const NIST_DIR = path.join(BIN_DIR, '..', 'nist');
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function getFlag(name: string): string {
+  const idx = args.indexOf(`--${name}`);
+  if (idx === -1 || idx + 1 >= args.length) return '';
+  return args[idx + 1];
+}
+
+function runDb(...dbArgs: string[]): string {
+  const proc = Bun.spawnSync([path.join(BIN_DIR, 'comply-db'), ...dbArgs], {
+    stdout: 'pipe', stderr: 'pipe',
+  });
+  if (proc.exitCode !== 0) {
+    const err = new TextDecoder().decode(proc.stderr);
+    throw new Error(`comply-db ${dbArgs[0]} failed: ${err}`);
+  }
+  return new TextDecoder().decode(proc.stdout).trim();
+}
+
+function parseJson(output: string): any {
+  try { return JSON.parse(output); } catch { return null; }
+}
+
+function loadHipaaFilter(): any {
+  const p = path.join(NIST_DIR, 'hipaa-filter.json');
+  if (!fs.existsSync(p)) { console.error('HIPAA filter not found'); process.exit(1); }
+  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+function loadToolBindings(): any {
+  const p = path.join(NIST_DIR, 'tool-bindings.json');
+  if (!fs.existsSync(p)) { console.error('Tool bindings not found'); process.exit(1); }
+  return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+// ─── start ──────────────────────────────────────────────────
+
+function start() {
+  const auditType = getFlag('type') || 'ocr-desk';
+
+  // Create snapshot via comply-db
+  const output = runDb('audit-snapshot', 'create', '--type', auditType);
+  const snapshot = parseJson(output);
+  if (!snapshot) { console.error('Failed to create audit snapshot'); process.exit(1); }
+
+  // Build Phase 1 scope questions based on audit type
+  const questions = [
+    { id: 'company_name', question: 'What is your company name?', required: true },
+    { id: 'phi_description', question: 'Briefly describe the PHI your organization handles (e.g., patient records, lab results, insurance claims).', required: true },
+    { id: 'cloud_provider', question: 'What cloud provider(s) do you use? (e.g., AWS, GCP, Azure, on-prem)', required: true },
+  ];
+
+  if (auditType !== 'customer-questionnaire') {
+    questions.push({ id: 'employee_count', question: 'Approximately how many employees or contractors handle PHI?', required: false });
+  }
+
+  console.log(JSON.stringify({
+    snapshot_id: snapshot.snapshot_id,
+    audit_type: auditType,
+    phase: 1,
+    phase_name: 'Scope',
+    questions,
+  }));
+}
+
+// ─── phase2 — Document Request ──────────────────────────────
+
+function phase2() {
+  const snapshotId = getFlag('snapshot-id');
+  if (!snapshotId) { console.error('Usage: comply-audit phase2 --snapshot-id <N>'); process.exit(1); }
+
+  // Update phase
+  runDb('audit-snapshot', 'update', '--id', snapshotId, '--phase', '2');
+
+  // Standard OCR document request list
+  const documents = [
+    { id: 'risk_assessment', name: 'Risk Assessment', cfr: '164.308(a)(1)(ii)(A)', description: 'Current risk assessment identifying threats and vulnerabilities to ePHI' },
+    { id: 'security_policies', name: 'Security Policies & Procedures', cfr: '164.316(a)', description: 'Written policies covering all HIPAA Security Rule requirements' },
+    { id: 'incident_response', name: 'Incident Response Plan', cfr: '164.308(a)(6)', description: 'Procedures for identifying, responding to, and mitigating security incidents' },
+    { id: 'baa_inventory', name: 'Business Associate Agreements', cfr: '164.308(b)(1)', description: 'Inventory of all business associates with signed BAAs' },
+    { id: 'training_records', name: 'Workforce Training Records', cfr: '164.308(a)(5)', description: 'Evidence that all workforce members received HIPAA security training' },
+    { id: 'access_controls', name: 'Access Control Documentation', cfr: '164.312(a)(1)', description: 'Documentation of access control mechanisms for systems containing ePHI' },
+    { id: 'audit_logs', name: 'Audit Log Configuration', cfr: '164.312(b)', description: 'Evidence that audit controls record activity in systems with ePHI' },
+    { id: 'encryption_docs', name: 'Encryption Documentation', cfr: '164.312(a)(2)(iv)', description: 'Documentation of encryption methods for ePHI at rest and in transit' },
+    { id: 'contingency_plan', name: 'Contingency Plan', cfr: '164.308(a)(7)', description: 'Data backup, disaster recovery, and emergency mode operations plans' },
+    { id: 'physical_security', name: 'Physical Security Documentation', cfr: '164.310(a)(1)', description: 'Facility access controls and workstation security documentation' },
+  ];
+
+  // Check existing evidence in DB for each document type
+  const docStatus = documents.map(doc => {
+    try {
+      // Query evidence for related controls
+      const evidence = runDb('query', `SELECT COUNT(*) as cnt FROM evidence WHERE control_id IN (SELECT oscal_id FROM controls WHERE framework_refs LIKE '%${doc.cfr.replace(/[()]/g, '_')}%')`);
+      const parsed = parseJson(evidence);
+      const hasEvidence = parsed?.[0]?.cnt > 0;
+      return { ...doc, status: hasEvidence ? 'present' : 'missing' };
+    } catch {
+      return { ...doc, status: 'unknown' };
+    }
+  });
+
+  const present = docStatus.filter(d => d.status === 'present').length;
+  const missing = docStatus.filter(d => d.status !== 'present').length;
+
+  console.log(JSON.stringify({
+    snapshot_id: Number(snapshotId),
+    phase: 2,
+    phase_name: 'Document Request',
+    total_documents: documents.length,
+    present,
+    missing,
+    documents: docStatus,
+  }));
+}
+
+// ─── phase3 — Technical Verification ────────────────────────
+
+function phase3() {
+  const snapshotId = getFlag('snapshot-id');
+  if (!snapshotId) { console.error('Usage: comply-audit phase3 --snapshot-id <N>'); process.exit(1); }
+
+  runDb('audit-snapshot', 'update', '--id', snapshotId, '--phase', '3');
+
+  // Run comply-orchestrate scan and capture output
+  const scanProc = Bun.spawnSync([path.join(BIN_DIR, 'comply-orchestrate'), 'scan', '--framework', 'hipaa'], {
+    stdout: 'pipe', stderr: 'pipe', timeout: 300_000, // 5 min
+  });
+
+  const scanOutput = new TextDecoder().decode(scanProc.stdout);
+  const scanErr = new TextDecoder().decode(scanProc.stderr);
+  const timedOut = scanProc.exitCode === null;
+
+  // Gather check_results from DB grouped by HIPAA section
+  const resultsRaw = runDb('query', 'SELECT cr.control_id, cr.check_id, cr.result, cr.tool, cr.severity FROM check_results cr INNER JOIN controls c ON cr.control_id = c.oscal_id ORDER BY cr.control_id');
+  const results = parseJson(resultsRaw) || [];
+
+  // Group by HIPAA section using hipaa-sections reverse map
+  const sectionGroups: Record<string, any[]> = {};
+  const controlSections: Record<string, string> = {};
+
+  for (const r of results) {
+    if (!controlSections[r.control_id]) {
+      try {
+        const sections = parseJson(runDb('hipaa-sections', r.control_id));
+        controlSections[r.control_id] = sections?.primary_category || 'Unknown';
+      } catch {
+        controlSections[r.control_id] = 'Unknown';
+      }
+    }
+    const section = controlSections[r.control_id];
+    if (!sectionGroups[section]) sectionGroups[section] = [];
+    sectionGroups[section].push(r);
+  }
+
+  // Summary stats
+  const totalChecks = results.length;
+  const passing = results.filter((r: any) => r.result === 'PASS').length;
+  const failing = results.filter((r: any) => r.result === 'FAIL').length;
+
+  console.log(JSON.stringify({
+    snapshot_id: Number(snapshotId),
+    phase: 3,
+    phase_name: 'Technical Verification',
+    timed_out: timedOut,
+    scan_error: scanErr ? scanErr.trim().slice(0, 500) : null,
+    total_checks: totalChecks,
+    passing,
+    failing,
+    unverified: totalChecks === 0,
+    sections: sectionGroups,
+  }));
+}
+
+// ─── phase4 — Interview Questions ───────────────────────────
+
+function phase4() {
+  const snapshotId = getFlag('snapshot-id');
+  if (!snapshotId) { console.error('Usage: comply-audit phase4 --snapshot-id <N>'); process.exit(1); }
+
+  runDb('audit-snapshot', 'update', '--id', snapshotId, '--phase', '4');
+
+  const bindings = loadToolBindings();
+  const filter = loadHipaaFilter();
+
+  // Get HIPAA control IDs
+  const hipaaControls = new Set<string>();
+  for (const controls of Object.values(filter.mapping)) {
+    for (const id of controls as string[]) hipaaControls.add(id);
+  }
+
+  // Find interview-only AND hybrid controls
+  // Interview-only: controls with no automated checks (no emdash/prowler/checkov/trivy)
+  // Hybrid: controls with automated checks that also benefit from interview
+  const interviewControls: Array<{ control_id: string; type: 'interview_only' | 'hybrid' }> = [];
+  const HYBRID_CONTROLS = ['cp-2', 'ir-1', 'at-2', 'ca-2', 'pl-2', 'ra-5', 'sa-9', 'pm-10'];
+
+  for (const controlId of hipaaControls) {
+    const binding = bindings.bindings[controlId];
+    const hasAutomated = binding && (
+      (binding.emdash?.length > 0) ||
+      (binding.prowler?.length > 0) ||
+      (binding.checkov?.length > 0) ||
+      (binding.trivy?.length > 0)
+    );
+
+    if (!hasAutomated) {
+      interviewControls.push({ control_id: controlId, type: 'interview_only' });
+    } else if (HYBRID_CONTROLS.includes(controlId)) {
+      interviewControls.push({ control_id: controlId, type: 'hybrid' });
+    }
+  }
+
+  // Smart-skip: check if evidence exists and is < 30 days old
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const questions: any[] = [];
+  const skipped: string[] = [];
+
+  for (const ctrl of interviewControls) {
+    try {
+      const evidenceRaw = runDb('query', `SELECT COUNT(*) as cnt FROM evidence WHERE control_id = '${ctrl.control_id}' AND created_at > '${thirtyDaysAgo}'`);
+      const evidence = parseJson(evidenceRaw);
+      if (evidence?.[0]?.cnt > 0) {
+        skipped.push(ctrl.control_id);
+        continue;
+      }
+    } catch { /* no evidence — include the question */ }
+
+    // Get HIPAA section for grouping
+    let hipaaSection = 'Unknown';
+    try {
+      const sections = parseJson(runDb('hipaa-sections', ctrl.control_id));
+      hipaaSection = sections?.primary_category || 'Unknown';
+    } catch {}
+
+    questions.push({
+      control_id: ctrl.control_id,
+      type: ctrl.type,
+      hipaa_section: hipaaSection,
+    });
+  }
+
+  // Group by HIPAA section for the audit type's question budget
+  const snapshotRaw = runDb('audit-snapshot', 'get', snapshotId);
+  const snapshot = parseJson(snapshotRaw);
+  const auditType = snapshot?.audit_type || 'ocr-desk';
+
+  // Question budget: ocr-desk = 8 max, customer-questionnaire uses library, comprehensive = uncapped
+  let maxQuestions = auditType === 'comprehensive' ? 999 : 8;
+  const budgetedQuestions = questions.slice(0, maxQuestions);
+
+  console.log(JSON.stringify({
+    snapshot_id: Number(snapshotId),
+    phase: 4,
+    phase_name: 'Interview',
+    audit_type: auditType,
+    total_controls: interviewControls.length,
+    skipped_count: skipped.length,
+    skipped_controls: skipped,
+    questions: budgetedQuestions,
+    question_budget: maxQuestions === 999 ? 'uncapped' : maxQuestions,
+    over_budget: questions.length - budgetedQuestions.length,
+  }));
+}
+
+// ─── phase5 — Compile Findings ──────────────────────────────
+
+function phase5() {
+  const snapshotId = getFlag('snapshot-id');
+  if (!snapshotId) { console.error('Usage: comply-audit phase5 --snapshot-id <N>'); process.exit(1); }
+
+  runDb('audit-snapshot', 'update', '--id', snapshotId, '--phase', '5');
+
+  // Gather all failures from check_results
+  const failsRaw = runDb('query', `SELECT cr.control_id, cr.check_id, cr.result, cr.tool, cr.severity, cr.output FROM check_results cr WHERE cr.result = 'FAIL' ORDER BY cr.control_id`);
+  const fails = parseJson(failsRaw) || [];
+
+  // Gather interview gaps (findings already recorded by the LLM during phase 4)
+  const existingFindingsRaw = runDb('query', `SELECT * FROM audit_findings WHERE snapshot_id = ${snapshotId}`);
+  const existingFindings = parseJson(existingFindingsRaw) || [];
+
+  // Build findings from scan failures (avoiding duplicates with already-recorded findings)
+  const existingKeys = new Set(existingFindings.map((f: any) => `${f.control_id}|${f.check_id || ''}`));
+  let findingNumber = existingFindings.length;
+
+  const newFindings: any[] = [];
+  for (const fail of fails) {
+    const key = `${fail.control_id}|${fail.check_id || ''}`;
+    if (existingKeys.has(key)) continue;
+
+    findingNumber++;
+
+    // Get HIPAA section
+    let hipaaSection = 'Unknown';
+    let cfrRef = '';
+    try {
+      const sections = parseJson(runDb('hipaa-sections', fail.control_id));
+      hipaaSection = sections?.primary_category || 'Unknown';
+      cfrRef = sections?.cfr_refs?.[0] || '';
+    } catch {}
+
+    // Determine severity from check result or default
+    const severity = fail.severity || 'Minor';
+
+    // Record the finding
+    runDb('record-finding',
+      '--snapshot-id', snapshotId,
+      '--control', fail.control_id,
+      '--severity', severity,
+      '--description', `Automated check failed: ${fail.tool}:${fail.check_id}. ${fail.output || ''}`.trim(),
+      '--check-id', fail.check_id || '',
+      '--hipaa-section', hipaaSection,
+      '--cfr-ref', cfrRef,
+    );
+
+    newFindings.push({
+      finding_number: findingNumber,
+      control_id: fail.control_id,
+      check_id: fail.check_id,
+      hipaa_section: hipaaSection,
+      severity,
+      cfr_reference: cfrRef,
+    });
+  }
+
+  // Get all findings now
+  const allFindingsRaw = runDb('query', `SELECT * FROM audit_findings WHERE snapshot_id = ${snapshotId} ORDER BY finding_number`);
+  const allFindings = parseJson(allFindingsRaw) || [];
+
+  // Group by HIPAA section
+  const bySection: Record<string, any[]> = {};
+  for (const f of allFindings) {
+    const section = f.hipaa_section || 'Unknown';
+    if (!bySection[section]) bySection[section] = [];
+    bySection[section].push(f);
+  }
+
+  const counts = {
+    Critical: allFindings.filter((f: any) => f.severity === 'Critical').length,
+    Major: allFindings.filter((f: any) => f.severity === 'Major').length,
+    Minor: allFindings.filter((f: any) => f.severity === 'Minor').length,
+    Observation: allFindings.filter((f: any) => f.severity === 'Observation').length,
+  };
+
+  console.log(JSON.stringify({
+    snapshot_id: Number(snapshotId),
+    phase: 5,
+    phase_name: 'Draft Findings',
+    total_findings: allFindings.length,
+    new_from_scan: newFindings.length,
+    from_interview: existingFindings.length,
+    severity_counts: counts,
+    zero_findings: allFindings.length === 0,
+    findings_by_section: bySection,
+  }));
+}
+
+// ─── phase7 — Final Report ──────────────────────────────────
+
+function phase7() {
+  const snapshotId = getFlag('snapshot-id');
+  if (!snapshotId) { console.error('Usage: comply-audit phase7 --snapshot-id <N>'); process.exit(1); }
+
+  runDb('audit-snapshot', 'update', '--id', snapshotId, '--phase', '7');
+
+  // Get all findings with entity responses
+  const findingsRaw = runDb('query', `SELECT * FROM audit_findings WHERE snapshot_id = ${snapshotId} ORDER BY CASE severity WHEN 'Critical' THEN 1 WHEN 'Major' THEN 2 WHEN 'Minor' THEN 3 WHEN 'Observation' THEN 4 END, finding_number`);
+  const findings = parseJson(findingsRaw) || [];
+
+  // Count by severity
+  const counts: Record<string, number> = { Critical: 0, Major: 0, Minor: 0, Observation: 0 };
+  for (const f of findings) counts[f.severity] = (counts[f.severity] || 0) + 1;
+
+  // Build prioritized action checklist
+  const checklist = findings
+    .filter((f: any) => f.entity_response !== 'disputed')
+    .map((f: any) => ({
+      priority: f.severity === 'Critical' ? 'CRITICAL — Fix immediately' :
+                f.severity === 'Major' ? 'IMPORTANT — Fix within 30 days' :
+                'ADVISORY — Fix when convenient',
+      finding_number: f.finding_number,
+      control_id: f.control_id,
+      hipaa_section: f.hipaa_section,
+      description: f.description,
+      entity_response: f.entity_response,
+    }));
+
+  // Check for prior audits for delta
+  let delta = null;
+  try {
+    const snapshotsRaw = runDb('audit-snapshot', 'list');
+    const snapshots = parseJson(snapshotsRaw) || [];
+    const completed = snapshots.filter((s: any) => s.completed_at && s.id !== Number(snapshotId));
+    if (completed.length > 0) {
+      const priorId = completed[0].id;
+      const diffRaw = runDb('audit-diff', '--id1', String(priorId), '--id2', snapshotId);
+      delta = parseJson(diffRaw);
+    }
+  } catch { /* no prior audit — skip delta */ }
+
+  // Mark audit as completed
+  runDb('audit-snapshot', 'update', '--id', snapshotId, '--completed');
+
+  console.log(JSON.stringify({
+    snapshot_id: Number(snapshotId),
+    phase: 7,
+    phase_name: 'Final Report',
+    severity_counts: counts,
+    total_findings: findings.length,
+    findings,
+    action_checklist: checklist,
+    delta,
+  }));
+}
+
+// ─── resume ─────────────────────────────────────────────────
+
+function resume() {
+  const output = runDb('audit-snapshot', 'in-progress');
+  const result = parseJson(output);
+
+  if (!result?.found) {
+    console.log(JSON.stringify({ found: false, message: 'No in-progress audit found. Run comply-audit start to begin a new audit.' }));
+  } else {
+    console.log(JSON.stringify({
+      found: true,
+      snapshot_id: result.id,
+      audit_type: result.audit_type,
+      current_phase: result.current_phase,
+      created_at: result.created_at,
+    }));
+  }
+}
+
+// ─── diff ───────────────────────────────────────────────────
+
+function diff() {
+  const id1 = getFlag('id1');
+  const id2 = getFlag('id2');
+  if (!id1 || !id2) { console.error('Usage: comply-audit diff --id1 <N> --id2 <N>'); process.exit(1); }
+  // Delegate to comply-db
+  const output = runDb('audit-diff', '--id1', id1, '--id2', id2);
+  console.log(output);
+}
+
+// ─── Router ─────────────────────────────────────────────────
+
+switch (subcommand) {
+  case 'start': start(); break;
+  case 'phase2': phase2(); break;
+  case 'phase3': phase3(); break;
+  case 'phase4': phase4(); break;
+  case 'phase5': phase5(); break;
+  case 'phase7': phase7(); break;
+  case 'resume': resume(); break;
+  case 'diff': diff(); break;
+  default:
+    console.error('Usage: comply-audit <start|phase2|phase3|phase4|phase5|phase7|resume|diff>');
+    if (subcommand) console.error(`Unknown: ${subcommand}`);
+    process.exit(1);
+}

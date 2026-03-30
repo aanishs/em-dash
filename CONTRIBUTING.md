@@ -6,7 +6,7 @@
 git clone https://github.com/aanishs/em-dash.git
 cd em-dash
 bun install
-bun test          # ~141 tests, all free, under 4 seconds
+bun test          # ~197 tests, all free, under 14 seconds
 ```
 
 ## Architecture (v3 — cross-framework)
@@ -24,10 +24,11 @@ nist/
 ├── tool-bindings.json                 # 800-53 control → verification tools (v3.0)
 └── cross-framework.ts                 # shared cross-framework matrix module
 
-frameworks/checks-registry.ts          # 68 em-dash checks — HOW to execute (pure execution)
+frameworks/checks-registry.ts          # 71 em-dash checks — HOW to execute (pure execution)
 bin/comply-db                           # SQLite compliance database + cross-framework matrix
 bin/comply-orchestrate                  # parallel tool scanner (Prowler, Checkov, Trivy, etc.)
-skills/                                # 8 skills + 6 framework routers
+bin/comply-audit                        # 7-phase audit orchestrator (start, phase2-7, resume, diff)
+skills/                                # 9 skills + 6 framework routers
 policies/                              # 8 Rego/OPA policy files (AWS, GCP, Azure, K8s, Docker)
 templates/policies/                    # Policy document templates
 scripts/validate-*.ts                  # filter validation scripts
@@ -489,7 +490,7 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 ## Testing
 
 ```bash
-bun test                  # ~135 tests, free, <4s
+bun test                  # ~197 tests, free, <14s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
 ```
@@ -500,9 +501,11 @@ bun run dev:skill         # watch mode: auto-regen + validate on change
 | ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | `test/architecture.test.ts`     | ~47    | NIST catalog, all filter files, tool bindings, CIS, cross-framework matrix, SQLite DB |
 | `test/skill-validation.test.ts` | ~40    | skill templates, generated files, frontmatter, bin utilities, Rego policies |
-| `test/rego-policy.test.ts`      | ~22    | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s, Docker)           |
-| `test/framework.test.ts`        | ~10    | checks-registry validation, framework loader                                |
+| `test/rego-policy.test.ts`      | ~25    | Rego policies against IaC fixtures (AWS, GCP, Azure, K8s, Docker, backup)   |
+| `test/framework.test.ts`        | ~15    | checks-registry validation, framework loader, tool binding consistency      |
 | `test/bin-smoke.test.ts`        | ~20    | Actually executes bin utilities and validates output format                  |
+| `test/orchestrate.test.ts`      | ~19    | Normalizer functions for Prowler, Checkov, Trivy, Semgrep, kube-bench       |
+| `test/dashboard-api.test.ts`    | ~18    | HTTP endpoint tests for all dashboard API routes                            |
 | `test/touchfiles.test.ts`       | ~11    | Diff-based test selection logic (glob matching, touchfile maps)              |
 | `test/skill-e2e.test.ts`        | (stub) | E2E skill tests — gated behind EVALS=1                                      |
 
@@ -547,7 +550,7 @@ test("my new check appears in generated scan skill", () => {
 
 Before submitting:
 
-- [ ] `bun test` passes (~141 tests)
+- [ ] `bun test` passes (~197 tests)
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
 - [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)

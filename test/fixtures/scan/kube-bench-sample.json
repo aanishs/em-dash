@@ -1,0 +1,33 @@
+{
+  "Controls": [
+    {
+      "tests": [
+        {
+          "results": [
+            {
+              "test_number": "1.1.1",
+              "status": "PASS",
+              "scored": true,
+              "test_desc": "Ensure API server --anonymous-auth is false",
+              "remediation": ""
+            },
+            {
+              "test_number": "1.1.2",
+              "status": "FAIL",
+              "scored": true,
+              "test_desc": "Ensure API server --basic-auth-file is not set",
+              "remediation": "Remove --basic-auth-file argument"
+            },
+            {
+              "test_number": "1.1.3",
+              "status": "WARN",
+              "scored": false,
+              "test_desc": "Ensure insecure port is disabled",
+              "remediation": "Set --insecure-port=0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

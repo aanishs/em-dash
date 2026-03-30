@@ -17,14 +17,14 @@ nist/
 └── cross-framework.ts                 # shared cross-framework matrix module
 
 SQLite per project: ~/.em-dash/projects/{slug}/compliance.db
-  metadata (active_frameworks) → controls → evidence → check_results → signatures → compliance_baselines
+  metadata (active_frameworks) → controls → evidence → check_results → signatures → compliance_baselines → audit_snapshots → audit_findings
 ```
 
 ## Commands
 
 ```bash
 bun install          # install dependencies
-bun test             # run all tests (~141 tests)
+bun test             # run all tests (~197 tests)
 bun run build        # alias for gen:skill-docs
 bun run gen:skill-docs  # regenerate SKILL.md files from templates
 bun run dashboard    # start the compliance dashboard on localhost:3000
@@ -44,8 +44,9 @@ em-dash/
 │   ├── {hipaa,cis,iso27001}.json      # display metadata (soc2/gdpr/pci-dss need contributions)
 │   ├── schema.ts                      # TypeScript interfaces
 │   └── index.ts                       # framework loader
-├── skills/                            # 8 skills + 4 framework routers + em-dashboard
+├── skills/                            # 9 skills + 4 framework routers + em-dashboard
 │   ├── hipaa/ soc2/ gdpr/ pci-dss/ cis/ iso27001/  # framework routers
+│   ├── hipaa-audit/                    # interactive 7-phase audit simulation (OCR/questionnaire/comprehensive)
 │   ├── comply-auto/                    # autopilot: scan → fix → ask → next
 │   ├── comply-assess/                  # focused interview
 │   ├── comply-scan/                    # focused scan
@@ -53,8 +54,9 @@ em-dash/
 │   ├── comply-report/                  # report + audit packet
 │   ├── comply-breach/                  # incident response
 │   └── em-dashboard/                 # visual compliance dashboard
-├── bin/                               # 7 CLI utilities
-│   ├── comply-db                       # SQLite operations (init, status, control, cross-framework, frameworks, cis-coverage, query)
+├── bin/                               # 8 CLI utilities
+│   ├── comply-db                       # SQLite operations (init, status, control, hipaa-sections, audit-snapshot, audit-diff, query)
+│   ├── comply-audit                    # 7-phase audit orchestrator (start, phase2-7, resume, diff)
 │   ├── comply-orchestrate              # parallel tool scanner with CIS tagging
 │   ├── comply-attest                   # Ed25519 attestation signing + user-sign
 │   ├── comply-verify                   # attestation verification
@@ -83,6 +85,8 @@ em-dash/
 - **Ed25519 signed attestations** — RFC 8785 JSON canonicalization, user attestation support
 - **Adding a framework = one filter file** — same catalog, zero code changes
 - **Cross-framework matrix** — all 6 frameworks converge on 800-53, enabling cross-framework impact scoring (scoped to active frameworks)
+- **comply-audit is the orchestrator** — 7-phase state machine in code (not prompt). LLM calls per-phase subcommands, binary outputs JSON. All SQLite ops go through comply-db via Bun.spawn.
+- **No fake scoring** — HIPAA has no scoring system. Compliance is per-requirement: PASS/FAIL/PENDING. Dashboard shows % of controls complete. No letter grades.
 
 ## Adding a new framework
 

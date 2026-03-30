@@ -1,8 +1,8 @@
 # em-dash
 
-[![Tests](https://img.shields.io/badge/tests-141-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-197-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.2.0-orange)]()
+[![Version](https://img.shields.io/badge/version-3.4.0-orange)]()
 [![NIST 800-53](https://img.shields.io/badge/NIST%20800--53-1196%20controls-blue)]()
 [![Frameworks](https://img.shields.io/badge/frameworks-6%20supported-blue)]()
 [![Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-blueviolet)]()
@@ -20,10 +20,6 @@ It matters because healthcare data is deeply personal. Because one bad workflow,
 [Vanta](https://www.vanta.com/) wants $10k a year. We almost paid [Delve](https://delve.co/). They raised millions. Then [got accused of fabricating compliance evidence](https://techcrunch.com/2026/03/22/delve-accused-of-misleading-customers-with-fake-compliance/). Which is, admittedly, a bold approach to compliance.
 
 But this is not just about one company acting insane in public. It points to a bigger problem. The market got very good at selling the *feeling* of compliance. Much less good at helping teams do the work.
-
-Pay a vendor. Trust the black box. Download the PDF. Hope nobody asks a follow-up question.
-
-Meanwhile, [OCR's most common enforcement finding](https://www.hipaajournal.com/hipaa-violation-cases/) is inadequate risk analysis. So even after all the dashboards, all the checklists, all the very serious security pages, teams are still missing the part that actually matters.
 
 So we built em-dash.
 
@@ -196,25 +192,26 @@ bin/comply-db frameworks --remove cis # remove a framework
 | `/comply-assess` | Focused interview — one NIST control at a time |
 | `/comply-report` | Compliance report + Ed25519 signed audit packet |
 | `/comply-breach` | Guided incident response and breach notification |
+| `/hipaa-audit` | **Mock HIPAA audit.** 7-phase OCR simulation with findings and action checklist |
 | `/em-dashboard` | Visual compliance dashboard at localhost:3000 |
 
 ---
 
-## 68 automated checks
+## 71 automated checks
 
 ```mermaid
 pie title Check Distribution
-    "Code-level (grep)" : 29
-    "Cloud CLI (AWS)" : 20
-    "Rego policies" : 11
+    "Code-level (grep)" : 30
+    "Cloud CLI (AWS/Azure)" : 21
+    "Rego policies" : 12
     "Tool integrations" : 8
 ```
 
-**Code-level (29):** PHI detection, RBAC, audit logging, encryption, session timeout, password hashing, least privilege, secrets in config, DB security, plus 10 policy document checks that partially automate interview-only controls. No tools required.
+**Code-level (30):** PHI detection, RBAC, audit logging, encryption, session timeout, password hashing, least privilege, secrets in config, DB security, container image signing, plus 10 policy document checks that partially automate interview-only controls. No tools required.
 
-**Cloud infrastructure (20):** IAM, MFA, CloudTrail, VPC flow logs, S3/RDS/EBS/DynamoDB encryption, KMS rotation, security groups, GuardDuty, Security Hub, Config.
+**Cloud infrastructure (21):** IAM, MFA, CloudTrail, VPC flow logs, S3/RDS/EBS/DynamoDB encryption, KMS rotation, Azure Key Vault rotation, security groups, GuardDuty, Security Hub, Config.
 
-**Rego policies (11 across 8 files):** Terraform/K8s IaC validation. Multi-cloud: AWS, GCP, Azure. Encryption, access control, audit logging, transmission security, backup/DR, container security, secrets.
+**Rego policies (12 across 8 files):** Terraform/K8s IaC validation. Multi-cloud: AWS, GCP, Azure. Encryption, access control, audit logging, transmission security, backup/DR (35-day RDS retention), container security, secrets.
 
 **Tool integrations (8):** Orchestrated via `comply-orchestrate`:
 
@@ -294,6 +291,10 @@ bin/comply-orchestrate detect            # list available tools + versions
 bin/comply-orchestrate scan              # run all tools, write to SQLite
 bin/comply-orchestrate diff              # compliance drift with per-framework breakdown
 
+# Mock audit
+bin/comply-audit start --type ocr-desk   # start 7-phase audit simulation
+bin/comply-audit resume                  # resume in-progress audit
+
 # Signing
 bin/comply-attest init-keys              # generate Ed25519 keypair
 bin/comply-audit-packet --output audit.zip --redact
@@ -311,15 +312,15 @@ em-dash/
 │   ├── tool-bindings.json             # control → check mappings (v3.0)
 │   └── cross-framework.ts             # shared cross-framework matrix module
 ├── frameworks/
-│   ├── checks-registry.ts             # 68 checks (pure execution)
+│   ├── checks-registry.ts             # 71 checks (pure execution)
 │   ├── schema.ts                      # TypeScript interfaces
 │   └── {hipaa,cis,iso27001}.json      # display metadata (soc2/gdpr/pci-dss need community contributions)
 ├── policies/                          # 8 Rego policy files (multi-cloud)
-├── bin/                               # 7 CLI utilities
+├── bin/                               # 8 CLI utilities
 ├── scripts/                           # dashboard server, filter validators
 ├── dashboard/                         # visual dashboard (HTML/CSS/JS)
-├── skills/                            # 8 skills + 4 framework routers + em-dashboard
-└── test/                              # 141 tests across 8 files
+├── skills/                            # 9 skills + 6 framework routers + em-dashboard
+└── test/                              # 197 tests across 10 files
 ```
 
 **Key design decisions:**

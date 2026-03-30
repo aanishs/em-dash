@@ -1,0 +1,37 @@
+{
+  "Results": [
+    {
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2024-1234",
+          "Severity": "HIGH",
+          "PkgName": "lodash",
+          "Title": "Prototype pollution in lodash"
+        }
+      ],
+      "Misconfigurations": [
+        {
+          "ID": "AVD-AWS-0088",
+          "AVDID": "AVD-AWS-0088",
+          "Status": "FAIL",
+          "Severity": "MEDIUM",
+          "Title": "S3 bucket encryption not configured",
+          "CauseMetadata": { "Resource": "aws_s3_bucket.logs" }
+        },
+        {
+          "ID": "AVD-AWS-0086",
+          "Status": "PASS",
+          "Severity": "LOW",
+          "Title": "S3 bucket public access blocked"
+        }
+      ],
+      "Secrets": [
+        {
+          "Severity": "CRITICAL",
+          "Match": "AKIA1234567890EXAMPLE",
+          "Title": "AWS Access Key detected"
+        }
+      ]
+    }
+  ]
+}

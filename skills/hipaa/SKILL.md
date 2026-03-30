@@ -39,6 +39,7 @@ Tell the user: "HIPAA compliance initialized. [N] NIST 800-53 controls imported.
 - **Partial:** "Run `/comply-assess` for interviews or `/comply-scan` for automated checks."
 - **Failures found:** "Run `/comply-fix` to remediate."
 - **Complete:** "Run `/comply-report` to generate your signed audit packet."
+- **Want to experience a mock audit?** "Run `/hipaa-audit` — it simulates a real HHS OCR audit in 7 phases with findings and a prioritized action checklist."
 
 ## Step 3: Multiple frameworks
 

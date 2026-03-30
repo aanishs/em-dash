@@ -1,0 +1,22 @@
+{
+  "results": [
+    {
+      "check_id": "javascript.express.security.audit.xss.mustache-escape",
+      "path": "src/app.js",
+      "start": { "line": 42 },
+      "extra": {
+        "severity": "WARNING",
+        "message": "Unescaped output in template"
+      }
+    },
+    {
+      "check_id": "javascript.lang.security.detect-eval",
+      "path": "src/utils.js",
+      "start": { "line": 10 },
+      "extra": {
+        "severity": "ERROR",
+        "message": "Detected eval usage"
+      }
+    }
+  ]
+}

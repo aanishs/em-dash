@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.4.0 — HIPAA audit simulation, test coverage, drop fake grades (2026-03-29)
+
+**`/hipaa-audit` — 7-phase mock HIPAA audit.** New skill simulates a real HHS OCR audit: scope, document request, technical verification (runs comply-orchestrate scan), interview (smart-skip for controls with recent evidence), draft findings, entity response, and final report. Three modes: OCR desk audit (8-question budget), customer security questionnaire (30 curated SIG/CAIQ questions), and comprehensive (uncapped). `bin/comply-audit` orchestrates the state machine; all SQLite ops go through comply-db. Findings grouped by HIPAA section with CFR references and prioritized action checklist.
+
+**comply-orchestrate test coverage.** 19 new tests for the scanning pipeline normalizers (Prowler, Checkov, Trivy, Semgrep, kube-bench, default). Each tool's JSON output format tested with fixtures. `normalize-test` subcommand enables piping JSON fixtures through normalizeTool. Closes #37.
+
+**Dashboard API test coverage.** 18 new tests for all API endpoints. Spawns server on a random port with isolated temp DB, tests compliance queries, evidence upload/download/delete, export (CSV/HTML), scan status, and framework metadata. Closes #33.
+
+**Removed fake grading system.** HIPAA has no scoring system — compliance is per-requirement, not a letter grade. Removed `comply-db grade` subcommand and the made-up `100 - 25×Critical - 10×Major` formula. Kept honest per-control PASS/FAIL/PENDING + % complete. P1 TODO resolved as "won't do."
+
+**197 tests** across 10 files (up from 158).
+
 ## v3.3.1 — Community contributions: Azure KV rotation, container signing, backup retention (2026-03-29)
 
 **Azure Key Vault rotation check.** New `azure-keyvault-rotation` cloud CLI check verifies rotation policies on Key Vault keys. Bound to SC-28 (encryption at rest). (PR #40 — @weedorflow)

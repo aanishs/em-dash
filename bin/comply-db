@@ -14,6 +14,9 @@
  *   sign <id>                  Record user signature
  *   summary                    Overall compliance score
  *   cross-framework            Show cross-framework compliance matrix
+ *   hipaa-sections <id>        Reverse-map: NIST control → HIPAA CFR sections + category
+ *   audit-snapshot <create|update|list|get>  Manage audit snapshots
+ *   audit-diff --id1 <N> --id2 <N>          Compare two audit snapshots
  *   query <sql>                Run raw SQL (for debugging)
  */
 
@@ -196,6 +199,40 @@ function migrateSchema(db: InstanceType<typeof Database>) {
       tool_versions  TEXT
     );
   `);
+
+  // Audit simulation tables (for /hipaa-audit)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_snapshots (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      audit_type       TEXT NOT NULL,
+      current_phase    INTEGER DEFAULT 1,
+      grade            TEXT,
+      total_findings   INTEGER DEFAULT 0,
+      critical_findings INTEGER DEFAULT 0,
+      major_findings   INTEGER DEFAULT 0,
+      minor_findings   INTEGER DEFAULT 0,
+      observation_findings INTEGER DEFAULT 0,
+      created_at       TEXT DEFAULT (datetime('now')),
+      completed_at     TEXT
+    );
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_findings (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      snapshot_id      INTEGER NOT NULL REFERENCES audit_snapshots(id),
+      finding_number   INTEGER NOT NULL,
+      control_id       TEXT NOT NULL,
+      check_id         TEXT,
+      hipaa_section    TEXT,
+      severity         TEXT NOT NULL,
+      description      TEXT NOT NULL,
+      cfr_reference    TEXT,
+      entity_response  TEXT,
+      entity_response_text TEXT,
+      created_at       TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_findings_snapshot ON audit_findings(snapshot_id);`);
 }
 
 function init() {
@@ -725,6 +762,255 @@ function cisCoverage() {
   }
 }
 
+// ─── HIPAA Sections (reverse map) ────────────────────────────
+
+/**
+ * Reverse-maps a NIST control ID to HIPAA CFR sections + category.
+ *
+ * CFR prefix → HIPAA category:
+ *   164.308 → Administrative Safeguards
+ *   164.310 → Physical Safeguards
+ *   164.312 → Technical Safeguards
+ *   164.314 → Organizational Requirements
+ *   164.316 → Policies & Procedures (Documentation)
+ */
+function hipaaSections() {
+  const controlId = args[1];
+  if (!controlId) { console.error('Usage: comply-db hipaa-sections <oscal_id>'); process.exit(1); }
+
+  const filterPath = path.join(NIST_DIR, 'hipaa-filter.json');
+  if (!fs.existsSync(filterPath)) { console.error('HIPAA filter not found'); process.exit(1); }
+  const filter = JSON.parse(fs.readFileSync(filterPath, 'utf-8'));
+
+  const CFR_CATEGORIES: Record<string, string> = {
+    '164.308': 'Administrative Safeguards',
+    '164.310': 'Physical Safeguards',
+    '164.312': 'Technical Safeguards',
+    '164.314': 'Organizational Requirements',
+    '164.316': 'Policies & Procedures',
+  };
+
+  const cfrRefs: string[] = [];
+  const categories = new Set<string>();
+  const upperControlId = controlId.toUpperCase();
+
+  for (const [spec, controls] of Object.entries(filter.mapping)) {
+    if ((controls as string[]).some(c => c.toUpperCase() === upperControlId)) {
+      cfrRefs.push(spec);
+      // Derive category from CFR prefix (e.g., "164.312(a)(1)" → "164.312")
+      const prefix = spec.match(/^(\d+\.\d+)/)?.[1] || '';
+      const cat = CFR_CATEGORIES[prefix];
+      if (cat) categories.add(cat);
+    }
+  }
+
+  const result = {
+    control_id: controlId,
+    cfr_refs: cfrRefs,
+    categories: Array.from(categories),
+    primary_category: Array.from(categories)[0] || 'Unknown',
+  };
+  console.log(JSON.stringify(result));
+}
+
+// ─── Audit Snapshots ────────────────────────────────────────
+
+function auditSnapshot() {
+  const sub = args[1];
+
+  if (sub === 'create') {
+    const auditType = getFlag('type') || 'ocr-desk';
+    const validTypes = ['ocr-desk', 'customer-questionnaire', 'comprehensive'];
+    if (!validTypes.includes(auditType)) {
+      console.error(`Invalid audit type: ${auditType}. Valid: ${validTypes.join(', ')}`);
+      process.exit(1);
+    }
+
+    const db = openDb();
+    migrateSchema(db);
+    const result = db.prepare('INSERT INTO audit_snapshots (audit_type) VALUES (?)').run(auditType);
+    db.close();
+    console.log(JSON.stringify({ snapshot_id: result.lastInsertRowid, audit_type: auditType, current_phase: 1 }));
+    return;
+  }
+
+  if (sub === 'update') {
+    const id = getFlag('id');
+    if (!id) { console.error('Usage: comply-db audit-snapshot update --id <N> [--phase <N>] [--grade <G>] [--completed]'); process.exit(1); }
+
+    const db = openDb();
+    const phase = getFlag('phase');
+    const grade = getFlag('grade');
+    const completed = args.includes('--completed');
+
+    if (phase) db.prepare('UPDATE audit_snapshots SET current_phase = ? WHERE id = ?').run(Number(phase), Number(id));
+    if (grade) db.prepare('UPDATE audit_snapshots SET grade = ? WHERE id = ?').run(grade, Number(id));
+    if (completed) db.prepare('UPDATE audit_snapshots SET completed_at = datetime(\'now\') WHERE id = ?').run(Number(id));
+    db.close();
+    console.log(JSON.stringify({ updated: Number(id) }));
+    return;
+  }
+
+  if (sub === 'list') {
+    const db = openDb();
+    const snapshots = db.prepare('SELECT * FROM audit_snapshots ORDER BY created_at DESC').all();
+    db.close();
+    console.log(JSON.stringify(snapshots));
+    return;
+  }
+
+  if (sub === 'get') {
+    const id = args[2] || getFlag('id');
+    if (!id) { console.error('Usage: comply-db audit-snapshot get <id>'); process.exit(1); }
+    const db = openDb();
+    const snapshot = db.prepare('SELECT * FROM audit_snapshots WHERE id = ?').get(Number(id));
+    const findings = db.prepare('SELECT * FROM audit_findings WHERE snapshot_id = ? ORDER BY finding_number').all(Number(id));
+    db.close();
+    if (!snapshot) { console.error(`Snapshot ${id} not found`); process.exit(1); }
+    console.log(JSON.stringify({ ...(snapshot as any), findings }));
+    return;
+  }
+
+  if (sub === 'in-progress') {
+    const db = openDb();
+    const snapshot = db.prepare('SELECT * FROM audit_snapshots WHERE completed_at IS NULL ORDER BY created_at DESC LIMIT 1').get();
+    db.close();
+    if (!snapshot) {
+      console.log(JSON.stringify({ found: false }));
+    } else {
+      console.log(JSON.stringify({ found: true, ...(snapshot as any) }));
+    }
+    return;
+  }
+
+  console.error('Usage: comply-db audit-snapshot <create|update|list|get|in-progress>');
+  process.exit(1);
+}
+
+// ─── Audit Findings (record) ────────────────────────────────
+
+function recordAuditFinding() {
+  const snapshotId = getFlag('snapshot-id');
+  const controlId = getFlag('control');
+  const severity = getFlag('severity');
+  const description = getFlag('description');
+  const checkId = getFlag('check-id') || '';
+  const hipaaSection = getFlag('hipaa-section') || '';
+  const cfrRef = getFlag('cfr-ref') || '';
+
+  if (!snapshotId || !controlId || !severity || !description) {
+    console.error('Usage: comply-db record-finding --snapshot-id <N> --control <id> --severity <Critical|Major|Minor|Observation> --description "..." [--check-id X] [--hipaa-section X] [--cfr-ref X]');
+    process.exit(1);
+  }
+
+  const validSeverities = ['Critical', 'Major', 'Minor', 'Observation'];
+  if (!validSeverities.includes(severity)) {
+    console.error(`Invalid severity: ${severity}. Valid: ${validSeverities.join(', ')}`);
+    process.exit(1);
+  }
+
+  const db = openDb();
+  // Get next finding number for this snapshot
+  const max = db.prepare('SELECT MAX(finding_number) as maxn FROM audit_findings WHERE snapshot_id = ?').get(Number(snapshotId)) as any;
+  const nextNum = (max?.maxn || 0) + 1;
+
+  db.prepare('INSERT INTO audit_findings (snapshot_id, finding_number, control_id, check_id, hipaa_section, severity, description, cfr_reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
+    Number(snapshotId), nextNum, controlId, checkId, hipaaSection, severity, description, cfrRef,
+  );
+  db.close();
+  console.log(JSON.stringify({ finding_number: nextNum, snapshot_id: Number(snapshotId), control_id: controlId, severity }));
+}
+
+// ─── Audit Finding Response ─────────────────────────────────
+
+function recordFindingResponse() {
+  const snapshotId = getFlag('snapshot-id');
+  const findingNum = getFlag('finding');
+  const response = getFlag('response');
+  const responseText = getFlag('response-text') || '';
+
+  if (!snapshotId || !findingNum || !response) {
+    console.error('Usage: comply-db record-response --snapshot-id <N> --finding <num> --response <accepted|compensating|disputed> [--response-text "..."]');
+    process.exit(1);
+  }
+
+  const validResponses = ['accepted', 'compensating', 'disputed'];
+  if (!validResponses.includes(response)) {
+    console.error(`Invalid response: ${response}. Valid: ${validResponses.join(', ')}`);
+    process.exit(1);
+  }
+
+  const db = openDb();
+  const result = db.prepare('UPDATE audit_findings SET entity_response = ?, entity_response_text = ? WHERE snapshot_id = ? AND finding_number = ?').run(
+    response, responseText, Number(snapshotId), Number(findingNum),
+  );
+  db.close();
+
+  if (result.changes === 0) {
+    console.error(`Finding #${findingNum} not found in snapshot ${snapshotId}`);
+    process.exit(1);
+  }
+  console.log(JSON.stringify({ updated: true, snapshot_id: Number(snapshotId), finding_number: Number(findingNum), response }));
+}
+
+// ─── Audit Diff ─────────────────────────────────────────────
+
+function auditDiff() {
+  const id1 = getFlag('id1');
+  const id2 = getFlag('id2');
+  if (!id1 || !id2) { console.error('Usage: comply-db audit-diff --id1 <N> --id2 <N>'); process.exit(1); }
+
+  const db = openDb();
+  const snap1 = db.prepare('SELECT * FROM audit_snapshots WHERE id = ?').get(Number(id1)) as any;
+  const snap2 = db.prepare('SELECT * FROM audit_snapshots WHERE id = ?').get(Number(id2)) as any;
+  if (!snap1) { console.error(`Snapshot ${id1} not found`); db.close(); process.exit(1); }
+  if (!snap2) { console.error(`Snapshot ${id2} not found`); db.close(); process.exit(1); }
+
+  if (snap1.audit_type !== snap2.audit_type) {
+    console.error(`WARNING: Comparing different audit types (${snap1.audit_type} vs ${snap2.audit_type})`);
+  }
+
+  const findings1 = db.prepare('SELECT * FROM audit_findings WHERE snapshot_id = ?').all(Number(id1)) as any[];
+  const findings2 = db.prepare('SELECT * FROM audit_findings WHERE snapshot_id = ?').all(Number(id2)) as any[];
+  db.close();
+
+  // Build composite keys for matching: control_id + check_id + hipaa_section
+  const key = (f: any) => `${f.control_id}|${f.check_id || ''}|${f.hipaa_section || ''}`;
+  const map1 = new Map(findings1.map(f => [key(f), f]));
+  const map2 = new Map(findings2.map(f => [key(f), f]));
+
+  const resolved: any[] = [];   // in snap1 but not snap2
+  const newFindings: any[] = []; // in snap2 but not snap1
+  const changedSeverity: any[] = [];
+  const unchanged: any[] = [];
+
+  for (const [k, f1] of map1) {
+    const f2 = map2.get(k);
+    if (!f2) {
+      resolved.push(f1);
+    } else if (f1.severity !== f2.severity) {
+      changedSeverity.push({ control_id: f1.control_id, old_severity: f1.severity, new_severity: f2.severity });
+    } else {
+      unchanged.push(f1);
+    }
+  }
+  for (const [k, f2] of map2) {
+    if (!map1.has(k)) newFindings.push(f2);
+  }
+
+  const result = {
+    snapshot_old: { id: Number(id1), grade: snap1.grade, audit_type: snap1.audit_type, created_at: snap1.created_at },
+    snapshot_new: { id: Number(id2), grade: snap2.grade, audit_type: snap2.audit_type, created_at: snap2.created_at },
+    resolved: resolved.length,
+    new_findings: newFindings.length,
+    changed_severity: changedSeverity.length,
+    unchanged: unchanged.length,
+    grade_delta: `${snap1.grade || '?'} → ${snap2.grade || '?'}`,
+    details: { resolved, new_findings: newFindings, changed_severity: changedSeverity },
+  };
+  console.log(JSON.stringify(result));
+}
+
 // ─── Router ─────────────────────────────────────────────────
 
 switch (subcommand) {
@@ -738,9 +1024,14 @@ switch (subcommand) {
   case 'cross-framework': crossFramework(); break;
   case 'frameworks': frameworks(); break;
   case 'cis-coverage': cisCoverage(); break;
+  case 'hipaa-sections': hipaaSections(); break;
+  case 'audit-snapshot': auditSnapshot(); break;
+  case 'record-finding': recordAuditFinding(); break;
+  case 'record-response': recordFindingResponse(); break;
+  case 'audit-diff': auditDiff(); break;
   case 'query': rawQuery(); break;
   default:
-    console.error('Usage: comply-db <init|status|control|update-scan|summary|cross-framework|frameworks|cis-coverage|query>');
+    console.error('Usage: comply-db <init|status|control|update-scan|summary|cross-framework|frameworks|hipaa-sections|audit-snapshot|record-finding|record-response|audit-diff|cis-coverage|query>');
     if (subcommand) console.error(`Unknown: ${subcommand}`);
     process.exit(1);
 }
