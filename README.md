@@ -11,7 +11,7 @@ I'm [Aanish](https://github.com/aanishs). I build [CoralEHR](https://coralehr.co
 
 We needed HIPAA compliance.
 
-What we found was an industry that treats compliance like a procurement accessory. Healthcare data is deeply personal, and the vendors selling the *feeling* of compliance mostly just invoice annually.
+What we found was an industry that treats compliance like a procurement accessory.
 
 [Vanta](https://www.vanta.com/) wants $10k a year. We almost paid [Delve](https://delve.co/). They raised millions. Then [got accused of fabricating compliance evidence](https://techcrunch.com/2026/03/22/delve-accused-of-misleading-customers-with-fake-compliance/). Which is, admittedly, a bold approach to compliance.
 
