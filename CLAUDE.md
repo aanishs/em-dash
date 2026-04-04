@@ -99,3 +99,11 @@ em-dash/
 
 1. Add to `frameworks/checks-registry.ts` (id, type, command/pattern)
 2. Add check ID to relevant control in `nist/tool-bindings.json`
+
+## Health Stack
+
+- typecheck: tsc --noEmit
+- lint: biome check .
+- test: bun test
+- deadcode: knip
+- shell: N/A (no .sh files, bin scripts are Bun TypeScript)

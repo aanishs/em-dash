@@ -1,20 +1,20 @@
 {
-  "results": {
-    "passed_checks": [
-      {
-        "check_id": "CKV_AWS_19",
-        "resource": "aws_s3_bucket.data",
-        "check_result": { "result": "PASSED" }
-      }
-    ],
-    "failed_checks": [
-      {
-        "check_id": "CKV_AWS_16",
-        "resource": "aws_db_instance.main",
-        "severity": "HIGH",
-        "check_result": { "result": "FAILED" },
-        "guideline": "Ensure RDS encryption is enabled"
-      }
-    ]
-  }
+	"results": {
+		"passed_checks": [
+			{
+				"check_id": "CKV_AWS_19",
+				"resource": "aws_s3_bucket.data",
+				"check_result": { "result": "PASSED" }
+			}
+		],
+		"failed_checks": [
+			{
+				"check_id": "CKV_AWS_16",
+				"resource": "aws_db_instance.main",
+				"severity": "HIGH",
+				"check_result": { "result": "FAILED" },
+				"guideline": "Ensure RDS encryption is enabled"
+			}
+		]
+	}
 }

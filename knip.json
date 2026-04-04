@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["frameworks/index.ts", "nist/cross-framework.ts", "scripts/*.ts"],
+  "project": ["frameworks/**/*.ts", "nist/**/*.ts", "scripts/**/*.ts"],
+  "ignore": ["demo/**", "test/**", "bin/**"],
+  "ignoreDependencies": ["bun-types"],
+  "bun": false
+}

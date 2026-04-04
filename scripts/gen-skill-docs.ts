@@ -8,47 +8,53 @@
  * Supports --dry-run: generate to memory, exit 1 if different from committed file.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import type { FrameworkDefinition } from '../frameworks/schema';
+import * as fs from "node:fs";
+import * as path from "node:path";
+import type { FrameworkDefinition } from "../frameworks/schema";
 
-const ROOT = path.resolve(import.meta.dir, '..');
-const DRY_RUN = process.argv.includes('--dry-run');
+const ROOT = path.resolve(import.meta.dir, "..");
+const DRY_RUN = process.argv.includes("--dry-run");
 
 // ─── Framework Loading ──────────────────────────────────────
 
 function loadFrameworkForSkill(skillName: string): FrameworkDefinition | null {
-  // Extract framework ID from skill name (e.g., "hipaa-scan" → "hipaa", "soc2-assess" → "soc2")
-  const match = skillName.match(/^([a-z0-9]+)-(?:assess|scan|remediate|report|monitor|breach|vendor|risk)$/);
-  const frameworkId = match ? match[1] : (skillName === 'hipaa' || skillName === 'soc2' ? skillName : null);
-  if (!frameworkId) return null;
+	// Extract framework ID from skill name (e.g., "hipaa-scan" → "hipaa", "soc2-assess" → "soc2")
+	const match = skillName.match(
+		/^([a-z0-9]+)-(?:assess|scan|remediate|report|monitor|breach|vendor|risk)$/,
+	);
+	const frameworkId = match
+		? match[1]
+		: skillName === "hipaa" || skillName === "soc2"
+			? skillName
+			: null;
+	if (!frameworkId) return null;
 
-  const defPath = path.join(ROOT, 'frameworks', `${frameworkId}.json`);
-  if (!fs.existsSync(defPath)) return null;
+	const defPath = path.join(ROOT, "frameworks", `${frameworkId}.json`);
+	if (!fs.existsSync(defPath)) return null;
 
-  try {
-    return JSON.parse(fs.readFileSync(defPath, 'utf-8'));
-  } catch {
-    return null;
-  }
+	try {
+		return JSON.parse(fs.readFileSync(defPath, "utf-8"));
+	} catch {
+		return null;
+	}
 }
 
 // ─── Placeholder Resolvers ──────────────────────────────────
 
 interface TemplateContext {
-  skillName: string;
-  tmplPath: string;
-  binDir: string;
-  localBinDir: string;
-  policyDir: string;
-  localPolicyDir: string;
-  framework: FrameworkDefinition | null;
+	skillName: string;
+	tmplPath: string;
+	binDir: string;
+	localBinDir: string;
+	policyDir: string;
+	localPolicyDir: string;
+	framework: FrameworkDefinition | null;
 }
 
 // ─── Composed Preamble Sections ─────────────────────────────
 
 function generatePreambleBash(ctx: TemplateContext): string {
-  return `## Preamble (run first)
+	return `## Preamble (run first)
 
 \`\`\`bash
 mkdir -p ~/.em-dash/sessions
@@ -73,7 +79,7 @@ _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinD
 }
 
 function generateUpdateCheck(_ctx: TemplateContext): string {
-  return `## Update Check
+	return `## Update Check
 
 If the preamble printed \`UPGRADE_AVAILABLE <current> <latest>\`, inform the user:
 
@@ -84,12 +90,12 @@ If \`JUST_UPGRADED\` was printed, note it and continue. Otherwise, skip this sec
 }
 
 function generateDisclaimerSection(ctx: TemplateContext): string {
-  if (ctx.framework?.disclaimer) {
-    return `## DISCLAIMER — Not Legal Advice
+	if (ctx.framework?.disclaimer) {
+		return `## DISCLAIMER — Not Legal Advice
 
 > **IMPORTANT:** ${ctx.framework.disclaimer}`;
-  }
-  return `## DISCLAIMER — Not Legal Advice
+	}
+	return `## DISCLAIMER — Not Legal Advice
 
 > **IMPORTANT:** This tool provides technical guidance for implementing compliance
 > controls. It is NOT legal advice and does not constitute certification. Compliance
@@ -100,8 +106,8 @@ function generateDisclaimerSection(ctx: TemplateContext): string {
 }
 
 function generateAskUserFormat(ctx: TemplateContext): string {
-  const fwName = ctx.framework?.name ?? 'compliance';
-  return `## AskUserQuestion Format
+	const fwName = ctx.framework?.name ?? "compliance";
+	return `## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch, and the current compliance phase (e.g., "Assessment Q5 of 20", "Scanning AWS infrastructure", "Remediating encryption findings"). (1-2 sentences)
@@ -113,7 +119,7 @@ When an option involves effort, show both scales: \`(human: ~X / CC: ~Y)\``;
 }
 
 function generateComplianceCompleteness(): string {
-  return `## Compliance Completeness Principle
+	return `## Compliance Completeness Principle
 
 **In compliance, shortcuts create audit gaps.**
 
@@ -136,7 +142,7 @@ complete thing. Every time. Compliance is not the place for "good enough."`;
 }
 
 function generateContributorMode(): string {
-  return `## Contributor Mode
+	return `## Contributor Mode
 
 If this skill is running from a development checkout (symlink at \`.claude/skills/em-dash\`
 pointing to a working directory), you are in **contributor mode**. Be aware that:
@@ -146,7 +152,7 @@ pointing to a working directory), you are in **contributor mode**. Be aware that
 }
 
 function generateCompletionStatus(): string {
-  return `## Completion Status Protocol
+	return `## Completion Status Protocol
 
 When the skill completes, report one of:
 - **DONE** — All phases completed successfully. Compliance status reported.
@@ -156,7 +162,7 @@ When the skill completes, report one of:
 }
 
 function generateEvidenceSection(ctx: TemplateContext): string {
-  return `## Evidence Collection
+	return `## Evidence Collection
 
 When collecting evidence, always:
 1. Write raw tool output to \`~/.em-dash/projects/$SLUG/evidence/{phase}-{datetime}/\`
@@ -165,7 +171,7 @@ When collecting evidence, always:
 }
 
 function generateReviewLogging(ctx: TemplateContext): string {
-  return `## Review Logging
+	return `## Review Logging
 
 After completing a skill, log the outcome:
 \`\`\`bash
@@ -175,9 +181,9 @@ _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinD
 }
 
 function generateDashboardSync(ctx: TemplateContext): string {
-  const skillKey = ctx.skillName.replace(/^hipaa-/, '');
+	const skillKey = ctx.skillName.replace(/^hipaa-/, "");
 
-  return `## Dashboard Sync
+	return `## Dashboard Sync
 
 After logging the review, if \`.em-dash/dashboard.json\` exists in the project root, update the skill status:
 
@@ -211,22 +217,22 @@ fi
 // ─── Composed Preamble ──────────────────────────────────────
 
 function generatePreamble(ctx: TemplateContext): string {
-  return [
-    generatePreambleBash(ctx),
-    generateUpdateCheck(ctx),
-    generateDisclaimerSection(ctx),
-    generateAskUserFormat(ctx),
-    generateComplianceCompleteness(),
-    generateContributorMode(),
-    generateCompletionStatus(),
-    generateEvidenceSection(ctx),
-    generateReviewLogging(ctx),
-    generateDashboardSync(ctx),
-  ].join('\n\n');
+	return [
+		generatePreambleBash(ctx),
+		generateUpdateCheck(ctx),
+		generateDisclaimerSection(ctx),
+		generateAskUserFormat(ctx),
+		generateComplianceCompleteness(),
+		generateContributorMode(),
+		generateCompletionStatus(),
+		generateEvidenceSection(ctx),
+		generateReviewLogging(ctx),
+		generateDashboardSync(ctx),
+	].join("\n\n");
 }
 
 function generateComplianceDashboard(ctx: TemplateContext): string {
-  return `## Compliance Dashboard
+	return `## Compliance Dashboard
 
 Display the current compliance status by running:
 \`\`\`bash
@@ -242,7 +248,7 @@ Recommended: Start with /comply-assess for an organizational assessment.
 }
 
 function generateToolDetection(ctx: TemplateContext): string {
-  return `## Tool Detection
+	return `## Tool Detection
 
 Run tool detection to understand what's available:
 \`\`\`bash
@@ -264,8 +270,10 @@ _EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinD
 }
 
 function generatePhiPatterns(ctx: TemplateContext): string {
-  const dataType = ctx.framework?.terminology?.sensitive_data ?? 'Protected Health Information (PHI)';
-  return `## Sensitive Data Detection Patterns
+	const dataType =
+		ctx.framework?.terminology?.sensitive_data ??
+		"Protected Health Information (PHI)";
+	return `## Sensitive Data Detection Patterns
 
 Scan the codebase for potential ${dataType} exposure using these patterns. Exclude \`node_modules/\`, \`vendor/\`, \`.git/\`, and test fixture directories with obviously mock data.
 
@@ -448,7 +456,7 @@ grep -rn "\\(app\\.use.*err\\|process\\.on.*uncaught\\|window\\.onerror\\|addEve
 grep -rn '"\\*"' --include="*.json" --include="*.tf" --include="*.yaml" --include="*.yml" --exclude-dir=node_modules . | grep -i "\\(action\\|resource\\|Effect.*Allow\\)" | head -10
 
 # Check Terraform/IaC for wildcard permissions
-grep -rn "\\(actions.*=.*\\[\"\\*\"\\]\\|resources.*=.*\\[\"\\*\"\\]\\|policy.*\\*\\)" --include="*.tf" --exclude-dir=node_modules . | head -10
+grep -rn "\\(actions.*=.*\\["\\*"\\]\\|resources.*=.*\\["\\*"\\]\\|policy.*\\*\\)" --include="*.tf" --exclude-dir=node_modules . | head -10
 
 # Check for hardcoded admin/root credentials
 grep -rn "\\(admin.*password\\|root.*password\\|master.*password\\|ADMIN_PASS\\|ROOT_PASS\\|DB_PASSWORD.*=\\)" --include="*.env*" --include="*.ts" --include="*.js" --include="*.py" --include="*.yml" --include="*.yaml" --exclude-dir=node_modules . | head -10
@@ -550,7 +558,7 @@ For each finding, classify severity:
 }
 
 function generateEvidenceCollection(ctx: TemplateContext): string {
-  return `## Evidence Collection Protocol
+	return `## Evidence Collection Protocol
 
 For each finding that is remediated, collect evidence:
 
@@ -578,7 +586,7 @@ echo '{"evidence_id":"EVD-'$(date +%s)'","phase":"'\${_PHASE}'","path":"'$_EVIDE
 }
 
 function generateAwsChecks(_ctx: TemplateContext): string {
-  return `#### 2A.1: IAM & Access Control (164.312(a)(1), 164.312(d))
+	return `#### 2A.1: IAM & Access Control (164.312(a)(1), 164.312(d))
 
 \`\`\`bash
 # Password policy — length, complexity, rotation
@@ -914,7 +922,7 @@ If \`TOOL_PROWLER=false\`, run ALL checks above as the primary scan.
 }
 
 function generateGcpChecks(_ctx: TemplateContext): string {
-  return `#### 2B.1: Cloud SQL (164.312(a)(2)(iv), 164.312(e)(1))
+	return `#### 2B.1: Cloud SQL (164.312(a)(2)(iv), 164.312(e)(1))
 
 \`\`\`bash
 # Cloud SQL instances — SSL, backups, flags, public IP
@@ -1135,7 +1143,7 @@ Flag secrets without rotation configured.
 }
 
 function generateAzureChecks(_ctx: TemplateContext): string {
-  return `#### 2C.1: Storage (164.312(a)(2)(iv))
+	return `#### 2C.1: Storage (164.312(a)(2)(iv))
 
 \`\`\`bash
 # Storage accounts — encryption, HTTPS-only, minimum TLS version
@@ -1315,7 +1323,7 @@ Flag: no backup policies (HIGH), retention < 30 days (MEDIUM).
 }
 
 function generateIacPolicyEngine(ctx: TemplateContext): string {
-  return `**IaC Detection (expanded):**
+	return `**IaC Detection (expanded):**
 
 Detect all Infrastructure-as-Code formats present in the project:
 
@@ -1426,14 +1434,14 @@ Report which tools ran and their findings:
 }
 
 function generateDashboardUpdates(ctx: TemplateContext): string {
-  const binDetect = `_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})`;
+	const _binDetect = `_EMDASH_BIN=$([ -d ${ctx.binDir} ] && echo ${ctx.binDir} || echo ${ctx.localBinDir})`;
 
-  const updateUsage = `**How to update the dashboard:**
+	const updateUsage = `**How to update the dashboard:**
 
 Update the compliance dashboard via \`PUT /api/dashboard\` or the dashboard UI. The API accepts JSON payloads for checklist updates, findings, vendor tracking, and risk management.`;
 
-  const maps: Record<string, string> = {
-    'hipaa-assess': `## Dashboard Checklist Updates
+	const maps: Record<string, string> = {
+		"hipaa-assess": `## Dashboard Checklist Updates
 
 As you conduct the interview, update the dashboard after each meaningful answer. Use your judgment — the user's answer tells you whether a control is genuinely in place or just aspirational.
 
@@ -1470,7 +1478,7 @@ For vendors without BAAs, also create evidence gaps via \`PUT /api/dashboard\` o
 
 ${updateUsage}`,
 
-    'hipaa-scan': `## Dashboard Updates
+		"hipaa-scan": `## Dashboard Updates
 
 As you complete each scan check, update the dashboard based on your **interpretation** of the results. A grep match does NOT automatically mean a control is in place — you must read the code and understand whether the control is real.
 
@@ -1532,7 +1540,7 @@ If you detect AWS/GCP/Azure in use (from CLI checks or code imports), add as ven
 
 ${updateUsage}`,
 
-    'hipaa-remediate': `## Dashboard Updates
+		"hipaa-remediate": `## Dashboard Updates
 
 As you generate policy documents and apply code fixes, update the dashboard. Policy generation is straightforward — if you wrote the document, the control is documented. Code fixes require judgment — verify the fix actually addresses the finding.
 
@@ -1569,7 +1577,7 @@ After each successful remediation, resolve the corresponding finding via \`PUT /
 
 ${updateUsage}`,
 
-    'hipaa-report': `## Dashboard Updates
+		"hipaa-report": `## Dashboard Updates
 
 After generating reports, update the documentation and evaluation checklist items.
 
@@ -1584,7 +1592,7 @@ After generating reports, update the documentation and evaluation checklist item
 
 ${updateUsage}`,
 
-    'hipaa-monitor': `## Dashboard Checklist Updates
+		"hipaa-monitor": `## Dashboard Checklist Updates
 
 Monitor is unique — it can both **complete** and **un-check** items. If a control has drifted (code removed, config changed, permission widened), downgrade it back to pending with a gap.
 
@@ -1605,7 +1613,7 @@ Monitor is unique — it can both **complete** and **un-check** items. If a cont
 
 ${updateUsage}`,
 
-    'hipaa-breach': `## Dashboard Checklist Updates
+		"hipaa-breach": `## Dashboard Checklist Updates
 
 After documenting the breach response, update incident-related items based on how the response actually went.
 
@@ -1621,11 +1629,11 @@ After documenting the breach response, update incident-related items based on ho
 | Response revealed gaps in procedures | 164.308(a)(6)(i) | Downgrade to pending if procedures failed |
 
 ${updateUsage}`,
-  };
+	};
 
-  // ─── New skills ──────────────────────────────────────────
+	// ─── New skills ──────────────────────────────────────────
 
-  maps['hipaa-vendor'] = `## Dashboard Updates
+	maps["hipaa-vendor"] = `## Dashboard Updates
 
 As you discover vendors and confirm BAA status, update the dashboard in real time.
 
@@ -1642,7 +1650,7 @@ Update BAA gap status via \`PUT /api/dashboard\` or the dashboard UI.
 
 ${updateUsage}`;
 
-  maps['hipaa-risk'] = `## Dashboard Updates
+	maps["hipaa-risk"] = `## Dashboard Updates
 
 As you identify and score risks with the user, update the dashboard in real time.
 
@@ -1658,7 +1666,7 @@ Update checklist items 164.308(a)(1)(ii)(A) and 164.308(a)(1)(ii)(B) via \`PUT /
 
 ${updateUsage}`;
 
-  return maps[ctx.skillName] || '';
+	return maps[ctx.skillName] || "";
 }
 
 // ─── Resolver Registry ──────────────────────────────────────
@@ -1666,107 +1674,122 @@ ${updateUsage}`;
 type Resolver = (ctx: TemplateContext) => string;
 
 const RESOLVERS: Record<string, Resolver> = {
-  PREAMBLE: generatePreamble,
-  COMPLIANCE_DASHBOARD: generateComplianceDashboard,
-  TOOL_DETECTION: generateToolDetection,
-  PHI_PATTERNS: generatePhiPatterns,
-  EVIDENCE_COLLECTION: generateEvidenceCollection,
-  AWS_CHECKS: generateAwsChecks,
-  GCP_CHECKS: generateGcpChecks,
-  AZURE_CHECKS: generateAzureChecks,
-  IAC_POLICY_ENGINE: generateIacPolicyEngine,
-  DASHBOARD_UPDATES: generateDashboardUpdates,
+	PREAMBLE: generatePreamble,
+	COMPLIANCE_DASHBOARD: generateComplianceDashboard,
+	TOOL_DETECTION: generateToolDetection,
+	PHI_PATTERNS: generatePhiPatterns,
+	EVIDENCE_COLLECTION: generateEvidenceCollection,
+	AWS_CHECKS: generateAwsChecks,
+	GCP_CHECKS: generateGcpChecks,
+	AZURE_CHECKS: generateAzureChecks,
+	IAC_POLICY_ENGINE: generateIacPolicyEngine,
+	DASHBOARD_UPDATES: generateDashboardUpdates,
 };
 
 // ─── Template Processing ────────────────────────────────────
 
 const GENERATED_HEADER = `<!-- AUTO-GENERATED from {{SOURCE}} — do not edit directly -->\n<!-- Regenerate: bun run gen:skill-docs -->\n`;
 
-function processTemplate(tmplPath: string): { outputPath: string; content: string } {
-  const tmplContent = fs.readFileSync(tmplPath, 'utf-8');
-  const relTmplPath = path.relative(ROOT, tmplPath);
-  const outputPath = tmplPath.replace(/\.tmpl$/, '');
+function processTemplate(tmplPath: string): {
+	outputPath: string;
+	content: string;
+} {
+	const tmplContent = fs.readFileSync(tmplPath, "utf-8");
+	const relTmplPath = path.relative(ROOT, tmplPath);
+	const outputPath = tmplPath.replace(/\.tmpl$/, "");
 
-  // Extract skill name from frontmatter
-  const nameMatch = tmplContent.match(/^name:\s*(.+)$/m);
-  const skillName = nameMatch ? nameMatch[1].trim() : path.basename(path.dirname(tmplPath));
+	// Extract skill name from frontmatter
+	const nameMatch = tmplContent.match(/^name:\s*(.+)$/m);
+	const skillName = nameMatch
+		? nameMatch[1].trim()
+		: path.basename(path.dirname(tmplPath));
 
-  const framework = loadFrameworkForSkill(skillName);
+	const framework = loadFrameworkForSkill(skillName);
 
-  const ctx: TemplateContext = {
-    skillName,
-    tmplPath,
-    binDir: '~/.claude/skills/em-dash/bin',
-    localBinDir: '.claude/skills/em-dash/bin',
-    policyDir: '~/.claude/skills/em-dash/policies',
-    localPolicyDir: '.claude/skills/em-dash/policies',
-    framework,
-  };
+	const ctx: TemplateContext = {
+		skillName,
+		tmplPath,
+		binDir: "~/.claude/skills/em-dash/bin",
+		localBinDir: ".claude/skills/em-dash/bin",
+		policyDir: "~/.claude/skills/em-dash/policies",
+		localPolicyDir: ".claude/skills/em-dash/policies",
+		framework,
+	};
 
-  // Replace placeholders
-  let content = tmplContent.replace(/\{\{(\w+)\}\}/g, (match, name) => {
-    const resolver = RESOLVERS[name];
-    if (!resolver) throw new Error(`Unknown placeholder {{${name}}} in ${relTmplPath}`);
-    return resolver(ctx);
-  });
+	// Replace placeholders
+	let content = tmplContent.replace(/\{\{(\w+)\}\}/g, (_match, name) => {
+		const resolver = RESOLVERS[name];
+		if (!resolver)
+			throw new Error(`Unknown placeholder {{${name}}} in ${relTmplPath}`);
+		return resolver(ctx);
+	});
 
-  // Check for unresolved placeholders
-  const remaining = content.match(/\{\{(\w+)\}\}/g);
-  if (remaining) {
-    throw new Error(`Unresolved placeholders in ${relTmplPath}: ${remaining.join(', ')}`);
-  }
+	// Check for unresolved placeholders
+	const remaining = content.match(/\{\{(\w+)\}\}/g);
+	if (remaining) {
+		throw new Error(
+			`Unresolved placeholders in ${relTmplPath}: ${remaining.join(", ")}`,
+		);
+	}
 
-  // Prepend generated header (after frontmatter)
-  const header = GENERATED_HEADER.replace('{{SOURCE}}', path.basename(tmplPath));
-  const fmStart = content.indexOf('---');
-  const fmEnd = content.indexOf('---', fmStart + 3);
-  if (fmEnd !== -1) {
-    const insertAt = content.indexOf('\n', fmEnd) + 1;
-    content = content.slice(0, insertAt) + header + content.slice(insertAt);
-  } else {
-    content = header + content;
-  }
+	// Prepend generated header (after frontmatter)
+	const header = GENERATED_HEADER.replace(
+		"{{SOURCE}}",
+		path.basename(tmplPath),
+	);
+	const fmStart = content.indexOf("---");
+	const fmEnd = content.indexOf("---", fmStart + 3);
+	if (fmEnd !== -1) {
+		const insertAt = content.indexOf("\n", fmEnd) + 1;
+		content = content.slice(0, insertAt) + header + content.slice(insertAt);
+	} else {
+		content = header + content;
+	}
 
-  return { outputPath, content };
+	return { outputPath, content };
 }
 
 // ─── Main ───────────────────────────────────────────────────
 
 function findTemplates(): string[] {
-  const templates: string[] = [];
-  const skillsDir = path.join(ROOT, 'skills');
+	const templates: string[] = [];
+	const skillsDir = path.join(ROOT, "skills");
 
-  if (!fs.existsSync(skillsDir)) return templates;
+	if (!fs.existsSync(skillsDir)) return templates;
 
-  for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-    const tmpl = path.join(skillsDir, entry.name, 'SKILL.md.tmpl');
-    if (fs.existsSync(tmpl)) templates.push(tmpl);
-  }
-  return templates;
+	for (const entry of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+		if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+		const tmpl = path.join(skillsDir, entry.name, "SKILL.md.tmpl");
+		if (fs.existsSync(tmpl)) templates.push(tmpl);
+	}
+	return templates;
 }
 
 let hasChanges = false;
 
 for (const tmplPath of findTemplates()) {
-  const { outputPath, content } = processTemplate(tmplPath);
-  const relOutput = path.relative(ROOT, outputPath);
+	const { outputPath, content } = processTemplate(tmplPath);
+	const relOutput = path.relative(ROOT, outputPath);
 
-  if (DRY_RUN) {
-    const existing = fs.existsSync(outputPath) ? fs.readFileSync(outputPath, 'utf-8') : '';
-    if (existing !== content) {
-      console.log(`STALE: ${relOutput}`);
-      hasChanges = true;
-    } else {
-      console.log(`FRESH: ${relOutput}`);
-    }
-  } else {
-    fs.writeFileSync(outputPath, content);
-    console.log(`GENERATED: ${relOutput}`);
-  }
+	if (DRY_RUN) {
+		const existing = fs.existsSync(outputPath)
+			? fs.readFileSync(outputPath, "utf-8")
+			: "";
+		if (existing !== content) {
+			console.log(`STALE: ${relOutput}`);
+			hasChanges = true;
+		} else {
+			console.log(`FRESH: ${relOutput}`);
+		}
+	} else {
+		fs.writeFileSync(outputPath, content);
+		console.log(`GENERATED: ${relOutput}`);
+	}
 }
 
 if (DRY_RUN && hasChanges) {
-  console.error('\nGenerated SKILL.md files are stale. Run: bun run gen:skill-docs');
-  process.exit(1);
+	console.error(
+		"\nGenerated SKILL.md files are stale. Run: bun run gen:skill-docs",
+	);
+	process.exit(1);
 }

@@ -1,137 +1,137 @@
 {
-  "resource": {
-    "aws_db_instance": {
-      "patient_db": {
-        "engine": "postgres",
-        "instance_class": "db.t3.medium",
-        "storage_encrypted": true,
-        "publicly_accessible": false,
-        "parameter_group_name": "postgres-ssl-enforced"
-      }
-    },
-    "aws_s3_bucket": {
-      "phi_uploads": {
-        "bucket": "phi-uploads",
-        "server_side_encryption_configuration": {
-          "rule": {
-            "apply_server_side_encryption_by_default": {
-              "sse_algorithm": "aws:kms"
-            }
-          }
-        }
-      }
-    },
-    "aws_ebs_volume": {
-      "data_vol": {
-        "availability_zone": "us-east-1a",
-        "size": 100,
-        "encrypted": true
-      }
-    },
-    "aws_kms_key": {
-      "phi_key": {
-        "description": "PHI encryption key",
-        "enable_key_rotation": true
-      }
-    },
-    "aws_sns_topic": {
-      "alerts": {
-        "name": "hipaa-alerts",
-        "kms_master_key_id": "arn:aws:kms:us-east-1:123456789:key/abc"
-      }
-    },
-    "aws_sqs_queue": {
-      "jobs": {
-        "name": "patient-jobs",
-        "kms_master_key_id": "arn:aws:kms:us-east-1:123456789:key/def"
-      }
-    },
-    "aws_security_group_rule": {
-      "ssh_restricted": {
-        "type": "ingress",
-        "from_port": 22,
-        "to_port": 22,
-        "cidr_blocks": ["10.0.0.0/8"]
-      }
-    },
-    "aws_security_group": {
-      "db_sg": {
-        "name": "db-access",
-        "ingress": [
-          {
-            "from_port": 5432,
-            "to_port": 5432,
-            "cidr_blocks": ["10.0.0.0/8"]
-          }
-        ]
-      }
-    },
-    "aws_lb_listener": {
-      "web": {
-        "port": 443,
-        "protocol": "HTTPS"
-      }
-    },
-    "aws_iam_policy": {
-      "scoped_policy": {
-        "name": "scoped-policy",
-        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::my-bucket/*\"]}]}"
-      }
-    },
-    "aws_iam_role_policy": {
-      "scoped_role": {
-        "name": "scoped-role",
-        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"dynamodb:GetItem\"],\"Resource\":[\"arn:aws:dynamodb:*:*:table/my-table\"]}]}"
-      }
-    },
-    "aws_iam_user_login_profile": {
-      "mfa_user": {
-        "user": "developer"
-      }
-    },
-    "aws_iam_user_mfa_device": {
-      "mfa_user": {
-        "user": "developer",
-        "serial_number": "arn:aws:iam::mfa/developer"
-      }
-    },
-    "aws_cloudtrail": {
-      "main_trail": {
-        "name": "main-trail",
-        "s3_bucket_name": "trail-bucket",
-        "is_multi_region_trail": true,
-        "enable_log_file_validation": true,
-        "kms_key_id": "arn:aws:kms:us-east-1:123456789:key/trail-key"
-      }
-    },
-    "aws_vpc": {
-      "main_vpc": {
-        "cidr_block": "10.0.0.0/16"
-      }
-    },
-    "aws_flow_log": {
-      "main_vpc_flow": {
-        "vpc_id": "${aws_vpc.main_vpc.id}",
-        "traffic_type": "ALL"
-      }
-    },
-    "aws_cloudwatch_log_group": {
-      "app_logs": {
-        "name": "/aws/lambda/my-func",
-        "retention_in_days": 365
-      }
-    }
-  },
-  "variable": {
-    "db_password": {
-      "description": "Database password",
-      "type": "string",
-      "sensitive": true
-    },
-    "api_key": {
-      "description": "API key",
-      "type": "string",
-      "sensitive": true
-    }
-  }
+	"resource": {
+		"aws_db_instance": {
+			"patient_db": {
+				"engine": "postgres",
+				"instance_class": "db.t3.medium",
+				"storage_encrypted": true,
+				"publicly_accessible": false,
+				"parameter_group_name": "postgres-ssl-enforced"
+			}
+		},
+		"aws_s3_bucket": {
+			"phi_uploads": {
+				"bucket": "phi-uploads",
+				"server_side_encryption_configuration": {
+					"rule": {
+						"apply_server_side_encryption_by_default": {
+							"sse_algorithm": "aws:kms"
+						}
+					}
+				}
+			}
+		},
+		"aws_ebs_volume": {
+			"data_vol": {
+				"availability_zone": "us-east-1a",
+				"size": 100,
+				"encrypted": true
+			}
+		},
+		"aws_kms_key": {
+			"phi_key": {
+				"description": "PHI encryption key",
+				"enable_key_rotation": true
+			}
+		},
+		"aws_sns_topic": {
+			"alerts": {
+				"name": "hipaa-alerts",
+				"kms_master_key_id": "arn:aws:kms:us-east-1:123456789:key/abc"
+			}
+		},
+		"aws_sqs_queue": {
+			"jobs": {
+				"name": "patient-jobs",
+				"kms_master_key_id": "arn:aws:kms:us-east-1:123456789:key/def"
+			}
+		},
+		"aws_security_group_rule": {
+			"ssh_restricted": {
+				"type": "ingress",
+				"from_port": 22,
+				"to_port": 22,
+				"cidr_blocks": ["10.0.0.0/8"]
+			}
+		},
+		"aws_security_group": {
+			"db_sg": {
+				"name": "db-access",
+				"ingress": [
+					{
+						"from_port": 5432,
+						"to_port": 5432,
+						"cidr_blocks": ["10.0.0.0/8"]
+					}
+				]
+			}
+		},
+		"aws_lb_listener": {
+			"web": {
+				"port": 443,
+				"protocol": "HTTPS"
+			}
+		},
+		"aws_iam_policy": {
+			"scoped_policy": {
+				"name": "scoped-policy",
+				"policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::my-bucket/*\"]}]}"
+			}
+		},
+		"aws_iam_role_policy": {
+			"scoped_role": {
+				"name": "scoped-role",
+				"policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"dynamodb:GetItem\"],\"Resource\":[\"arn:aws:dynamodb:*:*:table/my-table\"]}]}"
+			}
+		},
+		"aws_iam_user_login_profile": {
+			"mfa_user": {
+				"user": "developer"
+			}
+		},
+		"aws_iam_user_mfa_device": {
+			"mfa_user": {
+				"user": "developer",
+				"serial_number": "arn:aws:iam::mfa/developer"
+			}
+		},
+		"aws_cloudtrail": {
+			"main_trail": {
+				"name": "main-trail",
+				"s3_bucket_name": "trail-bucket",
+				"is_multi_region_trail": true,
+				"enable_log_file_validation": true,
+				"kms_key_id": "arn:aws:kms:us-east-1:123456789:key/trail-key"
+			}
+		},
+		"aws_vpc": {
+			"main_vpc": {
+				"cidr_block": "10.0.0.0/16"
+			}
+		},
+		"aws_flow_log": {
+			"main_vpc_flow": {
+				"vpc_id": "${aws_vpc.main_vpc.id}",
+				"traffic_type": "ALL"
+			}
+		},
+		"aws_cloudwatch_log_group": {
+			"app_logs": {
+				"name": "/aws/lambda/my-func",
+				"retention_in_days": 365
+			}
+		}
+	},
+	"variable": {
+		"db_password": {
+			"description": "Database password",
+			"type": "string",
+			"sensitive": true
+		},
+		"api_key": {
+			"description": "API key",
+			"type": "string",
+			"sensitive": true
+		}
+	}
 }

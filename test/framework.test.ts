@@ -5,130 +5,151 @@
  * Checks registry is pure execution. Tool bindings map controls to tools.
  */
 
-import { describe, test, expect } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import { CHECKS, getCheck, getChecksByType, getAllCheckIds } from '../frameworks/checks-registry';
+import { describe, expect, test } from "bun:test";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import {
+	CHECKS,
+	getAllCheckIds,
+	getCheck,
+	getChecksByType,
+} from "../frameworks/checks-registry";
 
-const ROOT = path.resolve(import.meta.dir, '..');
-const NIST = path.join(ROOT, 'nist');
+const ROOT = path.resolve(import.meta.dir, "..");
+const NIST = path.join(ROOT, "nist");
 
-describe('HIPAA framework definition', () => {
-  const hipaa = JSON.parse(fs.readFileSync(path.join(ROOT, 'frameworks', 'hipaa.json'), 'utf-8'));
+describe("HIPAA framework definition", () => {
+	const hipaa = JSON.parse(
+		fs.readFileSync(path.join(ROOT, "frameworks", "hipaa.json"), "utf-8"),
+	);
 
-  test('loads with correct id', () => {
-    expect(hipaa.id).toBe('hipaa');
-  });
+	test("loads with correct id", () => {
+		expect(hipaa.id).toBe("hipaa");
+	});
 
-  test('has required display fields', () => {
-    expect(hipaa.name).toBeTruthy();
-    expect(hipaa.version).toBeTruthy();
-    expect(hipaa.disclaimer).toBeTruthy();
-    expect(hipaa.terminology).toBeTruthy();
-    expect(hipaa.thresholds).toBeTruthy();
-    expect(hipaa.requirements).toBeArray();
-    expect(hipaa.checklist).toBeArray();
-  });
+	test("has required display fields", () => {
+		expect(hipaa.name).toBeTruthy();
+		expect(hipaa.version).toBeTruthy();
+		expect(hipaa.disclaimer).toBeTruthy();
+		expect(hipaa.terminology).toBeTruthy();
+		expect(hipaa.thresholds).toBeTruthy();
+		expect(hipaa.requirements).toBeArray();
+		expect(hipaa.checklist).toBeArray();
+	});
 
-  test('requirements are display-only (no check_ids)', () => {
-    for (const req of hipaa.requirements) {
-      expect(req.check_ids).toBeUndefined();
-      expect(req.oscal_refs).toBeUndefined();
-      expect(req.applicability).toBeUndefined();
-    }
-  });
+	test("requirements are display-only (no check_ids)", () => {
+		for (const req of hipaa.requirements) {
+			expect(req.check_ids).toBeUndefined();
+			expect(req.oscal_refs).toBeUndefined();
+			expect(req.applicability).toBeUndefined();
+		}
+	});
 
-  test('has oscal_profile reference', () => {
-    expect(hipaa.oscal_profile).toBeDefined();
-  });
+	test("has oscal_profile reference", () => {
+		expect(hipaa.oscal_profile).toBeDefined();
+	});
 });
 
-describe('Checks registry', () => {
-  test('has at least 50 checks', () => {
-    expect(CHECKS.length).toBeGreaterThanOrEqual(50);
-  });
+describe("Checks registry", () => {
+	test("has at least 50 checks", () => {
+		expect(CHECKS.length).toBeGreaterThanOrEqual(50);
+	});
 
-  test('no duplicate IDs', () => {
-    const ids = CHECKS.map((c) => c.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
+	test("no duplicate IDs", () => {
+		const ids = CHECKS.map((c) => c.id);
+		expect(new Set(ids).size).toBe(ids.length);
+	});
 
-  test('every check has required fields', () => {
-    for (const check of CHECKS) {
-      expect(check.id).toBeTruthy();
-      expect(check.category).toBeTruthy();
-      expect(check.description).toBeTruthy();
-      expect(check.type).toBeTruthy();
-      expect(check.severity_default).toMatch(/^(CRITICAL|HIGH|MEDIUM|LOW|INFO)$/);
-    }
-  });
+	test("every check has required fields", () => {
+		for (const check of CHECKS) {
+			expect(check.id).toBeTruthy();
+			expect(check.category).toBeTruthy();
+			expect(check.description).toBeTruthy();
+			expect(check.type).toBeTruthy();
+			expect(check.severity_default).toMatch(
+				/^(CRITICAL|HIGH|MEDIUM|LOW|INFO)$/,
+			);
+		}
+	});
 
-  test('no framework mappings on checks', () => {
-    for (const check of CHECKS) {
-      expect((check as any).frameworks).toBeUndefined();
-    }
-  });
+	test("no framework mappings on checks", () => {
+		for (const check of CHECKS) {
+			expect(
+				(check as unknown as Record<string, unknown>).frameworks,
+			).toBeUndefined();
+		}
+	});
 
-  test('code checks have patterns', () => {
-    for (const c of getChecksByType('code_grep')) {
-      expect(c.pattern).toBeTruthy();
-    }
-  });
+	test("code checks have patterns", () => {
+		for (const c of getChecksByType("code_grep")) {
+			expect(c.pattern).toBeTruthy();
+		}
+	});
 
-  test('cloud checks have commands', () => {
-    for (const c of getChecksByType('cloud_cli')) {
-      expect(c.command).toBeTruthy();
-    }
-  });
-  test('azure key vault rotation check is registered as an Azure cloud encryption check', () => {
-    const check = getCheck('azure-keyvault-rotation');
-    expect(check).toBeDefined();
-    expect(check?.type).toBe('cloud_cli');
-    expect(check?.category).toBe('encryption');
-    expect(check?.provider).toBe('azure');
-  });
+	test("cloud checks have commands", () => {
+		for (const c of getChecksByType("cloud_cli")) {
+			expect(c.command).toBeTruthy();
+		}
+	});
+	test("azure key vault rotation check is registered as an Azure cloud encryption check", () => {
+		const check = getCheck("azure-keyvault-rotation");
+		expect(check).toBeDefined();
+		expect(check?.type).toBe("cloud_cli");
+		expect(check?.category).toBe("encryption");
+		expect(check?.provider).toBe("azure");
+	});
 
-  test('container image signing check is registered as a code-level compute check', () => {
-    const check = getCheck('container-image-signing');
-    expect(check).toBeDefined();
-    expect(check?.type).toBe('code_grep');
-    expect(check?.category).toBe('compute');
-    expect(check?.provider).toBe('k8s');
-  });
+	test("container image signing check is registered as a code-level compute check", () => {
+		const check = getCheck("container-image-signing");
+		expect(check).toBeDefined();
+		expect(check?.type).toBe("code_grep");
+		expect(check?.category).toBe("compute");
+		expect(check?.provider).toBe("k8s");
+	});
 });
 
-describe('NIST ↔ Tool binding consistency', () => {
-  const bindings = JSON.parse(fs.readFileSync(path.join(NIST, 'tool-bindings.json'), 'utf-8'));
-  const regIds = new Set(getAllCheckIds());
+describe("NIST ↔ Tool binding consistency", () => {
+	const bindings = JSON.parse(
+		fs.readFileSync(path.join(NIST, "tool-bindings.json"), "utf-8"),
+	);
+	const regIds = new Set(getAllCheckIds());
 
-  test('all emdash checks in bindings exist in registry', () => {
-    for (const [, tools] of Object.entries(bindings.bindings)) {
-      for (const checkId of (tools as any).emdash || []) {
-        expect(regIds.has(checkId)).toBe(true);
-      }
-    }
-  });
+	test("all emdash checks in bindings exist in registry", () => {
+		for (const [, tools] of Object.entries(bindings.bindings)) {
+			for (const checkId of (tools as Record<string, string[]>).emdash || []) {
+				expect(regIds.has(checkId)).toBe(true);
+			}
+		}
+	});
 
-  test('binding control IDs exist in HIPAA filter', () => {
-    const filter = JSON.parse(fs.readFileSync(path.join(NIST, 'hipaa-filter.json'), 'utf-8'));
-    const filterControls = new Set<string>();
-    for (const ids of Object.values(filter.mapping)) {
-      for (const id of ids as string[]) filterControls.add(id);
-    }
-    for (const id of Object.keys(bindings.bindings)) {
-      expect(filterControls.has(id)).toBe(true);
-    }
-  });
+	test("binding control IDs exist in HIPAA filter", () => {
+		const filter = JSON.parse(
+			fs.readFileSync(path.join(NIST, "hipaa-filter.json"), "utf-8"),
+		);
+		const filterControls = new Set<string>();
+		for (const ids of Object.values(filter.mapping)) {
+			for (const id of ids as string[]) filterControls.add(id);
+		}
+		for (const id of Object.keys(bindings.bindings)) {
+			expect(filterControls.has(id)).toBe(true);
+		}
+	});
 
-  test('SC-28 includes the Azure Key Vault rotation check', () => {
-    expect(bindings.bindings['SC-28'].emdash).toContain('azure-keyvault-rotation');
-  });
+	test("SC-28 includes the Azure Key Vault rotation check", () => {
+		expect(bindings.bindings["SC-28"].emdash).toContain(
+			"azure-keyvault-rotation",
+		);
+	});
 
-  test('SI-7 includes the container image signing check', () => {
-    expect(bindings.bindings['SI-7'].emdash).toContain('container-image-signing');
-  });
+	test("SI-7 includes the container image signing check", () => {
+		expect(bindings.bindings["SI-7"].emdash).toContain(
+			"container-image-signing",
+		);
+	});
 
-  test('CP-9 includes the RDS backup retention check', () => {
-    expect(bindings.bindings['CP-9'].emdash).toContain('rego-aws-rds-backup-retention');
-  });
+	test("CP-9 includes the RDS backup retention check", () => {
+		expect(bindings.bindings["CP-9"].emdash).toContain(
+			"rego-aws-rds-backup-retention",
+		);
+	});
 });

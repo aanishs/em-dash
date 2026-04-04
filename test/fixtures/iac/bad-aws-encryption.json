@@ -1,37 +1,37 @@
 {
-  "resource": {
-    "aws_db_instance": {
-      "patient_db": {
-        "engine": "postgres",
-        "instance_class": "db.t3.medium",
-        "storage_encrypted": false
-      }
-    },
-    "aws_s3_bucket": {
-      "phi_uploads": {
-        "bucket": "phi-uploads"
-      }
-    },
-    "aws_ebs_volume": {
-      "data_vol": {
-        "availability_zone": "us-east-1a",
-        "size": 100
-      }
-    },
-    "aws_kms_key": {
-      "phi_key": {
-        "description": "PHI encryption key"
-      }
-    },
-    "aws_sns_topic": {
-      "alerts": {
-        "name": "hipaa-alerts"
-      }
-    },
-    "aws_sqs_queue": {
-      "jobs": {
-        "name": "patient-jobs"
-      }
-    }
-  }
+	"resource": {
+		"aws_db_instance": {
+			"patient_db": {
+				"engine": "postgres",
+				"instance_class": "db.t3.medium",
+				"storage_encrypted": false
+			}
+		},
+		"aws_s3_bucket": {
+			"phi_uploads": {
+				"bucket": "phi-uploads"
+			}
+		},
+		"aws_ebs_volume": {
+			"data_vol": {
+				"availability_zone": "us-east-1a",
+				"size": 100
+			}
+		},
+		"aws_kms_key": {
+			"phi_key": {
+				"description": "PHI encryption key"
+			}
+		},
+		"aws_sns_topic": {
+			"alerts": {
+				"name": "hipaa-alerts"
+			}
+		},
+		"aws_sqs_queue": {
+			"jobs": {
+				"name": "patient-jobs"
+			}
+		}
+	}
 }

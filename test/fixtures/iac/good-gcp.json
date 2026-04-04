@@ -1,58 +1,58 @@
 {
-  "resource": {
-    "google_sql_database_instance": {
-      "patient_db": {
-        "name": "patient-db",
-        "settings": [
-          {
-            "tier": "db-f1-micro",
-            "disk_encryption_key_name": "projects/my-project/locations/us/keyRings/my-ring/cryptoKeys/my-key",
-            "ip_configuration": {
-              "ipv4_enabled": false,
-              "require_ssl": true
-            }
-          }
-        ]
-      }
-    },
-    "google_storage_bucket": {
-      "phi_bucket": {
-        "name": "phi-data-bucket",
-        "location": "US",
-        "encryption": {
-          "default_kms_key_name": "projects/my-project/locations/us/keyRings/my-ring/cryptoKeys/my-key"
-        }
-      }
-    },
-    "google_compute_firewall": {
-      "allow_internal": {
-        "name": "allow-internal",
-        "direction": "INGRESS",
-        "source_ranges": ["10.0.0.0/8"],
-        "allow": [
-          {
-            "protocol": "tcp",
-            "ports": ["5432"]
-          }
-        ]
-      }
-    },
-    "google_project_iam_member": {
-      "sa_viewer": {
-        "member": "serviceAccount:my-sa@project.iam.gserviceaccount.com",
-        "role": "roles/viewer"
-      }
-    },
-    "google_project_iam_audit_config": {
-      "data_access": {
-        "service": "allServices",
-        "audit_log_config": [
-          {
-            "log_type": "DATA_READ",
-            "exempted_members": []
-          }
-        ]
-      }
-    }
-  }
+	"resource": {
+		"google_sql_database_instance": {
+			"patient_db": {
+				"name": "patient-db",
+				"settings": [
+					{
+						"tier": "db-f1-micro",
+						"disk_encryption_key_name": "projects/my-project/locations/us/keyRings/my-ring/cryptoKeys/my-key",
+						"ip_configuration": {
+							"ipv4_enabled": false,
+							"require_ssl": true
+						}
+					}
+				]
+			}
+		},
+		"google_storage_bucket": {
+			"phi_bucket": {
+				"name": "phi-data-bucket",
+				"location": "US",
+				"encryption": {
+					"default_kms_key_name": "projects/my-project/locations/us/keyRings/my-ring/cryptoKeys/my-key"
+				}
+			}
+		},
+		"google_compute_firewall": {
+			"allow_internal": {
+				"name": "allow-internal",
+				"direction": "INGRESS",
+				"source_ranges": ["10.0.0.0/8"],
+				"allow": [
+					{
+						"protocol": "tcp",
+						"ports": ["5432"]
+					}
+				]
+			}
+		},
+		"google_project_iam_member": {
+			"sa_viewer": {
+				"member": "serviceAccount:my-sa@project.iam.gserviceaccount.com",
+				"role": "roles/viewer"
+			}
+		},
+		"google_project_iam_audit_config": {
+			"data_access": {
+				"service": "allServices",
+				"audit_log_config": [
+					{
+						"log_type": "DATA_READ",
+						"exempted_members": []
+					}
+				]
+			}
+		}
+	}
 }

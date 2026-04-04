@@ -1,36 +1,36 @@
 {
-  "resource": {
-    "aws_security_group_rule": {
-      "ssh_open": {
-        "type": "ingress",
-        "from_port": 22,
-        "to_port": 22,
-        "cidr_blocks": ["0.0.0.0/0"]
-      }
-    },
-    "aws_security_group": {
-      "db_sg": {
-        "name": "db-access",
-        "ingress": [
-          {
-            "from_port": 5430,
-            "to_port": 5440,
-            "cidr_blocks": ["0.0.0.0/0"]
-          }
-        ]
-      }
-    },
-    "aws_lb_listener": {
-      "web": {
-        "port": 80,
-        "protocol": "HTTP"
-      }
-    },
-    "aws_db_instance": {
-      "public_rds": {
-        "engine": "postgres",
-        "publicly_accessible": true
-      }
-    }
-  }
+	"resource": {
+		"aws_security_group_rule": {
+			"ssh_open": {
+				"type": "ingress",
+				"from_port": 22,
+				"to_port": 22,
+				"cidr_blocks": ["0.0.0.0/0"]
+			}
+		},
+		"aws_security_group": {
+			"db_sg": {
+				"name": "db-access",
+				"ingress": [
+					{
+						"from_port": 5430,
+						"to_port": 5440,
+						"cidr_blocks": ["0.0.0.0/0"]
+					}
+				]
+			}
+		},
+		"aws_lb_listener": {
+			"web": {
+				"port": 80,
+				"protocol": "HTTP"
+			}
+		},
+		"aws_db_instance": {
+			"public_rds": {
+				"engine": "postgres",
+				"publicly_accessible": true
+			}
+		}
+	}
 }

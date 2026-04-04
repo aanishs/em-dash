@@ -1,57 +1,59 @@
 {
-  "resource": {
-    "google_sql_database_instance": {
-      "patient_db": {
-        "name": "patient-db",
-        "settings": [
-          {
-            "tier": "db-f1-micro",
-            "ip_configuration": {
-              "ipv4_enabled": true
-            }
-          }
-        ]
-      }
-    },
-    "google_storage_bucket": {
-      "phi_bucket": {
-        "name": "phi-data-bucket",
-        "location": "US"
-      }
-    },
-    "google_compute_firewall": {
-      "allow_ssh": {
-        "name": "allow-ssh",
-        "direction": "INGRESS",
-        "source_ranges": ["0.0.0.0/0"],
-        "allow": [
-          {
-            "protocol": "tcp",
-            "ports": ["3306"]
-          }
-        ]
-      }
-    },
-    "google_project_iam_member": {
-      "sa_owner": {
-        "member": "serviceAccount:my-sa@project.iam.gserviceaccount.com",
-        "role": "roles/owner"
-      },
-      "sa_editor": {
-        "member": "serviceAccount:other-sa@project.iam.gserviceaccount.com",
-        "role": "roles/editor"
-      }
-    },
-    "google_project_iam_audit_config": {
-      "data_access": {
-        "service": "allServices",
-        "audit_log_config": [
-          {
-            "log_type": "DATA_READ",
-            "exempted_members": ["serviceAccount:ci@project.iam.gserviceaccount.com"]
-          }
-        ]
-      }
-    }
-  }
+	"resource": {
+		"google_sql_database_instance": {
+			"patient_db": {
+				"name": "patient-db",
+				"settings": [
+					{
+						"tier": "db-f1-micro",
+						"ip_configuration": {
+							"ipv4_enabled": true
+						}
+					}
+				]
+			}
+		},
+		"google_storage_bucket": {
+			"phi_bucket": {
+				"name": "phi-data-bucket",
+				"location": "US"
+			}
+		},
+		"google_compute_firewall": {
+			"allow_ssh": {
+				"name": "allow-ssh",
+				"direction": "INGRESS",
+				"source_ranges": ["0.0.0.0/0"],
+				"allow": [
+					{
+						"protocol": "tcp",
+						"ports": ["3306"]
+					}
+				]
+			}
+		},
+		"google_project_iam_member": {
+			"sa_owner": {
+				"member": "serviceAccount:my-sa@project.iam.gserviceaccount.com",
+				"role": "roles/owner"
+			},
+			"sa_editor": {
+				"member": "serviceAccount:other-sa@project.iam.gserviceaccount.com",
+				"role": "roles/editor"
+			}
+		},
+		"google_project_iam_audit_config": {
+			"data_access": {
+				"service": "allServices",
+				"audit_log_config": [
+					{
+						"log_type": "DATA_READ",
+						"exempted_members": [
+							"serviceAccount:ci@project.iam.gserviceaccount.com"
+						]
+					}
+				]
+			}
+		}
+	}
 }

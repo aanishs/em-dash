@@ -1,100 +1,425 @@
 {
-  "id": "hipaa",
-  "name": "HIPAA Security Rule",
-  "version": "2.0",
-  "disclaimer": "This provides technical guidance for implementing HIPAA compliance controls. It is NOT legal advice and does not constitute HIPAA certification. Consult qualified legal counsel and consider engaging a certified HIPAA auditor for formal compliance verification.",
-  "terminology": {
-    "sensitive_data": "Protected Health Information (PHI)",
-    "covered_entity": "Covered Entity",
-    "processor": "Business Associate",
-    "processor_agreement": "Business Associate Agreement (BAA)"
-  },
-  "thresholds": {
-    "log_retention_days": 365,
-    "backup_retention_days": 7,
-    "session_timeout_minutes": 15,
-    "key_rotation_days": 365,
-    "password_min_length": 14,
-    "credential_max_age_days": 90
-  },
-  "oscal_profile": "hipaa-sp800-66r2-v1",
-  "requirements": [
-    { "id": "164.308(a)(1)(i)", "section": "Administrative Safeguards", "name": "Security Management Process", "description": "Policies to prevent, detect, contain, and correct security violations" },
-    { "id": "164.308(a)(1)(ii)(A)", "section": "Administrative Safeguards", "name": "Risk Analysis", "description": "Accurate and thorough assessment of potential risks to ePHI" },
-    { "id": "164.308(a)(1)(ii)(D)", "section": "Administrative Safeguards", "name": "Information System Activity Review", "description": "Regular review of audit logs, access reports, and security incident tracking" },
-    { "id": "164.308(a)(2)", "section": "Administrative Safeguards", "name": "Assigned Security Responsibility", "description": "Designate a HIPAA Security Officer" },
-    { "id": "164.308(a)(3)(ii)(C)", "section": "Administrative Safeguards", "name": "Termination Procedures", "description": "Revoke access when employment ends" },
-    { "id": "164.308(a)(4)", "section": "Administrative Safeguards", "name": "Information Access Management", "description": "Authorize access consistent with Privacy Rule" },
-    { "id": "164.308(a)(5)(i)", "section": "Administrative Safeguards", "name": "Security Awareness and Training", "description": "Security awareness training program" },
-    { "id": "164.308(a)(6)(i)", "section": "Administrative Safeguards", "name": "Security Incident Procedures", "description": "Identify and respond to security incidents" },
-    { "id": "164.308(a)(7)(i)", "section": "Administrative Safeguards", "name": "Contingency Plan", "description": "Policies for responding to emergencies" },
-    { "id": "164.308(b)(1)", "section": "Administrative Safeguards", "name": "Business Associate Contracts", "description": "Satisfactory assurances from business associates" },
-    { "id": "164.310(a)(1)", "section": "Physical Safeguards", "name": "Facility Access Controls", "description": "Limit physical access to electronic information systems" },
-    { "id": "164.310(b)", "section": "Physical Safeguards", "name": "Workstation Use", "description": "Specify proper functions and physical attributes of workstations" },
-    { "id": "164.310(c)", "section": "Physical Safeguards", "name": "Workstation Security", "description": "Physical safeguards restricting access to authorized users" },
-    { "id": "164.312(a)(1)", "section": "Technical Safeguards", "name": "Access Control", "description": "Technical policies to allow access only to authorized persons" },
-    { "id": "164.312(a)(2)(iii)", "section": "Technical Safeguards", "name": "Automatic Logoff", "description": "Terminate session after period of inactivity" },
-    { "id": "164.312(a)(2)(iv)", "section": "Technical Safeguards", "name": "Encryption and Decryption", "description": "Encrypt and decrypt ePHI at rest" },
-    { "id": "164.312(b)", "section": "Technical Safeguards", "name": "Audit Controls", "description": "Record and examine system activity" },
-    { "id": "164.312(c)(1)", "section": "Technical Safeguards", "name": "Integrity", "description": "Protect ePHI from improper alteration or destruction" },
-    { "id": "164.312(d)", "section": "Technical Safeguards", "name": "Person or Entity Authentication", "description": "Verify identity of person seeking access" },
-    { "id": "164.312(e)(1)", "section": "Technical Safeguards", "name": "Transmission Security", "description": "Guard against unauthorized access during transmission" },
-    { "id": "164.314(a)(1)", "section": "Organizational Requirements", "name": "Business Associate Contracts", "description": "Document satisfactory assurances from business associates" },
-    { "id": "164.316(a)", "section": "Policies and Documentation", "name": "Policies and Procedures", "description": "Implement reasonable and appropriate policies" },
-    { "id": "164.316(b)(1)", "section": "Policies and Documentation", "name": "Documentation", "description": "Maintain written policies and records of required actions" },
-    { "id": "164.502", "section": "Privacy Rule", "name": "Uses and Disclosures", "description": "Permitted uses and disclosures of PHI" },
-    { "id": "164.514", "section": "Privacy Rule", "name": "Safe Harbor De-identification", "description": "18 HIPAA Safe Harbor identifiers" }
-  ],
-  "checklist": [
-    { "id": "164.308(a)(1)(i)", "section": "Administrative Safeguards", "text": "Security Management Process — policies to prevent, detect, contain, and correct security violations" },
-    { "id": "164.308(a)(1)(ii)(A)", "section": "Administrative Safeguards", "text": "Risk Analysis — accurate and thorough assessment of potential risks to ePHI" },
-    { "id": "164.308(a)(1)(ii)(B)", "section": "Administrative Safeguards", "text": "Risk Management — security measures to reduce risks to reasonable level" },
-    { "id": "164.308(a)(1)(ii)(C)", "section": "Administrative Safeguards", "text": "Sanction Policy — sanctions against workforce members who violate policies" },
-    { "id": "164.308(a)(1)(ii)(D)", "section": "Administrative Safeguards", "text": "Information System Activity Review — regular review of audit logs and access reports" },
-    { "id": "164.308(a)(2)", "section": "Administrative Safeguards", "text": "Assigned Security Responsibility — designate a HIPAA Security Officer" },
-    { "id": "164.308(a)(3)(i)", "section": "Administrative Safeguards", "text": "Workforce Security — ensure appropriate access and prevent unauthorized access" },
-    { "id": "164.308(a)(3)(ii)(A)", "section": "Administrative Safeguards", "text": "Authorization and Supervision — authorize and supervise workforce ePHI access" },
-    { "id": "164.308(a)(3)(ii)(B)", "section": "Administrative Safeguards", "text": "Workforce Clearance Procedure — determine appropriate access levels" },
-    { "id": "164.308(a)(3)(ii)(C)", "section": "Administrative Safeguards", "text": "Termination Procedures — revoke access when employment ends" },
-    { "id": "164.308(a)(4)(i)", "section": "Administrative Safeguards", "text": "Information Access Management — authorize access consistent with Privacy Rule" },
-    { "id": "164.308(a)(4)(ii)(B)", "section": "Administrative Safeguards", "text": "Access Authorization — policies for granting ePHI access" },
-    { "id": "164.308(a)(4)(ii)(C)", "section": "Administrative Safeguards", "text": "Access Establishment and Modification — procedures for creating and revoking access" },
-    { "id": "164.308(a)(5)(i)", "section": "Administrative Safeguards", "text": "Security Awareness and Training — security awareness training program" },
-    { "id": "164.308(a)(5)(ii)(A)", "section": "Administrative Safeguards", "text": "Security Reminders — periodic security updates to workforce" },
-    { "id": "164.308(a)(5)(ii)(B)", "section": "Administrative Safeguards", "text": "Protection from Malicious Software — procedures for guarding against malware" },
-    { "id": "164.308(a)(5)(ii)(C)", "section": "Administrative Safeguards", "text": "Log-in Monitoring — procedures for monitoring log-in attempts" },
-    { "id": "164.308(a)(5)(ii)(D)", "section": "Administrative Safeguards", "text": "Password Management — procedures for creating, changing, safeguarding passwords" },
-    { "id": "164.308(a)(6)(i)", "section": "Administrative Safeguards", "text": "Security Incident Procedures — identify and respond to security incidents" },
-    { "id": "164.308(a)(6)(ii)", "section": "Administrative Safeguards", "text": "Response and Reporting — mitigate harmful effects and document incidents" },
-    { "id": "164.308(a)(7)(i)", "section": "Administrative Safeguards", "text": "Contingency Plan — policies for responding to emergencies" },
-    { "id": "164.308(a)(7)(ii)(A)", "section": "Administrative Safeguards", "text": "Data Backup Plan — create and maintain retrievable copies of ePHI" },
-    { "id": "164.308(a)(7)(ii)(B)", "section": "Administrative Safeguards", "text": "Disaster Recovery Plan — procedures to restore lost data" },
-    { "id": "164.308(a)(7)(ii)(C)", "section": "Administrative Safeguards", "text": "Emergency Mode Operation Plan — critical business processes during emergency" },
-    { "id": "164.308(a)(7)(ii)(D)", "section": "Administrative Safeguards", "text": "Testing and Revision — periodically test and revise contingency plans" },
-    { "id": "164.308(a)(8)", "section": "Administrative Safeguards", "text": "Evaluation — periodic technical and non-technical evaluation" },
-    { "id": "164.308(b)(1)", "section": "Administrative Safeguards", "text": "Business Associate Contracts — satisfactory assurances from business associates" },
-    { "id": "164.310(a)(1)", "section": "Physical Safeguards", "text": "Facility Access Controls — limit physical access to electronic information systems" },
-    { "id": "164.310(a)(2)(ii)", "section": "Physical Safeguards", "text": "Facility Security Plan — safeguard facility and equipment" },
-    { "id": "164.310(b)", "section": "Physical Safeguards", "text": "Workstation Use — specify proper functions and physical attributes of workstations" },
-    { "id": "164.310(c)", "section": "Physical Safeguards", "text": "Workstation Security — physical safeguards restricting access to authorized users" },
-    { "id": "164.310(d)(1)", "section": "Physical Safeguards", "text": "Device and Media Controls — govern receipt and removal of hardware and media" },
-    { "id": "164.310(d)(2)(i)", "section": "Physical Safeguards", "text": "Disposal — procedures for final disposal of ePHI and hardware" },
-    { "id": "164.312(a)(1)", "section": "Technical Safeguards", "text": "Access Control — technical policies to allow access only to authorized persons" },
-    { "id": "164.312(a)(2)(i)", "section": "Technical Safeguards", "text": "Unique User Identification — assign unique name/number to track user identity" },
-    { "id": "164.312(a)(2)(ii)", "section": "Technical Safeguards", "text": "Emergency Access Procedure — procedures for obtaining ePHI during emergency" },
-    { "id": "164.312(a)(2)(iii)", "section": "Technical Safeguards", "text": "Automatic Logoff — terminate session after period of inactivity" },
-    { "id": "164.312(a)(2)(iv)", "section": "Technical Safeguards", "text": "Encryption and Decryption — encrypt and decrypt ePHI at rest" },
-    { "id": "164.312(b)", "section": "Technical Safeguards", "text": "Audit Controls — record and examine system activity" },
-    { "id": "164.312(c)(1)", "section": "Technical Safeguards", "text": "Integrity — protect ePHI from improper alteration or destruction" },
-    { "id": "164.312(c)(2)", "section": "Technical Safeguards", "text": "Mechanism to Authenticate ePHI — corroborate that ePHI has not been altered" },
-    { "id": "164.312(d)", "section": "Technical Safeguards", "text": "Person or Entity Authentication — verify identity of person seeking access" },
-    { "id": "164.312(e)(1)", "section": "Technical Safeguards", "text": "Transmission Security — guard against unauthorized access during transmission" },
-    { "id": "164.312(e)(2)(i)", "section": "Technical Safeguards", "text": "Integrity Controls — ensure transmitted ePHI is not improperly modified" },
-    { "id": "164.312(e)(2)(ii)", "section": "Technical Safeguards", "text": "Encryption — encrypt ePHI in transit" },
-    { "id": "164.314(a)(1)", "section": "Organizational Requirements", "text": "Business Associate Contracts — document satisfactory assurances from BAs" },
-    { "id": "164.314(a)(2)(i)", "section": "Organizational Requirements", "text": "BA Contract Requirements — establish permitted uses and disclosures" },
-    { "id": "164.316(a)", "section": "Policies and Documentation", "text": "Policies and Procedures — implement reasonable and appropriate policies" },
-    { "id": "164.316(b)(1)", "section": "Policies and Documentation", "text": "Documentation — maintain written policies and records of required actions" },
-    { "id": "164.316(b)(2)(i)", "section": "Policies and Documentation", "text": "Time Limit — retain documentation for 6 years" }
-  ]
+	"id": "hipaa",
+	"name": "HIPAA Security Rule",
+	"version": "2.0",
+	"disclaimer": "This provides technical guidance for implementing HIPAA compliance controls. It is NOT legal advice and does not constitute HIPAA certification. Consult qualified legal counsel and consider engaging a certified HIPAA auditor for formal compliance verification.",
+	"terminology": {
+		"sensitive_data": "Protected Health Information (PHI)",
+		"covered_entity": "Covered Entity",
+		"processor": "Business Associate",
+		"processor_agreement": "Business Associate Agreement (BAA)"
+	},
+	"thresholds": {
+		"log_retention_days": 365,
+		"backup_retention_days": 7,
+		"session_timeout_minutes": 15,
+		"key_rotation_days": 365,
+		"password_min_length": 14,
+		"credential_max_age_days": 90
+	},
+	"oscal_profile": "hipaa-sp800-66r2-v1",
+	"requirements": [
+		{
+			"id": "164.308(a)(1)(i)",
+			"section": "Administrative Safeguards",
+			"name": "Security Management Process",
+			"description": "Policies to prevent, detect, contain, and correct security violations"
+		},
+		{
+			"id": "164.308(a)(1)(ii)(A)",
+			"section": "Administrative Safeguards",
+			"name": "Risk Analysis",
+			"description": "Accurate and thorough assessment of potential risks to ePHI"
+		},
+		{
+			"id": "164.308(a)(1)(ii)(D)",
+			"section": "Administrative Safeguards",
+			"name": "Information System Activity Review",
+			"description": "Regular review of audit logs, access reports, and security incident tracking"
+		},
+		{
+			"id": "164.308(a)(2)",
+			"section": "Administrative Safeguards",
+			"name": "Assigned Security Responsibility",
+			"description": "Designate a HIPAA Security Officer"
+		},
+		{
+			"id": "164.308(a)(3)(ii)(C)",
+			"section": "Administrative Safeguards",
+			"name": "Termination Procedures",
+			"description": "Revoke access when employment ends"
+		},
+		{
+			"id": "164.308(a)(4)",
+			"section": "Administrative Safeguards",
+			"name": "Information Access Management",
+			"description": "Authorize access consistent with Privacy Rule"
+		},
+		{
+			"id": "164.308(a)(5)(i)",
+			"section": "Administrative Safeguards",
+			"name": "Security Awareness and Training",
+			"description": "Security awareness training program"
+		},
+		{
+			"id": "164.308(a)(6)(i)",
+			"section": "Administrative Safeguards",
+			"name": "Security Incident Procedures",
+			"description": "Identify and respond to security incidents"
+		},
+		{
+			"id": "164.308(a)(7)(i)",
+			"section": "Administrative Safeguards",
+			"name": "Contingency Plan",
+			"description": "Policies for responding to emergencies"
+		},
+		{
+			"id": "164.308(b)(1)",
+			"section": "Administrative Safeguards",
+			"name": "Business Associate Contracts",
+			"description": "Satisfactory assurances from business associates"
+		},
+		{
+			"id": "164.310(a)(1)",
+			"section": "Physical Safeguards",
+			"name": "Facility Access Controls",
+			"description": "Limit physical access to electronic information systems"
+		},
+		{
+			"id": "164.310(b)",
+			"section": "Physical Safeguards",
+			"name": "Workstation Use",
+			"description": "Specify proper functions and physical attributes of workstations"
+		},
+		{
+			"id": "164.310(c)",
+			"section": "Physical Safeguards",
+			"name": "Workstation Security",
+			"description": "Physical safeguards restricting access to authorized users"
+		},
+		{
+			"id": "164.312(a)(1)",
+			"section": "Technical Safeguards",
+			"name": "Access Control",
+			"description": "Technical policies to allow access only to authorized persons"
+		},
+		{
+			"id": "164.312(a)(2)(iii)",
+			"section": "Technical Safeguards",
+			"name": "Automatic Logoff",
+			"description": "Terminate session after period of inactivity"
+		},
+		{
+			"id": "164.312(a)(2)(iv)",
+			"section": "Technical Safeguards",
+			"name": "Encryption and Decryption",
+			"description": "Encrypt and decrypt ePHI at rest"
+		},
+		{
+			"id": "164.312(b)",
+			"section": "Technical Safeguards",
+			"name": "Audit Controls",
+			"description": "Record and examine system activity"
+		},
+		{
+			"id": "164.312(c)(1)",
+			"section": "Technical Safeguards",
+			"name": "Integrity",
+			"description": "Protect ePHI from improper alteration or destruction"
+		},
+		{
+			"id": "164.312(d)",
+			"section": "Technical Safeguards",
+			"name": "Person or Entity Authentication",
+			"description": "Verify identity of person seeking access"
+		},
+		{
+			"id": "164.312(e)(1)",
+			"section": "Technical Safeguards",
+			"name": "Transmission Security",
+			"description": "Guard against unauthorized access during transmission"
+		},
+		{
+			"id": "164.314(a)(1)",
+			"section": "Organizational Requirements",
+			"name": "Business Associate Contracts",
+			"description": "Document satisfactory assurances from business associates"
+		},
+		{
+			"id": "164.316(a)",
+			"section": "Policies and Documentation",
+			"name": "Policies and Procedures",
+			"description": "Implement reasonable and appropriate policies"
+		},
+		{
+			"id": "164.316(b)(1)",
+			"section": "Policies and Documentation",
+			"name": "Documentation",
+			"description": "Maintain written policies and records of required actions"
+		},
+		{
+			"id": "164.502",
+			"section": "Privacy Rule",
+			"name": "Uses and Disclosures",
+			"description": "Permitted uses and disclosures of PHI"
+		},
+		{
+			"id": "164.514",
+			"section": "Privacy Rule",
+			"name": "Safe Harbor De-identification",
+			"description": "18 HIPAA Safe Harbor identifiers"
+		}
+	],
+	"checklist": [
+		{
+			"id": "164.308(a)(1)(i)",
+			"section": "Administrative Safeguards",
+			"text": "Security Management Process — policies to prevent, detect, contain, and correct security violations"
+		},
+		{
+			"id": "164.308(a)(1)(ii)(A)",
+			"section": "Administrative Safeguards",
+			"text": "Risk Analysis — accurate and thorough assessment of potential risks to ePHI"
+		},
+		{
+			"id": "164.308(a)(1)(ii)(B)",
+			"section": "Administrative Safeguards",
+			"text": "Risk Management — security measures to reduce risks to reasonable level"
+		},
+		{
+			"id": "164.308(a)(1)(ii)(C)",
+			"section": "Administrative Safeguards",
+			"text": "Sanction Policy — sanctions against workforce members who violate policies"
+		},
+		{
+			"id": "164.308(a)(1)(ii)(D)",
+			"section": "Administrative Safeguards",
+			"text": "Information System Activity Review — regular review of audit logs and access reports"
+		},
+		{
+			"id": "164.308(a)(2)",
+			"section": "Administrative Safeguards",
+			"text": "Assigned Security Responsibility — designate a HIPAA Security Officer"
+		},
+		{
+			"id": "164.308(a)(3)(i)",
+			"section": "Administrative Safeguards",
+			"text": "Workforce Security — ensure appropriate access and prevent unauthorized access"
+		},
+		{
+			"id": "164.308(a)(3)(ii)(A)",
+			"section": "Administrative Safeguards",
+			"text": "Authorization and Supervision — authorize and supervise workforce ePHI access"
+		},
+		{
+			"id": "164.308(a)(3)(ii)(B)",
+			"section": "Administrative Safeguards",
+			"text": "Workforce Clearance Procedure — determine appropriate access levels"
+		},
+		{
+			"id": "164.308(a)(3)(ii)(C)",
+			"section": "Administrative Safeguards",
+			"text": "Termination Procedures — revoke access when employment ends"
+		},
+		{
+			"id": "164.308(a)(4)(i)",
+			"section": "Administrative Safeguards",
+			"text": "Information Access Management — authorize access consistent with Privacy Rule"
+		},
+		{
+			"id": "164.308(a)(4)(ii)(B)",
+			"section": "Administrative Safeguards",
+			"text": "Access Authorization — policies for granting ePHI access"
+		},
+		{
+			"id": "164.308(a)(4)(ii)(C)",
+			"section": "Administrative Safeguards",
+			"text": "Access Establishment and Modification — procedures for creating and revoking access"
+		},
+		{
+			"id": "164.308(a)(5)(i)",
+			"section": "Administrative Safeguards",
+			"text": "Security Awareness and Training — security awareness training program"
+		},
+		{
+			"id": "164.308(a)(5)(ii)(A)",
+			"section": "Administrative Safeguards",
+			"text": "Security Reminders — periodic security updates to workforce"
+		},
+		{
+			"id": "164.308(a)(5)(ii)(B)",
+			"section": "Administrative Safeguards",
+			"text": "Protection from Malicious Software — procedures for guarding against malware"
+		},
+		{
+			"id": "164.308(a)(5)(ii)(C)",
+			"section": "Administrative Safeguards",
+			"text": "Log-in Monitoring — procedures for monitoring log-in attempts"
+		},
+		{
+			"id": "164.308(a)(5)(ii)(D)",
+			"section": "Administrative Safeguards",
+			"text": "Password Management — procedures for creating, changing, safeguarding passwords"
+		},
+		{
+			"id": "164.308(a)(6)(i)",
+			"section": "Administrative Safeguards",
+			"text": "Security Incident Procedures — identify and respond to security incidents"
+		},
+		{
+			"id": "164.308(a)(6)(ii)",
+			"section": "Administrative Safeguards",
+			"text": "Response and Reporting — mitigate harmful effects and document incidents"
+		},
+		{
+			"id": "164.308(a)(7)(i)",
+			"section": "Administrative Safeguards",
+			"text": "Contingency Plan — policies for responding to emergencies"
+		},
+		{
+			"id": "164.308(a)(7)(ii)(A)",
+			"section": "Administrative Safeguards",
+			"text": "Data Backup Plan — create and maintain retrievable copies of ePHI"
+		},
+		{
+			"id": "164.308(a)(7)(ii)(B)",
+			"section": "Administrative Safeguards",
+			"text": "Disaster Recovery Plan — procedures to restore lost data"
+		},
+		{
+			"id": "164.308(a)(7)(ii)(C)",
+			"section": "Administrative Safeguards",
+			"text": "Emergency Mode Operation Plan — critical business processes during emergency"
+		},
+		{
+			"id": "164.308(a)(7)(ii)(D)",
+			"section": "Administrative Safeguards",
+			"text": "Testing and Revision — periodically test and revise contingency plans"
+		},
+		{
+			"id": "164.308(a)(8)",
+			"section": "Administrative Safeguards",
+			"text": "Evaluation — periodic technical and non-technical evaluation"
+		},
+		{
+			"id": "164.308(b)(1)",
+			"section": "Administrative Safeguards",
+			"text": "Business Associate Contracts — satisfactory assurances from business associates"
+		},
+		{
+			"id": "164.310(a)(1)",
+			"section": "Physical Safeguards",
+			"text": "Facility Access Controls — limit physical access to electronic information systems"
+		},
+		{
+			"id": "164.310(a)(2)(ii)",
+			"section": "Physical Safeguards",
+			"text": "Facility Security Plan — safeguard facility and equipment"
+		},
+		{
+			"id": "164.310(b)",
+			"section": "Physical Safeguards",
+			"text": "Workstation Use — specify proper functions and physical attributes of workstations"
+		},
+		{
+			"id": "164.310(c)",
+			"section": "Physical Safeguards",
+			"text": "Workstation Security — physical safeguards restricting access to authorized users"
+		},
+		{
+			"id": "164.310(d)(1)",
+			"section": "Physical Safeguards",
+			"text": "Device and Media Controls — govern receipt and removal of hardware and media"
+		},
+		{
+			"id": "164.310(d)(2)(i)",
+			"section": "Physical Safeguards",
+			"text": "Disposal — procedures for final disposal of ePHI and hardware"
+		},
+		{
+			"id": "164.312(a)(1)",
+			"section": "Technical Safeguards",
+			"text": "Access Control — technical policies to allow access only to authorized persons"
+		},
+		{
+			"id": "164.312(a)(2)(i)",
+			"section": "Technical Safeguards",
+			"text": "Unique User Identification — assign unique name/number to track user identity"
+		},
+		{
+			"id": "164.312(a)(2)(ii)",
+			"section": "Technical Safeguards",
+			"text": "Emergency Access Procedure — procedures for obtaining ePHI during emergency"
+		},
+		{
+			"id": "164.312(a)(2)(iii)",
+			"section": "Technical Safeguards",
+			"text": "Automatic Logoff — terminate session after period of inactivity"
+		},
+		{
+			"id": "164.312(a)(2)(iv)",
+			"section": "Technical Safeguards",
+			"text": "Encryption and Decryption — encrypt and decrypt ePHI at rest"
+		},
+		{
+			"id": "164.312(b)",
+			"section": "Technical Safeguards",
+			"text": "Audit Controls — record and examine system activity"
+		},
+		{
+			"id": "164.312(c)(1)",
+			"section": "Technical Safeguards",
+			"text": "Integrity — protect ePHI from improper alteration or destruction"
+		},
+		{
+			"id": "164.312(c)(2)",
+			"section": "Technical Safeguards",
+			"text": "Mechanism to Authenticate ePHI — corroborate that ePHI has not been altered"
+		},
+		{
+			"id": "164.312(d)",
+			"section": "Technical Safeguards",
+			"text": "Person or Entity Authentication — verify identity of person seeking access"
+		},
+		{
+			"id": "164.312(e)(1)",
+			"section": "Technical Safeguards",
+			"text": "Transmission Security — guard against unauthorized access during transmission"
+		},
+		{
+			"id": "164.312(e)(2)(i)",
+			"section": "Technical Safeguards",
+			"text": "Integrity Controls — ensure transmitted ePHI is not improperly modified"
+		},
+		{
+			"id": "164.312(e)(2)(ii)",
+			"section": "Technical Safeguards",
+			"text": "Encryption — encrypt ePHI in transit"
+		},
+		{
+			"id": "164.314(a)(1)",
+			"section": "Organizational Requirements",
+			"text": "Business Associate Contracts — document satisfactory assurances from BAs"
+		},
+		{
+			"id": "164.314(a)(2)(i)",
+			"section": "Organizational Requirements",
+			"text": "BA Contract Requirements — establish permitted uses and disclosures"
+		},
+		{
+			"id": "164.316(a)",
+			"section": "Policies and Documentation",
+			"text": "Policies and Procedures — implement reasonable and appropriate policies"
+		},
+		{
+			"id": "164.316(b)(1)",
+			"section": "Policies and Documentation",
+			"text": "Documentation — maintain written policies and records of required actions"
+		},
+		{
+			"id": "164.316(b)(2)(i)",
+			"section": "Policies and Documentation",
+			"text": "Time Limit — retain documentation for 6 years"
+		}
+	]
 }

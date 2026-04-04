@@ -1,50 +1,158 @@
 {
-  "id": "iso27001",
-  "name": "ISO/IEC 27001:2022",
-  "version": "1.0",
-  "disclaimer": "This maps ISO 27001:2022 Annex A controls to NIST 800-53 for compliance tracking. This is NOT an ISO certification assessment. Consult an accredited certification body for formal ISO 27001 certification.",
-  "terminology": {
-    "sensitive_data": "Information Assets",
-    "covered_entity": "Organization",
-    "processor": "Supplier",
-    "processor_agreement": "Supplier Agreement"
-  },
-  "thresholds": {
-    "log_retention_days": 365,
-    "backup_retention_days": 30,
-    "session_timeout_minutes": 15,
-    "key_rotation_days": 365,
-    "password_min_length": 12,
-    "credential_max_age_days": 90
-  },
-  "requirements": [
-    { "id": "A.5", "section": "Organizational Controls", "name": "Information Security Policies", "description": "Management direction and support for information security" },
-    { "id": "A.6", "section": "People Controls", "name": "Human Resource Security", "description": "Security responsibilities of personnel before, during, and after employment" },
-    { "id": "A.7", "section": "Physical Controls", "name": "Physical and Environmental Security", "description": "Physical access controls and protection of facilities" },
-    { "id": "A.8", "section": "Technological Controls", "name": "Technology Security", "description": "Access control, cryptography, operations security, communications security" }
-  ],
-  "checklist": [
-    { "id": "A.5.1", "section": "Organizational Controls", "text": "Information security policies defined, approved, published, and communicated" },
-    { "id": "A.5.2", "section": "Organizational Controls", "text": "Information security roles and responsibilities assigned" },
-    { "id": "A.5.3", "section": "Organizational Controls", "text": "Segregation of duties implemented" },
-    { "id": "A.5.7", "section": "Organizational Controls", "text": "Threat intelligence collected and analyzed" },
-    { "id": "A.5.9", "section": "Organizational Controls", "text": "Inventory of information and associated assets maintained" },
-    { "id": "A.5.15", "section": "Organizational Controls", "text": "Access control policy defined and implemented" },
-    { "id": "A.5.17", "section": "Organizational Controls", "text": "Authentication information managed securely" },
-    { "id": "A.5.19", "section": "Organizational Controls", "text": "Information security in supplier relationships addressed" },
-    { "id": "A.5.24", "section": "Organizational Controls", "text": "Information security incident management planned and prepared" },
-    { "id": "A.5.29", "section": "Organizational Controls", "text": "ICT continuity planned, implemented, and tested" },
-    { "id": "A.6.3", "section": "People Controls", "text": "Information security awareness, education, and training provided" },
-    { "id": "A.7.1", "section": "Physical Controls", "text": "Physical security perimeters defined and implemented" },
-    { "id": "A.8.1", "section": "Technological Controls", "text": "User endpoint devices secured" },
-    { "id": "A.8.2", "section": "Technological Controls", "text": "Privileged access rights restricted and managed" },
-    { "id": "A.8.5", "section": "Technological Controls", "text": "Secure authentication implemented" },
-    { "id": "A.8.7", "section": "Technological Controls", "text": "Protection against malware implemented" },
-    { "id": "A.8.8", "section": "Technological Controls", "text": "Technical vulnerabilities managed" },
-    { "id": "A.8.13", "section": "Technological Controls", "text": "Information backup procedures established and tested" },
-    { "id": "A.8.15", "section": "Technological Controls", "text": "Logging and monitoring activities established" },
-    { "id": "A.8.20", "section": "Technological Controls", "text": "Networks secured and protected" },
-    { "id": "A.8.24", "section": "Technological Controls", "text": "Cryptography used to protect information" },
-    { "id": "A.8.25", "section": "Technological Controls", "text": "Secure development lifecycle applied" }
-  ]
+	"id": "iso27001",
+	"name": "ISO/IEC 27001:2022",
+	"version": "1.0",
+	"disclaimer": "This maps ISO 27001:2022 Annex A controls to NIST 800-53 for compliance tracking. This is NOT an ISO certification assessment. Consult an accredited certification body for formal ISO 27001 certification.",
+	"terminology": {
+		"sensitive_data": "Information Assets",
+		"covered_entity": "Organization",
+		"processor": "Supplier",
+		"processor_agreement": "Supplier Agreement"
+	},
+	"thresholds": {
+		"log_retention_days": 365,
+		"backup_retention_days": 30,
+		"session_timeout_minutes": 15,
+		"key_rotation_days": 365,
+		"password_min_length": 12,
+		"credential_max_age_days": 90
+	},
+	"requirements": [
+		{
+			"id": "A.5",
+			"section": "Organizational Controls",
+			"name": "Information Security Policies",
+			"description": "Management direction and support for information security"
+		},
+		{
+			"id": "A.6",
+			"section": "People Controls",
+			"name": "Human Resource Security",
+			"description": "Security responsibilities of personnel before, during, and after employment"
+		},
+		{
+			"id": "A.7",
+			"section": "Physical Controls",
+			"name": "Physical and Environmental Security",
+			"description": "Physical access controls and protection of facilities"
+		},
+		{
+			"id": "A.8",
+			"section": "Technological Controls",
+			"name": "Technology Security",
+			"description": "Access control, cryptography, operations security, communications security"
+		}
+	],
+	"checklist": [
+		{
+			"id": "A.5.1",
+			"section": "Organizational Controls",
+			"text": "Information security policies defined, approved, published, and communicated"
+		},
+		{
+			"id": "A.5.2",
+			"section": "Organizational Controls",
+			"text": "Information security roles and responsibilities assigned"
+		},
+		{
+			"id": "A.5.3",
+			"section": "Organizational Controls",
+			"text": "Segregation of duties implemented"
+		},
+		{
+			"id": "A.5.7",
+			"section": "Organizational Controls",
+			"text": "Threat intelligence collected and analyzed"
+		},
+		{
+			"id": "A.5.9",
+			"section": "Organizational Controls",
+			"text": "Inventory of information and associated assets maintained"
+		},
+		{
+			"id": "A.5.15",
+			"section": "Organizational Controls",
+			"text": "Access control policy defined and implemented"
+		},
+		{
+			"id": "A.5.17",
+			"section": "Organizational Controls",
+			"text": "Authentication information managed securely"
+		},
+		{
+			"id": "A.5.19",
+			"section": "Organizational Controls",
+			"text": "Information security in supplier relationships addressed"
+		},
+		{
+			"id": "A.5.24",
+			"section": "Organizational Controls",
+			"text": "Information security incident management planned and prepared"
+		},
+		{
+			"id": "A.5.29",
+			"section": "Organizational Controls",
+			"text": "ICT continuity planned, implemented, and tested"
+		},
+		{
+			"id": "A.6.3",
+			"section": "People Controls",
+			"text": "Information security awareness, education, and training provided"
+		},
+		{
+			"id": "A.7.1",
+			"section": "Physical Controls",
+			"text": "Physical security perimeters defined and implemented"
+		},
+		{
+			"id": "A.8.1",
+			"section": "Technological Controls",
+			"text": "User endpoint devices secured"
+		},
+		{
+			"id": "A.8.2",
+			"section": "Technological Controls",
+			"text": "Privileged access rights restricted and managed"
+		},
+		{
+			"id": "A.8.5",
+			"section": "Technological Controls",
+			"text": "Secure authentication implemented"
+		},
+		{
+			"id": "A.8.7",
+			"section": "Technological Controls",
+			"text": "Protection against malware implemented"
+		},
+		{
+			"id": "A.8.8",
+			"section": "Technological Controls",
+			"text": "Technical vulnerabilities managed"
+		},
+		{
+			"id": "A.8.13",
+			"section": "Technological Controls",
+			"text": "Information backup procedures established and tested"
+		},
+		{
+			"id": "A.8.15",
+			"section": "Technological Controls",
+			"text": "Logging and monitoring activities established"
+		},
+		{
+			"id": "A.8.20",
+			"section": "Technological Controls",
+			"text": "Networks secured and protected"
+		},
+		{
+			"id": "A.8.24",
+			"section": "Technological Controls",
+			"text": "Cryptography used to protect information"
+		},
+		{
+			"id": "A.8.25",
+			"section": "Technological Controls",
+			"text": "Secure development lifecycle applied"
+		}
+	]
 }
