@@ -36,8 +36,48 @@ Create /soc2-audit, /gdpr-audit, /pci-dss-audit using the same 7-phase structure
 
 ---
 
+## Infrastructure
+
+### Future Multi-Host Expansion Beyond Codex
+
+**What:** Extend the new host-aware skill generation and setup flow beyond `claude` and `codex` once Codex support has shipped cleanly.
+
+**Why:** The Codex work will introduce the right abstraction boundary for host-specific skill generation, install topology, and runtime path rewrites; future agents can reuse that design instead of starting from another Claude-only implementation.
+
+**Context:** The current eng review explicitly keeps scope to `claude` + `codex` only. This avoids dragging `--host auto`, broader agent support, and extra install branches into the first host-expansion PR. Revisit this after the Codex path is stable, tested, and adopted enough to justify more surface area.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Codex support landing with green generator/install/smoke tests
+
+---
+
 Consider:
 - Improve CIS AWS coverage from 71% → 90%+ (add Section 4 CloudWatch alarm checks)
 - HITRUST CSF framework filter
 - FedRAMP framework filter (NIST publishes baselines)
 - Auditor co-signing (multi-party attestation)
+
+## P3: comply-db CLI Contract Specification
+
+**What:** Document comply-db's CLI contract (subcommand → expected stdout JSON shape + exit codes).
+
+**Why:** Other scripts (comply-audit, comply-start, comply-orchestrate, dashboard-server) parse comply-db stdout. The contract tests from the infrastructure PR partially address this, but a formal specification would be the single source of truth for any future callers.
+
+**Context:** Codex (outside voice review, 2026-04-03) identified that comply-db's output format is an implicit API used by 4+ consumers. Contract tests verify behavior; a spec documents intent. Consider OpenAPI-style YAML or a simple markdown table of subcommand → JSON schema.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Infrastructure PR2 (module split stabilizes output format)
+
+## P3: E2E Test Fixtures
+
+**What:** Create pre-seeded compliance.db fixtures, sample scan outputs, and expected response patterns for reproducible E2E testing.
+
+**Why:** E2E tests that depend on live Claude responses are nondeterministic. Fixtures enable deterministic regression testing for the non-LLM portions (database queries, report generation, audit lifecycle).
+
+**Context:** test/fixtures/ already has IaC and scan samples. Extend with DB fixtures (pre-populated compliance.db at various journey stages) and golden output files for comply-db subcommands.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Infrastructure PR1 (schema migrations establish stable schema versions)

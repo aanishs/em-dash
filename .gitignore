@@ -7,4 +7,8 @@ node_modules/
 dist/
 .bun/
 bun.lock
+.agents/
+.em-dash/
 docs/launch/
+.gstack/
+.mcp.json
