@@ -1,0 +1,297 @@
+{
+  "AC-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write down your rules for who can access patient data and how, and make sure everyone on your team has read them.",
+    "why_it_matters": "Without written rules, every employee makes up their own, and you have no defense in a breach investigation."
+  },
+  "AC-2": {
+    "nist_name": "Account Management",
+    "plain_english": "Give every person who touches patient data their own unique login, and remove access the same day someone leaves.",
+    "why_it_matters": "If everyone shares one login, you cannot tell who accessed what when something goes wrong."
+  },
+  "AC-3": {
+    "nist_name": "Access Enforcement",
+    "plain_english": "Set up your systems so people can only see the patient data they actually need for their job.",
+    "why_it_matters": "A billing clerk who can read therapy notes is a lawsuit waiting to happen."
+  },
+  "AC-4": {
+    "nist_name": "Information Flow Enforcement",
+    "plain_english": "Control how patient data moves between your systems so it cannot flow to places it should not be.",
+    "why_it_matters": "Uncontrolled data flow means patient records can end up in test environments, analytics tools, or third-party apps without anyone noticing."
+  },
+  "AC-5": {
+    "nist_name": "Separation of Duties",
+    "plain_english": "Make sure no single person can both grant access to patient data and use that access themselves.",
+    "why_it_matters": "When one person controls everything, mistakes and misuse go undetected."
+  },
+  "AC-6": {
+    "nist_name": "Least Privilege",
+    "plain_english": "Give each person the minimum level of access they need to do their job, and nothing more.",
+    "why_it_matters": "The more access someone has, the more damage they can do, whether by accident or on purpose."
+  },
+  "AC-7": {
+    "nist_name": "Unsuccessful Logon Attempts",
+    "plain_english": "Lock accounts automatically after a few failed password attempts.",
+    "why_it_matters": "Without lockouts, attackers can try thousands of passwords until they break in."
+  },
+  "AC-11": {
+    "nist_name": "Device Lock",
+    "plain_english": "Set all computers and devices to lock their screens automatically after a short period of inactivity.",
+    "why_it_matters": "An unlocked screen in a clinic or coffee shop is an open door to every patient record on that device."
+  },
+  "AT-2": {
+    "nist_name": "Literacy Training and Awareness",
+    "plain_english": "Train every employee on how to spot phishing emails, handle patient data safely, and report security problems.",
+    "why_it_matters": "Most breaches start with a human mistake, and training is the cheapest way to prevent them."
+  },
+  "AU-2": {
+    "nist_name": "Event Logging",
+    "plain_english": "Decide which events your systems must log, like logins, data access, and configuration changes, and turn on logging for all of them.",
+    "why_it_matters": "If you do not log events, you will not know a breach happened until a patient or regulator tells you."
+  },
+  "AU-3": {
+    "nist_name": "Content of Audit Records",
+    "plain_english": "Make sure every log entry records who did what, when they did it, and which patient data was involved.",
+    "why_it_matters": "Incomplete logs are as useless as no logs when investigators ask you to reconstruct what happened."
+  },
+  "AU-6": {
+    "nist_name": "Audit Record Review, Analysis, and Reporting",
+    "plain_english": "Assign someone to regularly review your logs and investigate anything suspicious.",
+    "why_it_matters": "Logs that nobody reads are just wasted disk space; the average breach goes undetected for months without active review."
+  },
+  "AU-11": {
+    "nist_name": "Audit Record Retention",
+    "plain_english": "Keep your access logs for at least six years, stored safely where they cannot be tampered with.",
+    "why_it_matters": "HIPAA requires six-year document retention, and deleted logs look like you are hiding something."
+  },
+  "AU-12": {
+    "nist_name": "Audit Record Generation",
+    "plain_english": "Configure every system that handles patient data to automatically generate log entries for security-relevant events.",
+    "why_it_matters": "Systems that do not generate logs create blind spots where breaches can happen without any trace."
+  },
+  "CA-2": {
+    "nist_name": "Control Assessments",
+    "plain_english": "Test your security controls at least once a year to make sure they actually work the way you think they do.",
+    "why_it_matters": "Controls that are not tested regularly tend to break silently, leaving you exposed without knowing it."
+  },
+  "CA-7": {
+    "nist_name": "Continuous Monitoring",
+    "plain_english": "Set up automated tools that continuously watch your systems for security problems and alert you in real time.",
+    "why_it_matters": "Annual audits catch problems a year too late; continuous monitoring catches them while you can still fix them."
+  },
+  "CM-8": {
+    "nist_name": "System Component Inventory",
+    "plain_english": "Keep an up-to-date list of every server, database, laptop, and application that stores or processes patient data.",
+    "why_it_matters": "You cannot protect what you do not know exists, and forgotten systems are the easiest targets for attackers."
+  },
+  "CP-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write a plan for how your company will keep running if your systems go down, and make sure everyone knows where to find it.",
+    "why_it_matters": "Without a written plan, a server crash or ransomware attack turns into chaos that puts patient care at risk."
+  },
+  "CP-2": {
+    "nist_name": "Contingency Plan",
+    "plain_english": "Create a step-by-step emergency plan that covers who does what, how to recover data, and how to keep serving patients if your main systems fail.",
+    "why_it_matters": "When systems go down, every minute of confusion is a minute patients cannot get the care they need."
+  },
+  "CP-4": {
+    "nist_name": "Contingency Plan Testing",
+    "plain_english": "Test your emergency recovery plan at least once a year by actually running through it, not just reading it.",
+    "why_it_matters": "A plan that has never been tested will almost certainly fail when you need it most."
+  },
+  "CP-9": {
+    "nist_name": "System Backup",
+    "plain_english": "Back up all patient data regularly, store backups in a separate location, and verify you can actually restore from them.",
+    "why_it_matters": "Ransomware or hardware failure without working backups means permanent loss of patient records."
+  },
+  "CP-10": {
+    "nist_name": "System Recovery and Reconstitution",
+    "plain_english": "Have a tested process to rebuild your systems and restore patient data to a known good state after an outage or attack.",
+    "why_it_matters": "Getting back online fast after an incident is the difference between a bad day and a business-ending event."
+  },
+  "IA-2": {
+    "nist_name": "Identification and Authentication (Organizational Users)",
+    "plain_english": "Require everyone to prove who they are before accessing any system with patient data, using strong authentication like multi-factor login.",
+    "why_it_matters": "A password alone is not enough; stolen passwords are the number one way attackers get into healthcare systems."
+  },
+  "IA-4": {
+    "nist_name": "Identifier Management",
+    "plain_english": "Assign a unique user ID to every person and make sure no two people ever share the same login credentials.",
+    "why_it_matters": "Shared IDs make it impossible to track who accessed a patient record, which is exactly what regulators will ask."
+  },
+  "IA-5": {
+    "nist_name": "Authenticator Management",
+    "plain_english": "Set strong password rules, require regular password changes, and never store passwords in plain text.",
+    "why_it_matters": "Weak or reused passwords are the easiest way for attackers to break into your systems and steal patient data."
+  },
+  "IR-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write a clear incident response plan that spells out what to do, who to call, and how to report a security incident.",
+    "why_it_matters": "HIPAA requires you to report breaches within 60 days, and you cannot meet that deadline if you are figuring out the process on the fly."
+  },
+  "IR-4": {
+    "nist_name": "Incident Handling",
+    "plain_english": "When a security incident happens, follow a defined process to contain the damage, investigate the cause, and fix the problem.",
+    "why_it_matters": "An uncontained breach spreads fast and turns a small incident into a front-page disaster."
+  },
+  "IR-5": {
+    "nist_name": "Incident Monitoring",
+    "plain_english": "Track and document every security incident, no matter how small, so you can spot patterns and prevent repeat problems.",
+    "why_it_matters": "Small incidents that go untracked often turn out to be early warning signs of a major breach."
+  },
+  "IR-6": {
+    "nist_name": "Incident Reporting",
+    "plain_english": "Report security incidents to the right people inside your company and to outside authorities when required by law.",
+    "why_it_matters": "Failing to report a breach to HHS on time can turn a manageable fine into a million-dollar penalty."
+  },
+  "MA-2": {
+    "nist_name": "Controlled Maintenance",
+    "plain_english": "Schedule and document all maintenance on systems that handle patient data, and make sure maintenance does not expose that data.",
+    "why_it_matters": "Unplanned maintenance by unvetted people is a common way patient data gets exposed or systems get compromised."
+  },
+  "MA-5": {
+    "nist_name": "Maintenance Personnel",
+    "plain_english": "Vet anyone who performs maintenance on your systems and supervise them if they are not your own employees.",
+    "why_it_matters": "A repair technician with unsupervised access to your servers has the same access as your most trusted admin."
+  },
+  "MP-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write rules for how physical media like hard drives, USB sticks, and paper records containing patient data must be handled and stored.",
+    "why_it_matters": "A lost USB drive with unencrypted patient data is a reportable breach, even if nobody ever reads it."
+  },
+  "MP-2": {
+    "nist_name": "Media Access",
+    "plain_english": "Limit who can physically access storage media that contains patient data, and keep it locked up when not in use.",
+    "why_it_matters": "An unlocked filing cabinet or an unattended external drive is just as dangerous as an unlocked database."
+  },
+  "MP-6": {
+    "nist_name": "Media Sanitization",
+    "plain_english": "Before disposing of or reusing any device or disk that held patient data, wipe it completely so the data cannot be recovered.",
+    "why_it_matters": "Old hard drives sold on eBay with recoverable patient records have led to some of the most embarrassing HIPAA fines."
+  },
+  "PE-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write rules for who can physically enter areas where patient data is stored or processed, like server rooms and offices.",
+    "why_it_matters": "Digital security is worthless if anyone can walk into your server room and plug in a USB drive."
+  },
+  "PE-2": {
+    "nist_name": "Physical Access Authorizations",
+    "plain_english": "Keep a list of exactly who is authorized to enter secure areas, and update it whenever someone joins, moves, or leaves.",
+    "why_it_matters": "Former employees who still have badge access are a real and common threat to patient data."
+  },
+  "PE-3": {
+    "nist_name": "Physical Access Control",
+    "plain_english": "Use locks, badge readers, or other controls to physically prevent unauthorized people from getting to systems with patient data.",
+    "why_it_matters": "The best firewall in the world does not help if someone can walk up to the server and pull the hard drive."
+  },
+  "PE-5": {
+    "nist_name": "Access Control for Output Devices",
+    "plain_english": "Place printers, fax machines, and monitors that display patient data in areas where only authorized people can see them.",
+    "why_it_matters": "Patient records left sitting on a shared printer in a hallway are a privacy violation that happens every day in healthcare."
+  },
+  "PL-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write and maintain a master security plan that documents all of your security policies, who is responsible for what, and when they get reviewed.",
+    "why_it_matters": "A complete, current security plan is the first thing auditors ask for, and not having one is an automatic finding."
+  },
+  "PL-4": {
+    "nist_name": "Rules of Behavior",
+    "plain_english": "Create an acceptable-use agreement that every employee signs, spelling out what they can and cannot do with patient data.",
+    "why_it_matters": "Without a signed agreement, you cannot hold employees accountable or discipline them for mishandling data."
+  },
+  "PM-1": {
+    "nist_name": "Information Security Program Plan",
+    "plain_english": "Build a company-wide security program with clear goals, assigned responsibilities, and a timeline for getting everything done.",
+    "why_it_matters": "Scattered, one-off security efforts leave gaps that attackers will find and exploit."
+  },
+  "PM-2": {
+    "nist_name": "Information Security Program Leadership Role",
+    "plain_english": "Appoint one specific person to be in charge of your security program and give them the authority and resources to do the job.",
+    "why_it_matters": "When security is everyone's job, it ends up being nobody's job, and things fall through the cracks."
+  },
+  "PM-9": {
+    "nist_name": "Risk Management Strategy",
+    "plain_english": "Define how your company identifies, evaluates, and responds to risks to patient data, and document it as a formal strategy.",
+    "why_it_matters": "Without a strategy, you will spend money on the wrong risks and miss the ones that actually threaten your patients."
+  },
+  "PS-1": {
+    "nist_name": "Policy and Procedures",
+    "plain_english": "Write rules covering how you screen, hire, manage, and terminate employees who will have access to patient data.",
+    "why_it_matters": "Insider threats cause a significant share of healthcare breaches, and good HR policies are your first line of defense."
+  },
+  "PS-2": {
+    "nist_name": "Position Risk Designation",
+    "plain_english": "Classify every job role by how much access to patient data it requires, and screen people accordingly before granting access.",
+    "why_it_matters": "Treating a database admin the same as a receptionist means either over-screening everyone or under-screening the people who matter most."
+  },
+  "PS-3": {
+    "nist_name": "Personnel Screening",
+    "plain_english": "Run background checks on anyone who will have access to patient data before giving them that access.",
+    "why_it_matters": "Skipping background checks means you might hand the keys to patient records to someone with a history of fraud or data theft."
+  },
+  "PS-4": {
+    "nist_name": "Personnel Termination",
+    "plain_english": "Immediately revoke all access to patient data and collect all company devices when an employee leaves or is fired.",
+    "why_it_matters": "A disgruntled former employee with active credentials is one of the most dangerous threats to your data."
+  },
+  "PS-8": {
+    "nist_name": "Personnel Sanctions",
+    "plain_english": "Have a clear, documented process for disciplining employees who violate your security or privacy policies.",
+    "why_it_matters": "If there are no consequences for breaking the rules, the rules do not mean anything."
+  },
+  "RA-2": {
+    "nist_name": "Security Categorization",
+    "plain_english": "Classify your systems by how sensitive the patient data they handle is, so you know which ones need the strongest protection.",
+    "why_it_matters": "If you treat every system the same, you will either overspend on low-risk systems or under-protect the ones that matter most."
+  },
+  "RA-3": {
+    "nist_name": "Risk Assessment",
+    "plain_english": "Regularly identify what could go wrong with your patient data, how likely it is, and how bad it would be, and write it all down.",
+    "why_it_matters": "HIPAA specifically requires a risk assessment, and not having one is the most common reason for enforcement action."
+  },
+  "RA-5": {
+    "nist_name": "Vulnerability Monitoring and Scanning",
+    "plain_english": "Scan your systems regularly for known security weaknesses and fix what you find on a schedule.",
+    "why_it_matters": "Attackers use automated tools to find unpatched systems; if you are not scanning, they will find your weaknesses before you do."
+  },
+  "SA-9": {
+    "nist_name": "External System Services",
+    "plain_english": "Vet every vendor and cloud service that touches patient data, get a signed Business Associate Agreement, and monitor their security.",
+    "why_it_matters": "You are legally responsible for your vendors' breaches if you did not do your due diligence and get a BAA."
+  },
+  "SC-2": {
+    "nist_name": "Separation of System and User Functionality",
+    "plain_english": "Keep your administrative tools and management functions separate from the parts of your system that regular users and patients interact with.",
+    "why_it_matters": "If admin functions are mixed with user-facing features, an attacker who compromises one gets access to everything."
+  },
+  "SC-8": {
+    "nist_name": "Transmission Confidentiality and Integrity",
+    "plain_english": "Encrypt all patient data whenever it is sent over a network, whether by email, API, or file transfer.",
+    "why_it_matters": "Unencrypted data in transit can be intercepted by anyone on the same network, including on public Wi-Fi."
+  },
+  "SC-13": {
+    "nist_name": "Cryptographic Protection",
+    "plain_english": "Use strong, industry-standard encryption algorithms for protecting patient data, and do not try to build your own.",
+    "why_it_matters": "Homemade or outdated encryption is the same as no encryption when a skilled attacker targets your data."
+  },
+  "SC-28": {
+    "nist_name": "Protection of Information at Rest",
+    "plain_english": "Encrypt patient data wherever it is stored, including databases, file systems, backups, and laptop hard drives.",
+    "why_it_matters": "A stolen laptop or breached database with encrypted data is an incident; without encryption, it is a reportable breach."
+  },
+  "SI-3": {
+    "nist_name": "Malicious Code Protection",
+    "plain_english": "Install and keep updated antivirus and anti-malware tools on every device that accesses patient data.",
+    "why_it_matters": "Ransomware targeting healthcare is surging, and outdated malware protection is like leaving your front door open."
+  },
+  "SI-7": {
+    "nist_name": "Software, Firmware, and Information Integrity",
+    "plain_english": "Use tools to detect unauthorized changes to your software, configurations, and patient data so you know if something has been tampered with.",
+    "why_it_matters": "If an attacker quietly changes your code or data and you cannot detect it, you may be serving corrupted records for months."
+  },
+  "SI-12": {
+    "nist_name": "Information Management and Retention",
+    "plain_english": "Only keep patient data as long as you legally need it, and securely destroy it when that time is up.",
+    "why_it_matters": "Data you no longer need but still store is just more fuel for a breach, with zero business benefit."
+  }
+}
