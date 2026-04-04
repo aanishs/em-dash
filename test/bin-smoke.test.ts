@@ -173,6 +173,91 @@ describe("Bin smoke: comply-db update-scan", () => {
 	});
 });
 
+describe("Bin smoke: comply-db control --json", () => {
+	let tmpDir: string;
+
+	beforeAll(async () => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "emdash-explain-"));
+		await run("comply-db", ["init", "--framework", "hipaa"], { cwd: tmpDir });
+	});
+
+	afterAll(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	test("outputs valid JSON with enriched fields for SC-28", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["control", "SC-28", "--json", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.control_id).toBe("SC-28");
+		expect(data.nist_name).toBeDefined();
+		expect(data.family).toBeDefined();
+		expect(data.plain_english).toBeDefined();
+		expect(data.why_it_matters).toBeDefined();
+		expect(data.nist_guidance).toBeDefined();
+		expect(data.hipaa_sections).toBeInstanceOf(Array);
+		expect(data.hipaa_sections.length).toBeGreaterThan(0);
+		expect(data.related_controls).toBeInstanceOf(Array);
+		expect(data.related_controls.length).toBeGreaterThan(0);
+		expect(data.verification).toBeDefined();
+		expect(data.verification.automated).toBe(true);
+		expect(data._sources).toBeDefined();
+		expect(data._sources.nist_catalog).toBe("found");
+		expect(data._sources.plain_english).toBe("found");
+	});
+
+	test("resolves HIPAA CFR section to NIST control", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["control", "164.312(a)(2)(iv)", "--json", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		// 164.312(a)(2)(iv) maps to SC-28
+		expect(data.control_id).toBe("SC-28");
+		expect(data.resolved_from).toBe("164.312(a)(2)(iv)");
+	});
+
+	test("--simple flag sets eli5_requested", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["control", "SC-28", "--json", "--simple", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.eli5_requested).toBe(true);
+	});
+
+	test("returns error for invalid control ID", async () => {
+		const { stderr, exitCode } = await run(
+			"comply-db",
+			["control", "FAKE-99", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain("not found");
+	});
+
+	test("interview-only control has interview_only flag", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["control", "AC-4", "--json", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.verification).toBeDefined();
+		expect(data.verification.interview_only).toBe(true);
+		expect(data.verification.automated).toBe(false);
+	});
+});
+
 describe("Bin smoke: hipaa-evidence-hash", () => {
 	let tmpDir: string;
 
