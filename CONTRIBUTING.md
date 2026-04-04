@@ -51,7 +51,10 @@ SKILL.md files are **generated** — don't edit them directly. They'd be overwri
 
 1. Edit the `.tmpl` file (e.g., `skills/comply-assess/SKILL.md.tmpl`)
 2. Run `bun run gen:skill-docs`
-3. Commit both the `.tmpl` and generated `.md` files
+3. If you touched shared generator logic or frontmatter/path handling, also run `bun run gen:skill-docs -- --host codex`
+4. Commit the `.tmpl` and Claude-generated `skills/*/SKILL.md` files
+
+Codex wrappers under `.agents/skills/` are generated output and are intentionally gitignored. They are validated in tests and by `bun run skill:check`, but they are not committed.
 
 **Why generated files?** The 8 skills share a lot of logic — PHI patterns, cloud commands, evidence collection, the preamble. Without the template engine, you'd copy-paste thousands of lines across skills and they'd drift apart. Placeholders keep everything in sync.
 
@@ -493,6 +496,7 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 bun test                  # ~197 tests, free, <14s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
+bun run test:codex-smoke  # optional real Codex smoke test (requires CODEX_SMOKE=1)
 ```
 
 ### Test files
@@ -553,7 +557,7 @@ Before submitting:
 - [ ] `bun test` passes (~197 tests)
 - [ ] `bun run gen:skill-docs -- --dry-run` passes (if templates changed)
 - [ ] `bun run skill:check` is all green
-- [ ] Both `.tmpl` and generated `.md` files committed (if templates changed)
+- [ ] Both `.tmpl` and Claude-generated `skills/*/SKILL.md` files committed (if templates changed)
 - [ ] New Rego policies have `check_id` and `severity` in all `deny` rules
 - [ ] New policy templates added to `expectedTemplates` in tests
 - [ ] CHANGELOG updated (user-facing language, not implementation details)
