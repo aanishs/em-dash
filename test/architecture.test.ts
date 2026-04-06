@@ -546,36 +546,30 @@ describe("Signing & Verification", () => {
 
 // ═══ Skills ═════════════════════════════════════════════════
 
-describe("Skills (20 total)", () => {
-	test("exactly 20 skill directories", () => {
+describe("Skills (14 total)", () => {
+	test("exactly 14 skill directories", () => {
 		const skills = fs
 			.readdirSync(path.join(ROOT, "skills"))
 			.filter((d: string) =>
 				fs.statSync(path.join(ROOT, "skills", d)).isDirectory(),
 			);
-		expect(skills.length).toBe(20);
+		expect(skills.length).toBe(14);
 	});
 
 	test("expected skills present", () => {
 		const expected = [
 			"comply",
-			"comply-auto",
 			"comply-assess",
-			"comply-audit",
+			"comply-auto",
 			"comply-breach",
-			"comply-deal",
 			"comply-explain",
 			"comply-fix",
-			"comply-monitor",
-			"comply-policy",
 			"comply-report",
 			"comply-scan",
-			"cis",
 			"em-dashboard",
 			"gdpr",
 			"hipaa",
 			"hipaa-audit",
-			"iso27001",
 			"pci-dss",
 			"soc2",
 		];
@@ -607,6 +601,7 @@ describe("Skills (20 total)", () => {
 		const removed = [
 			"comply-vendor",
 			"comply-risk",
+			"comply-monitor",
 			"comply-oscal-import",
 			"comply-verify",
 			"comply-remediate",
