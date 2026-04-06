@@ -278,7 +278,7 @@ describe("comply-start apply", () => {
 		const answersFile = path.join(tmpHome, "answers.json");
 		fs.writeFileSync(answersFile, JSON.stringify(minimalAnswers));
 
-		const { exitCode, stderr } = await run(
+		const { stdout, exitCode } = await run(
 			"comply-start",
 			["apply", "--answers", answersFile],
 			{
@@ -287,12 +287,11 @@ describe("comply-start apply", () => {
 			},
 		);
 
-		// Check that it didn't crash (init may warn about missing frameworks, that's OK)
-		if (exitCode !== 0) {
-			// Apply may fail if comply-db init can't find nist files from this cwd
-			// In that case, verify it at least attempted properly
-			expect(stderr).toBeDefined();
-		}
+		expect(exitCode).toBe(0);
+		const result = JSON.parse(stdout);
+		expect(result.success).toBe(true);
+		expect(result.phi_flows_written).toBe(2);
+		expect(result.vendors_written).toBe(2);
 	});
 
 	test("apply generates action items for missing BAA", async () => {
@@ -321,11 +320,9 @@ describe("comply-start apply", () => {
 			},
 		);
 
-		// If apply succeeds, check the output or DB for BAA action items
-		if (exitCode === 0 && stdout) {
-			// Success path
-			expect(exitCode).toBe(0);
-		}
+		expect(exitCode).toBe(0);
+		const result = JSON.parse(stdout);
+		expect(result.success).toBe(true);
 	});
 
 	test("apply generates B2B2C action items", async () => {
@@ -342,7 +339,7 @@ describe("comply-start apply", () => {
 		const answersFile = path.join(tmpHome, "answers-b2b2c.json");
 		fs.writeFileSync(answersFile, JSON.stringify(b2b2cAnswers));
 
-		const { exitCode } = await run(
+		const { stdout, exitCode } = await run(
 			"comply-start",
 			["apply", "--answers", answersFile],
 			{
@@ -351,11 +348,9 @@ describe("comply-start apply", () => {
 			},
 		);
 
-		// Verify it processes without crashing
-		// The B2B2C flag should trigger additional action items
-		if (exitCode === 0) {
-			expect(exitCode).toBe(0);
-		}
+		expect(exitCode).toBe(0);
+		const result = JSON.parse(stdout);
+		expect(result.success).toBe(true);
 	});
 });
 

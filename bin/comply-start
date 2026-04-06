@@ -477,6 +477,36 @@ function apply() {
   // 2. Open DB for transactional writes
   const db = openDb();
 
+  // Create onramp-specific tables if not yet present
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS phi_data_flows (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      source           TEXT NOT NULL,
+      destination      TEXT NOT NULL,
+      data_type        TEXT NOT NULL,
+      encryption_status TEXT DEFAULT 'unknown',
+      notes            TEXT
+    );
+    CREATE TABLE IF NOT EXISTS vendor_registry (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      vendor           TEXT NOT NULL,
+      services_used    TEXT,
+      baa_status       TEXT DEFAULT 'unknown',
+      phi_scope        TEXT DEFAULT 'unknown',
+      detected_from    TEXT,
+      confirmed_by_user INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS action_items (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      priority         INTEGER,
+      control_id       TEXT,
+      description      TEXT,
+      effort           TEXT,
+      phase            TEXT,
+      status           TEXT DEFAULT 'pending'
+    );
+  `);
+
   try {
     const tx = db.transaction(() => {
       // Write phi_data_flows
@@ -620,11 +650,7 @@ function report() {
   if (fs.existsSync(plainEnglishPath)) {
     try {
       plainEnglish = JSON.parse(fs.readFileSync(plainEnglishPath, 'utf-8'));
-    } catch {
-      console.error('WARNING: Could not parse nist/plain-english.json, falling back to control IDs');
-    }
-  } else {
-    console.error('WARNING: nist/plain-english.json not found, using NIST control IDs as-is');
+    } catch { /* fall back to control IDs */ }
   }
 
   function translateControl(controlId: string): string {
@@ -678,7 +704,7 @@ function report() {
 
   // Build Top 5 Blockers
   const top5Blockers = actionItems
-    .filter(a => a.status === 'pending')
+    .filter(a => !a.status || a.status === 'pending')
     .slice(0, 5)
     .map(a => ({
       priority: a.priority,

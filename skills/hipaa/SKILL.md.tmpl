@@ -98,11 +98,12 @@ Construct the answers JSON from the user's responses and the confirmed vendor li
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 
 # Write answers to temp file
-cat > /tmp/hipaa-onramp-answers.json << 'ANSWERS_EOF'
+_ANSWERS_FILE=$(mktemp /tmp/hipaa-onramp-answers-XXXXXX.json)
+cat > "$_ANSWERS_FILE" << 'ANSWERS_EOF'
 {CONSTRUCT JSON FROM USER RESPONSES}
 ANSWERS_EOF
 
-"$_EMDASH_BIN"/comply-start apply --answers /tmp/hipaa-onramp-answers.json
+"$_EMDASH_BIN"/comply-start apply --answers "$_ANSWERS_FILE"
 "$_EMDASH_BIN"/comply-start report
 ```
 
@@ -121,7 +122,7 @@ After presenting the report, tell the user:
 
 Clean up:
 ```bash
-rm -f /tmp/hipaa-onramp-answers.json
+rm -f "$_ANSWERS_FILE"
 ```
 
 ## Step 5: Returning User
