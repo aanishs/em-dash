@@ -31,7 +31,7 @@ _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-da
 ```
 
 Show the user their compliance score. If less than 50% complete, warn:
-"Your compliance coverage is low. Consider running `/comply-auto` first."
+"Your compliance coverage is low. Consider running `/comply` first to build your compliance posture."
 
 ## Step 2: Generate report
 

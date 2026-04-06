@@ -36,8 +36,8 @@ function findGenerated(): string[] {
 describe("Skill template validation", () => {
 	const templates = findTemplates();
 
-	test("14 skill templates exist", () => {
-		expect(templates.length).toBe(14);
+	test("16 skill templates exist", () => {
+		expect(templates.length).toBe(16);
 	});
 
 	for (const tmpl of templates) {
@@ -60,8 +60,8 @@ describe("Skill template validation", () => {
 describe("Generated SKILL.md files", () => {
 	const generated = findGenerated();
 
-	test("14 generated files exist", () => {
-		expect(generated.length).toBe(14);
+	test("16 generated files exist", () => {
+		expect(generated.length).toBe(16);
 	});
 
 	for (const md of generated) {

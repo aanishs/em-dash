@@ -1,0 +1,120 @@
+---
+name: comply-policy
+version: 1.0.0
+description: |
+  Generate personalized compliance policy documents from assessment data.
+  Reads your tech stack, data flows, and control status from SQLite,
+  then generates policies that reference your actual infrastructure.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Glob
+  - AskUserQuestion
+---
+
+## DISCLAIMER
+
+> **IMPORTANT:** This tool provides technical guidance for implementing compliance controls. It is NOT legal advice and does not constitute certification. Consult qualified legal counsel for formal compliance verification.
+
+
+# /comply-policy — Policy Document Generator
+
+Generate personalized compliance policy documents using your assessment data and tech stack.
+
+## Step 1: Check compliance data exists
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+_SLUG=$("$_EMDASH_BIN"/comply-slug 2>/dev/null | grep SLUG= | cut -d= -f2)
+_DB_PATH=~/.em-dash/projects/$_SLUG/compliance.db
+[ -f "$_DB_PATH" ] && echo "DB_EXISTS" || echo "NO_DB"
+```
+
+If NO_DB: "No compliance data found. Run `/hipaa` or another framework command first to complete an assessment, then come back to generate policies."
+
+## Step 2: Load assessment context
+
+```bash
+"$_EMDASH_BIN"/comply-db query "SELECT * FROM vendor_registry" 2>/dev/null || echo "NO_VENDORS"
+"$_EMDASH_BIN"/comply-db query "SELECT * FROM phi_data_flows" 2>/dev/null || echo "NO_FLOWS"
+"$_EMDASH_BIN"/comply-db query "SELECT key, value FROM metadata WHERE key IN ('framework', 'active_frameworks')" 2>/dev/null
+"$_EMDASH_BIN"/comply-db summary 2>/dev/null
+```
+
+If vendor_registry AND phi_data_flows are both empty: "No assessment data found. Run your framework command (e.g., `/hipaa`) to complete the assessment interview first. The policy generator needs to know your tech stack, data flows, and vendors to generate personalized policies."
+
+## Step 3: Read existing policy templates
+
+```bash
+ls templates/policies/ 2>/dev/null
+```
+
+These templates provide structural scaffolding. The generator personalizes each section with your actual assessment data.
+
+## Step 4: Ask which policies to generate
+
+Use AskUserQuestion:
+
+> "Which policies do you want to generate? I'll personalize each one with your actual tech stack, data flows, and vendors."
+>
+> - A) Incident Response Plan — what to do when a breach happens
+> - B) Privacy Policy — how you handle personal/patient data
+> - C) Security Policy — your technical security controls
+> - D) Data Retention Policy — how long you keep data and how you dispose of it
+> - E) BAA Template — template for business associate agreements with vendors
+> - F) All of the above
+
+## Step 5: Generate each selected policy
+
+For each policy, generate a complete document following this structure:
+
+```markdown
+# [Policy Name]
+## [Project Name] — Compliance Policy
+
+**Version:** 1.0
+**Effective Date:** [today's date]
+**Last Reviewed:** [today's date]
+**Owner:** [from assessment if available, otherwise "To be assigned"]
+
+## Purpose
+[Plain-English: why this policy exists, what it protects]
+
+## Scope
+[From assessment: which systems, data types, and people this covers.
+ Reference actual vendors from vendor_registry.
+ Reference actual data flows from phi_data_flows.]
+
+## Policy Statements
+[Generated from framework requirements.
+ Each statement cites the specific NIST control.
+ Use plain-English descriptions.]
+
+## Procedures
+[Specific to the user's stack.
+ Reference actual cloud provider, auth system, database.
+ Don't say "your cloud provider" — say "AWS us-east-1" or whatever they use.]
+
+## Responsibilities
+[From assessment: who does what.]
+
+## Review Schedule
+[Annual for most, quarterly for incident response.]
+```
+
+Write each policy to `policies/<policy-name>.md` in the project directory.
+
+## Step 6: Evidence and signing
+
+For each generated policy, tell the user:
+
+"Policy generated at `policies/<policy-name>.md`. Read it carefully — you should understand every policy before signing. When ready, you can sign it with `comply-attest`."
+
+## Step 7: Update journey
+
+```bash
+"$_EMDASH_BIN"/comply-db journey complete --milestone 3 2>/dev/null || true
+```
+
+"Policies generated. Your next step is setting up PR-level compliance checking (Milestone 4). Run `/comply` to continue."

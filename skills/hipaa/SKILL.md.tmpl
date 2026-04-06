@@ -5,7 +5,7 @@ version: 3.0.0
 description: |
   HIPAA compliance. For first-time users, runs the founder onramp
   (advisory detection, 9 questions, PHI flow map, action plan).
-  For returning users, shows status and routes to comply-auto/scan/assess/fix/report.
+  For returning users, shows status and routes to comply/scan/assess/fix/report.
 allowed-tools:
   - Bash
   - Read
@@ -138,7 +138,7 @@ Tell the user: "HIPAA compliance initialized. [N] NIST 800-53 controls imported.
 
 ## Step 6: Recommend next step (returning users)
 
-- **0% complete:** "Run `/comply-auto` to start — it scans your infrastructure, fixes what it can, and asks you questions."
+- **0% complete:** "Run `/comply` to start your compliance journey — it guides you through everything step by step."
 - **Partial:** "Run `/comply-assess` for interviews or `/comply-scan` for automated checks."
 - **Failures found:** "Run `/comply-fix` to remediate."
 - **Complete:** "Run `/comply-report` to generate your signed audit packet."

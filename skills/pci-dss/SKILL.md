@@ -1,10 +1,10 @@
 ---
 
 name: pci-dss
-version: 2.0.0
+version: 3.0.0
 description: |
-  PCI-DSS compliance. Initializes the framework, shows status,
-  and routes to comply-auto/scan/assess/fix/report skills.
+  PCI-DSS compliance. Initializes the framework, asks domain-specific questions
+  about cardholder data environment and SAQ type, then routes to comply skills.
 allowed-tools:
   - Bash
   - Read
@@ -20,32 +20,70 @@ allowed-tools:
 
 # /pci-dss — PCI-DSS Compliance
 
-Initialize PCI-DSS compliance and show your status.
+Initialize PCI-DSS compliance with domain-specific context.
 
-## Step 1: Initialize
+## Step 1: Initialize framework
 
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 "$_EMDASH_BIN"/comply-db init --framework pci-dss 2>/dev/null || true
+"$_EMDASH_BIN"/comply-db journey init 2>/dev/null || true
 "$_EMDASH_BIN"/comply-db summary
-"$_EMDASH_BIN"/comply-db status
 ```
 
 Tell the user: "PCI-DSS compliance initialized. [N] NIST 800-53 controls imported."
 
-## Step 2: Recommend next step
+## Step 2: PCI-DSS-specific questions
 
-- **0% complete:** "Run `/comply-auto` to start — it scans your infrastructure, fixes what it can, and asks you questions."
+Ask these via AskUserQuestion, one at a time:
+
+### Q1: Cardholder data handling
+
+> "How does your application handle payment card data?"
+>
+> - A) We use a payment processor (Stripe, Square, Braintree) and never see card numbers
+> - B) We handle card data through a hosted payment page (iframe/redirect)
+> - C) We directly store, process, or transmit card numbers in our systems
+> - D) Not sure
+
+If A: "Using a payment processor significantly reduces your PCI scope. You'll likely qualify for SAQ A (simplest). Most controls are inherited from your processor."
+
+### Q2: Cardholder data environment scope
+
+> "What systems touch payment data in your environment?"
+>
+> - A) Just the payment processor integration (API calls only)
+> - B) Our web servers handle payment forms, but we don't store card data
+> - C) We store card data in our database
+> - D) Card data flows through multiple systems
+
+### Q3: SAQ type
+
+> "Which PCI-DSS Self-Assessment Questionnaire type applies to you?"
+>
+> - A) SAQ A — card-not-present, fully outsourced (e-commerce with hosted payment page)
+> - B) SAQ A-EP — card-not-present, partially outsourced (e-commerce with redirect)
+> - C) SAQ D — all other merchants / service providers
+> - D) I'm not sure which SAQ applies
+
+If D: Based on Q1 and Q2 answers, recommend the likely SAQ type.
+
+Store answers in metadata for context in assessments and reports.
+
+## Step 3: Recommend next step
+
+Based on progress:
+- **0% complete:** "Run `/comply` to start your compliance journey, or `/comply-auto` to scan everything."
 - **Partial:** "Run `/comply-assess` for interviews or `/comply-scan` for automated checks."
 - **Failures found:** "Run `/comply-fix` to remediate."
-- **Complete:** "Run `/comply-report` to generate your signed audit packet."
+- **Complete:** "Run `/comply-report` to generate your compliance report."
 
-## Step 3: Multiple frameworks
+## Step 4: Multiple frameworks
 
-If user wants to add another framework: "Run `/soc2`, `/gdpr`, or `/pci-dss` to add more. Controls are shared automatically."
+"Want to add another framework? Run `/hipaa`, `/soc2`, or `/gdpr`. Controls are shared automatically."
 
 ## Important
 
 - All `/comply-*` skills work with whichever frameworks you've initialized.
 - Evidence lives in SQLite: `~/.em-dash/projects/{slug}/compliance.db`
-- Payment card data security — cardholder data protection
+- PCI-DSS covers: cardholder data protection, network security, access control, monitoring
