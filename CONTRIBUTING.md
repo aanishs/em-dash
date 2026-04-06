@@ -496,7 +496,6 @@ These are resolved by `scripts/gen-skill-docs.ts`:
 bun test                  # ~197 tests, free, <14s
 bun run skill:check       # health dashboard for all skills/bins/policies
 bun run dev:skill         # watch mode: auto-regen + validate on change
-bun run test:codex-smoke  # optional real Codex smoke test (requires CODEX_SMOKE=1)
 ```
 
 ### Test files
