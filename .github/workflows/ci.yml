@@ -17,6 +17,8 @@ jobs:
       - run: bun install
       - run: bun run gen:skill-docs -- --dry-run
       - run: bun run skill:check
+      - run: bunx biome check .
+      - run: bunx knip
       - run: bun test
 
   compliance:
