@@ -33,6 +33,7 @@ if (!CODEX_SMOKE || !CODEX_BIN) {
 			fs.mkdirSync(localSkillsDir, { recursive: true });
 			fs.symlinkSync(ROOT, path.join(localSkillsDir, "em-dash"));
 
+			const smokeOutputRoot = makeTempDir("emdash-codex-smoke-output-");
 			const setupProc = Bun.spawnSync(
 				[
 					"bash",
@@ -42,7 +43,11 @@ if (!CODEX_SMOKE || !CODEX_BIN) {
 				],
 				{
 					cwd: projectDir,
-					env: { ...process.env, HOME: home },
+					env: {
+						...process.env,
+						HOME: home,
+						EMDASH_CODEX_OUTPUT_ROOT: smokeOutputRoot,
+					},
 					stdout: "pipe",
 					stderr: "pipe",
 				},

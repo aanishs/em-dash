@@ -129,8 +129,7 @@ link_claude_skill_dirs() {
 }
 
 link_codex_skill_dirs() {
-  local emdash_dir="$1"
-  local skills_dir="$2"
+  local skills_dir="$1"
   local agents_dir="$CODEX_GENERATED_SKILLS_DIR"
   local linked=()
 
@@ -219,6 +218,10 @@ fi
 
 if [ "$HOST" = "codex" ]; then
   migrate_direct_codex_install "$SOURCE_EMDASH_DIR" "$CODEX_EMDASH"
+  # Recompute after migration may have moved SOURCE_EMDASH_DIR
+  if [ -z "${EMDASH_CODEX_OUTPUT_ROOT:-}" ]; then
+    CODEX_GENERATED_SKILLS_DIR="$SOURCE_EMDASH_DIR/.agents/skills"
+  fi
   generate_codex_skill_docs
 
   if [ "$CODEX_REPO_LOCAL" -eq 1 ]; then
@@ -230,7 +233,7 @@ if [ "$HOST" = "codex" ]; then
   if [ "$CODEX_REPO_LOCAL" -eq 0 ]; then
     create_codex_runtime_root "$SOURCE_EMDASH_DIR" "$CODEX_EMDASH"
   fi
-  link_codex_skill_dirs "$SOURCE_EMDASH_DIR" "$CODEX_SKILLS"
+  link_codex_skill_dirs "$CODEX_SKILLS"
 
   echo ""
   echo "em-dash ready (codex)."
