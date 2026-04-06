@@ -546,14 +546,14 @@ describe("Signing & Verification", () => {
 
 // ═══ Skills ═════════════════════════════════════════════════
 
-describe("Skills (13 total)", () => {
-	test("exactly 13 skill directories", () => {
+describe("Skills (20 total)", () => {
+	test("exactly 20 skill directories", () => {
 		const skills = fs
 			.readdirSync(path.join(ROOT, "skills"))
 			.filter((d: string) =>
 				fs.statSync(path.join(ROOT, "skills", d)).isDirectory(),
 			);
-		expect(skills.length).toBe(13);
+		expect(skills.length).toBe(20);
 	});
 
 	test("expected skills present", () => {
@@ -561,16 +561,23 @@ describe("Skills (13 total)", () => {
 			"comply",
 			"comply-auto",
 			"comply-assess",
-			"comply-scan",
-			"comply-fix",
-			"comply-report",
+			"comply-audit",
 			"comply-breach",
+			"comply-deal",
+			"comply-explain",
+			"comply-fix",
+			"comply-monitor",
+			"comply-policy",
+			"comply-report",
+			"comply-scan",
+			"cis",
 			"em-dashboard",
+			"gdpr",
 			"hipaa",
 			"hipaa-audit",
-			"soc2",
-			"gdpr",
+			"iso27001",
 			"pci-dss",
+			"soc2",
 		];
 		const skills = fs
 			.readdirSync(path.join(ROOT, "skills"))
@@ -600,7 +607,6 @@ describe("Skills (13 total)", () => {
 		const removed = [
 			"comply-vendor",
 			"comply-risk",
-			"comply-monitor",
 			"comply-oscal-import",
 			"comply-verify",
 			"comply-remediate",

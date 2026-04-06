@@ -17,6 +17,8 @@
  *   hipaa-sections <id>        Reverse-map: NIST control → HIPAA CFR sections + category
  *   audit-snapshot <create|update|list|get>  Manage audit snapshots
  *   audit-diff --id1 <N> --id2 <N>          Compare two audit snapshots
+ *   journey <init|status|skip|complete>     Manage compliance journey milestones
+ *   config <get|set> <key> [value]          User preferences (~/.em-dash/config.json)
  *   query <sql>                Run raw SQL (for debugging)
  */
 
@@ -111,6 +113,158 @@ function extractParts(parts: any[]): string {
     if (part.parts) result += extractParts(part.parts);
   }
   return result.trim();
+}
+
+// ─── Explain Helpers ────────────────────────────────────────
+
+const PLAIN_ENGLISH_PATH = path.join(NIST_DIR, 'plain-english.json');
+const TOOL_BINDINGS_PATH = path.join(NIST_DIR, 'tool-bindings.json');
+const HIPAA_JSON_PATH = path.join(import.meta.dir, '..', 'frameworks', 'hipaa.json');
+
+/** Known tool keys in tool-bindings.json (everything else is metadata) */
+const TOOL_KEYS = ['emdash', 'prowler', 'checkov', 'trivy', 'lynis'];
+
+function loadPlainEnglish(controlId: string): { plain_english: string; why_it_matters: string; nist_name: string } | null {
+  try {
+    if (!fs.existsSync(PLAIN_ENGLISH_PATH)) return null;
+    const data = JSON.parse(fs.readFileSync(PLAIN_ENGLISH_PATH, 'utf-8'));
+    return data[controlId] || null;
+  } catch { return null; }
+}
+
+function extractGuidance(catalog: any, controlId: string): string {
+  const id = controlId.toLowerCase();
+  for (const group of catalog.catalog.groups) {
+    for (const ctrl of group.controls || []) {
+      if (ctrl.id === id) {
+        const guidancePart = ctrl.parts?.find((p: any) => p.name === 'guidance');
+        return guidancePart?.prose || '';
+      }
+      for (const enh of ctrl.controls || []) {
+        if (enh.id === id) {
+          const guidancePart = enh.parts?.find((p: any) => p.name === 'guidance');
+          return guidancePart?.prose || '';
+        }
+      }
+    }
+  }
+  return '';
+}
+
+/** Build an index of controlId → title from the full NIST catalog */
+function buildCatalogIndex(catalog: any): Record<string, string> {
+  const index: Record<string, string> = {};
+  for (const group of catalog.catalog.groups) {
+    for (const ctrl of group.controls || []) {
+      index[ctrl.id.toUpperCase()] = ctrl.title;
+      for (const enh of ctrl.controls || []) {
+        index[enh.id.toUpperCase()] = enh.title || ctrl.title;
+      }
+    }
+  }
+  return index;
+}
+
+function extractRelatedControls(catalog: any, controlId: string, catalogIndex: Record<string, string>): { id: string; title: string }[] {
+  const id = controlId.toLowerCase();
+  for (const group of catalog.catalog.groups) {
+    for (const ctrl of group.controls || []) {
+      if (ctrl.id === id) {
+        return (ctrl.links || [])
+          .filter((l: any) => l.rel === 'related')
+          .map((l: any) => {
+            const refId = l.href.replace('#', '').toUpperCase();
+            return { id: refId, title: catalogIndex[refId] || refId };
+          });
+      }
+      for (const enh of ctrl.controls || []) {
+        if (enh.id === id) {
+          return (enh.links || [])
+            .filter((l: any) => l.rel === 'related')
+            .map((l: any) => {
+              const refId = l.href.replace('#', '').toUpperCase();
+              return { id: refId, title: catalogIndex[refId] || refId };
+            });
+        }
+      }
+    }
+  }
+  return [];
+}
+
+function resolveFromCFR(cfrSection: string): string[] {
+  try {
+    const filterPath = path.join(NIST_DIR, 'hipaa-filter.json');
+    if (!fs.existsSync(filterPath)) return [];
+    const filter = JSON.parse(fs.readFileSync(filterPath, 'utf-8'));
+    const controls = filter.mapping[cfrSection];
+    return Array.isArray(controls) ? controls : [];
+  } catch { return []; }
+}
+
+function normalizeVerification(controlId: string): { automated: boolean; tools: string[]; checks: string[]; interview_only: boolean } | null {
+  try {
+    if (!fs.existsSync(TOOL_BINDINGS_PATH)) return null;
+    const bindings = JSON.parse(fs.readFileSync(TOOL_BINDINGS_PATH, 'utf-8'));
+    const binding = bindings.bindings[controlId];
+    if (!binding) return null;
+
+    const tools: string[] = [];
+    const checks: string[] = [];
+    for (const key of TOOL_KEYS) {
+      const arr = binding[key];
+      if (Array.isArray(arr) && arr.length > 0) {
+        tools.push(key);
+        checks.push(...arr);
+      }
+    }
+
+    return {
+      automated: tools.length > 0,
+      tools,
+      checks,
+      interview_only: binding.interview_only === true,
+    };
+  } catch { return null; }
+}
+
+function getHipaaName(cfrSections: string[]): string | null {
+  try {
+    if (!fs.existsSync(HIPAA_JSON_PATH)) return null;
+    const hipaa = JSON.parse(fs.readFileSync(HIPAA_JSON_PATH, 'utf-8'));
+    // Use checklist array (more complete than requirements: 35 vs 25 entries)
+    for (const cfr of cfrSections) {
+      const item = hipaa.checklist?.find((c: any) => c.id === cfr);
+      if (item) return item.text.split('—')[0]?.trim() || item.text;
+    }
+    // Fallback to requirements
+    for (const cfr of cfrSections) {
+      const req = hipaa.requirements?.find((r: any) => r.id === cfr);
+      if (req) return req.name;
+    }
+    return null;
+  } catch { return null; }
+}
+
+function getDetectedStack(dbPath: string): string[] {
+  try {
+    if (!fs.existsSync(dbPath)) return [];
+    const db = new Database(dbPath, { readonly: true });
+    // vendor_registry is created by comply-start apply, not by comply-db init
+    try {
+      const vendors = db.prepare('SELECT vendor FROM vendor_registry').all() as any[];
+      db.close();
+      return vendors.map((v: any) => v.vendor).filter(Boolean);
+    } catch {
+      db.close();
+      return [];
+    }
+  } catch { return []; }
+}
+
+/** Check if input looks like a HIPAA CFR section (e.g., 164.312(a)(2)(iv)) */
+function isCFRSection(input: string): boolean {
+  return /^164\.\d{3}/.test(input);
 }
 
 // ─── Schema ─────────────────────────────────────────────────
@@ -233,6 +387,57 @@ function migrateSchema(db: InstanceType<typeof Database>) {
     );
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_findings_snapshot ON audit_findings(snapshot_id);`);
+
+  // Onboarding tables (for comply-start)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS phi_data_flows (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      source            TEXT NOT NULL,
+      destination       TEXT NOT NULL,
+      data_type         TEXT NOT NULL,
+      encryption_status TEXT,
+      notes             TEXT,
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vendor_registry (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      vendor            TEXT NOT NULL,
+      services_used     TEXT,
+      baa_status        TEXT DEFAULT 'unknown',
+      phi_scope         TEXT,
+      detected_from     TEXT,
+      confirmed_by_user INTEGER DEFAULT 0,
+      notes             TEXT,
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS action_items (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      priority          INTEGER NOT NULL,
+      control_id        TEXT,
+      description       TEXT NOT NULL,
+      effort            TEXT,
+      status            TEXT DEFAULT 'pending',
+      phase             TEXT,
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Journey milestones for guided compliance journey
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS journey_milestones (
+      milestone_id       INTEGER PRIMARY KEY,
+      name               TEXT NOT NULL,
+      status             TEXT DEFAULT 'LOCKED',
+      started_at         TEXT,
+      completed_at       TEXT,
+      evidence_count     INTEGER DEFAULT 0,
+      needs_revalidation INTEGER DEFAULT 0
+    );
+  `);
 }
 
 function init() {
@@ -349,19 +554,163 @@ function status() {
 }
 
 function controlDetail() {
-  const oscalId = args[1];
-  if (!oscalId) { console.error('Usage: comply-db control <oscal_id>'); process.exit(1); }
+  const inputId = args[1];
+  if (!inputId) { console.error('Usage: comply-db control <oscal_id|cfr_section> [--json] [--simple]'); process.exit(1); }
 
-  const db = openDb();
+  const jsonMode = args.includes('--json');
+  const simpleMode = args.includes('--simple');
+
+  // CFR resolution: if input looks like a HIPAA CFR section, resolve to NIST control IDs
+  let controlIds: string[];
+  let resolvedFrom: string | null = null;
+  if (isCFRSection(inputId)) {
+    controlIds = resolveFromCFR(inputId);
+    if (controlIds.length === 0) {
+      console.error(`CFR section ${inputId} not found in hipaa-filter.json.`);
+      process.exit(1);
+    }
+    resolvedFrom = inputId;
+  } else {
+    controlIds = [inputId];
+  }
+
+  // If multiple controls resolved from CFR, output each
+  if (jsonMode && controlIds.length > 1) {
+    const results = controlIds.map(id => buildControlData(id, resolvedFrom, simpleMode));
+    console.log(JSON.stringify(results, null, 2));
+    return;
+  }
+
+  // Single control (or first from CFR resolution for text mode)
+  const oscalId = controlIds[0];
+
+  if (jsonMode) {
+    const data = buildControlData(oscalId, resolvedFrom, simpleMode);
+    console.log(JSON.stringify(data, null, 2));
+  } else {
+    printControlText(oscalId);
+  }
+}
+
+/** Build enriched data object for a single control */
+function buildControlData(oscalId: string, resolvedFrom: string | null, simpleMode: boolean): any {
+  const dbPath = getDbPath();
+  const sources: Record<string, string> = {};
+
+  // Load NIST catalog (required)
+  const catalog = loadNistCatalog();
+  sources.nist_catalog = 'found';
+  const catalogIndex = buildCatalogIndex(catalog);
+
+  // Extract from catalog
+  const { prose, assess, title, family } = extractControlProse(catalog, oscalId);
+  const guidance = extractGuidance(catalog, oscalId);
+  const relatedControls = extractRelatedControls(catalog, oscalId, catalogIndex);
+
+  // Plain-English
+  const pe = loadPlainEnglish(oscalId);
+  sources.plain_english = pe ? 'found' : 'not_found';
+
+  // HIPAA sections (reverse-map: NIST → CFR)
+  let hipaaSections: string[] = [];
+  try {
+    const filterPath = path.join(NIST_DIR, 'hipaa-filter.json');
+    if (fs.existsSync(filterPath)) {
+      const filter = JSON.parse(fs.readFileSync(filterPath, 'utf-8'));
+      const upperControlId = oscalId.toUpperCase();
+      for (const [spec, controls] of Object.entries(filter.mapping)) {
+        if ((controls as string[]).some(c => c.toUpperCase() === upperControlId)) {
+          hipaaSections.push(spec);
+        }
+      }
+      sources.hipaa_filter = 'found';
+    } else {
+      sources.hipaa_filter = 'not_found';
+    }
+  } catch { sources.hipaa_filter = 'error'; }
+
+  // HIPAA name (from checklist, which is more complete than requirements)
+  const hipaaName = getHipaaName(hipaaSections);
+
+  // Verification normalization
+  const verification = normalizeVerification(oscalId);
+  sources.tool_bindings = verification !== null ? 'found' : 'not_found';
+
+  // SQLite-dependent fields
+  let status = 'unknown';
+  let evidenceCount = 0;
+  let detectedStack: string[] = [];
+  try {
+    if (fs.existsSync(dbPath)) {
+      const db = new Database(dbPath, { readonly: true });
+      const ctrl = db.prepare('SELECT status FROM controls WHERE oscal_id = ?').get(oscalId) as any;
+      if (ctrl) status = ctrl.status;
+      const evCount = db.prepare('SELECT COUNT(*) as cnt FROM evidence WHERE control_id = ?').get(oscalId) as any;
+      if (evCount) evidenceCount = evCount.cnt;
+      db.close();
+      sources.sqlite_db = 'found';
+    } else {
+      sources.sqlite_db = 'not_found';
+    }
+  } catch { sources.sqlite_db = 'error'; }
+
+  detectedStack = getDetectedStack(dbPath);
+
+  return {
+    control_id: oscalId,
+    resolved_from: resolvedFrom,
+    nist_name: title,
+    family,
+    plain_english: pe?.plain_english ?? null,
+    why_it_matters: pe?.why_it_matters ?? null,
+    nist_guidance: guidance || null,
+    hipaa_sections: hipaaSections,
+    hipaa_name: hipaaName,
+    related_controls: relatedControls,
+    status,
+    evidence_count: evidenceCount,
+    detected_stack: detectedStack,
+    verification,
+    eli5_requested: simpleMode,
+    _sources: sources,
+  };
+}
+
+/** Original text output for comply-db control (backwards compatible) */
+function printControlText(oscalId: string) {
+  const dbPath = getDbPath();
+  if (!fs.existsSync(dbPath)) {
+    console.error('No database. Run: comply-db init');
+    process.exit(1);
+  }
+
+  const db = new Database(dbPath, { readonly: true });
   const ctrl = db.prepare('SELECT * FROM controls WHERE oscal_id = ?').get(oscalId) as any;
-  if (!ctrl) { console.error(`Control ${oscalId} not found`); process.exit(1); }
+  if (!ctrl) {
+    // Show valid IDs
+    const all = db.prepare('SELECT oscal_id FROM controls ORDER BY oscal_id').all() as any[];
+    db.close();
+    const ids = all.map((r: any) => r.oscal_id);
+    const preview = ids.slice(0, 10).join(', ');
+    console.error(`Control ${oscalId} not found. Valid IDs (${ids.length} total): ${preview}${ids.length > 10 ? '...' : ''}`);
+    process.exit(1);
+  }
 
   const checks = db.prepare('SELECT * FROM check_results WHERE control_id = ? ORDER BY created_at DESC').all(oscalId) as any[];
   const evidence = db.prepare('SELECT * FROM evidence WHERE control_id = ? ORDER BY created_at DESC').all(oscalId) as any[];
   const sigs = db.prepare('SELECT * FROM signatures WHERE control_id = ? ORDER BY created_at DESC').all(oscalId) as any[];
 
+  // Plain-English header
+  const pe = loadPlainEnglish(oscalId);
+
   console.log(`\n═══ ${ctrl.oscal_id}: ${ctrl.title} ═══`);
   console.log(`Family: ${ctrl.family} | Status: ${ctrl.status}`);
+
+  if (pe) {
+    console.log(`\nPlain English: ${pe.plain_english}`);
+    console.log(`Why it matters: ${pe.why_it_matters}`);
+  }
+
   const refs = JSON.parse(ctrl.framework_refs || '{}');
   const refSummary = Object.entries(refs).map(([fw, specs]) => `${fw}: ${(specs as string[]).join(', ')}`).join(' | ');
   console.log(`Frameworks: ${refSummary}`);
@@ -1011,6 +1360,156 @@ function auditDiff() {
   console.log(JSON.stringify(result));
 }
 
+// ─── Journey ───────────────────────────────────────────────
+
+const JOURNEY_MILESTONES = [
+  { id: 1, name: 'Framework Advisor' },
+  { id: 2, name: 'Assessment & Scan' },
+  { id: 3, name: 'Policy Generator' },
+  { id: 4, name: 'PR Gate Setup' },
+  { id: 5, name: 'Trust Page' },
+  { id: 6, name: 'Deal Rescue' },
+];
+
+function journey() {
+  const sub = args[1];
+  if (!sub || !['init', 'status', 'skip', 'complete'].includes(sub)) {
+    console.error('Usage: comply-db journey <init|status|skip|complete> [--milestone N]');
+    process.exit(1);
+  }
+
+  const db = openDb();
+  migrateSchema(db);
+
+  if (sub === 'init') {
+    const existing = db.prepare('SELECT COUNT(*) as n FROM journey_milestones').get() as any;
+    if (existing.n > 0) {
+      console.log(JSON.stringify({ action: 'already_initialized', milestones: existing.n }));
+      return;
+    }
+    const insert = db.prepare('INSERT INTO journey_milestones (milestone_id, name, status) VALUES (?, ?, ?)');
+    const tx = db.transaction(() => {
+      for (const m of JOURNEY_MILESTONES) {
+        insert.run(m.id, m.name, m.id === 1 ? 'AVAILABLE' : 'LOCKED');
+      }
+    });
+    tx();
+    console.log(JSON.stringify({ action: 'initialized', milestones: JOURNEY_MILESTONES.length }));
+  }
+
+  if (sub === 'status') {
+    const milestones = db.prepare('SELECT * FROM journey_milestones ORDER BY milestone_id').all();
+    if (milestones.length === 0) {
+      console.log(JSON.stringify({ initialized: false, milestones: [] }));
+      return;
+    }
+    const current = (milestones as any[]).find(m => m.status !== 'COMPLETE') || null;
+    console.log(JSON.stringify({
+      initialized: true,
+      current_milestone: current ? { id: current.milestone_id, name: current.name, status: current.status } : null,
+      milestones: (milestones as any[]).map(m => ({
+        id: m.milestone_id,
+        name: m.name,
+        status: m.status,
+        needs_revalidation: !!m.needs_revalidation,
+      })),
+      complete: (milestones as any[]).every(m => m.status === 'COMPLETE'),
+    }));
+  }
+
+  if (sub === 'skip' || sub === 'complete') {
+    const milestoneId = Number(getFlag('milestone'));
+    if (!milestoneId || milestoneId < 1 || milestoneId > JOURNEY_MILESTONES.length) {
+      console.error(`Usage: comply-db journey ${sub} --milestone <1-${JOURNEY_MILESTONES.length}>`);
+      process.exit(1);
+    }
+    const label = sub === 'skip' ? 'COMPLETE' : 'COMPLETE';
+    const now = new Date().toISOString();
+    db.prepare('UPDATE journey_milestones SET status = ?, completed_at = ? WHERE milestone_id = ?')
+      .run(label, now, milestoneId);
+
+    // Unlock next milestone if it exists and is LOCKED
+    const nextId = milestoneId + 1;
+    if (nextId <= JOURNEY_MILESTONES.length) {
+      const next = db.prepare('SELECT status FROM journey_milestones WHERE milestone_id = ?').get(nextId) as any;
+      if (next && next.status === 'LOCKED') {
+        db.prepare('UPDATE journey_milestones SET status = ? WHERE milestone_id = ?').run('AVAILABLE', nextId);
+      }
+    }
+
+    console.log(JSON.stringify({
+      action: sub,
+      milestone_id: milestoneId,
+      status: label,
+      next_unlocked: nextId <= JOURNEY_MILESTONES.length ? nextId : null,
+    }));
+  }
+}
+
+// ─── User Config ───────────────────────────────────────────
+
+function getUserConfigPath(): string {
+  return path.join(process.env.HOME ?? '', '.em-dash', 'config.json');
+}
+
+function readUserConfig(): Record<string, any> {
+  const p = getUserConfigPath();
+  if (!fs.existsSync(p)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeUserConfig(config: Record<string, any>) {
+  const p = getUserConfigPath();
+  const dir = path.dirname(p);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(config, null, 2) + '\n');
+}
+
+function config() {
+  const sub = args[1];
+  const key = args[2];
+
+  if (sub === 'get') {
+    if (!key) {
+      // Return all config
+      console.log(JSON.stringify(readUserConfig()));
+      return;
+    }
+    const cfg = readUserConfig();
+    console.log(cfg[key] ?? '');
+    return;
+  }
+
+  if (sub === 'set') {
+    const value = args[3];
+    if (!key || value === undefined) {
+      console.error('Usage: comply-db config set <key> <value>');
+      process.exit(1);
+    }
+    const validKeys: Record<string, string[]> = {
+      persona: ['founder', 'engineer', 'audit'],
+      explain: ['always', 'on-demand', 'off'],
+      auto_sign: ['true', 'false'],
+    };
+    if (validKeys[key] && !validKeys[key].includes(value)) {
+      console.error(`Invalid value for ${key}. Must be one of: ${validKeys[key].join(', ')}`);
+      process.exit(1);
+    }
+    const cfg = readUserConfig();
+    cfg[key] = value;
+    writeUserConfig(cfg);
+    console.log(JSON.stringify({ action: 'set', key, value }));
+    return;
+  }
+
+  console.error('Usage: comply-db config <get|set> <key> [value]');
+  process.exit(1);
+}
+
 // ─── Router ─────────────────────────────────────────────────
 
 switch (subcommand) {
@@ -1029,9 +1528,11 @@ switch (subcommand) {
   case 'record-finding': recordAuditFinding(); break;
   case 'record-response': recordFindingResponse(); break;
   case 'audit-diff': auditDiff(); break;
+  case 'journey': journey(); break;
+  case 'config': config(); break;
   case 'query': rawQuery(); break;
   default:
-    console.error('Usage: comply-db <init|status|control|update-scan|summary|cross-framework|frameworks|hipaa-sections|audit-snapshot|record-finding|record-response|audit-diff|cis-coverage|query>');
+    console.error('Usage: comply-db <init|status|control|update-scan|summary|cross-framework|frameworks|hipaa-sections|audit-snapshot|record-finding|record-response|audit-diff|cis-coverage|journey|config|query>');
     if (subcommand) console.error(`Unknown: ${subcommand}`);
     process.exit(1);
 }
