@@ -90,7 +90,7 @@ const VENDOR_PATTERNS: VendorPattern[] = [
   },
   {
     vendor: 'gcp',
-    packages: ['@google-cloud/', 'google-cloud-', 'googleapis', 'firebase-admin', 'gcloud', 'github.com/googleapis/', 'cloud.google.com/go'],
+    packages: ['@google-cloud/', 'google-cloud-', 'googleapis', 'gcloud', 'github.com/googleapis/', 'cloud.google.com/go'],
     tfProviders: ['google', 'google-beta'],
     envKeys: ['GOOGLE_APPLICATION_CREDENTIALS', 'GOOGLE_CLOUD_PROJECT', 'GCP_PROJECT', 'GCLOUD_PROJECT'],
     dockerImages: ['gcr.io/', 'google/'],
@@ -509,6 +509,11 @@ function apply() {
 
   try {
     const tx = db.transaction(() => {
+      // Clear previous onramp data to ensure idempotency
+      db.exec('DELETE FROM phi_data_flows');
+      db.exec('DELETE FROM vendor_registry');
+      db.exec('DELETE FROM action_items');
+
       // Write phi_data_flows
       if (Array.isArray(answers.phi_flows)) {
         const insertFlow = db.prepare(
