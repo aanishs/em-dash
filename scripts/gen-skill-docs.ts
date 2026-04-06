@@ -14,6 +14,11 @@ import type { FrameworkDefinition } from "../frameworks/schema";
 
 const ROOT = path.resolve(import.meta.dir, "..");
 const DRY_RUN = process.argv.includes("--dry-run");
+const HOST_IDX = process.argv.indexOf("--host");
+const HOST =
+	HOST_IDX !== -1 ? (process.argv[HOST_IDX + 1] ?? "claude") : "claude";
+const CODEX_OUTPUT_ROOT =
+	process.env.EMDASH_CODEX_OUTPUT_ROOT ?? path.join(ROOT, ".agents", "skills");
 
 // ─── Framework Loading ──────────────────────────────────────
 
@@ -1765,25 +1770,115 @@ function findTemplates(): string[] {
 	return templates;
 }
 
+// ─── Codex Post-Processing ─────────────────────────────────
+
+function stripCodexFrontmatter(content: string): string {
+	const fmStart = content.indexOf("---");
+	const fmEnd = content.indexOf("---", fmStart + 3);
+	if (fmStart === -1 || fmEnd === -1) return content;
+
+	const before = content.slice(0, fmStart + 4);
+	const fm = content.slice(fmStart + 4, fmEnd);
+	const after = content.slice(fmEnd);
+
+	let cleaned = fm.replace(/^version:.*\n/m, "");
+	cleaned = cleaned.replace(/^allowed-tools:\n(  - .*\n)*/m, "");
+
+	return before + cleaned + after;
+}
+
+function replaceClaudePaths(content: string): string {
+	return content
+		.replace(/~\/\.claude\/skills\/em-dash/g, "~/.codex/skills/em-dash")
+		.replace(/\.claude\/skills\/em-dash/g, ".agents/skills/em-dash");
+}
+
+function extractFrontmatterField(content: string, field: string): string {
+	const fmStart = content.indexOf("---");
+	const fmEnd = content.indexOf("---", fmStart + 3);
+	if (fmStart === -1 || fmEnd === -1) return "";
+	const fm = content.slice(fmStart + 4, fmEnd);
+
+	if (field === "description") {
+		const multiLine = fm.match(/^description:\s*\|?\s*\n((?:  .*\n)*)/m);
+		if (multiLine) return multiLine[1].replace(/^  /gm, "").trim();
+		const inlineMatch = fm.match(/^description:\s*(.+)$/m);
+		return inlineMatch ? inlineMatch[1].trim() : "";
+	}
+
+	const match = fm.match(new RegExp(`^${field}:\\s*(.+)$`, "m"));
+	return match ? match[1].trim() : "";
+}
+
+function generateOpenAIYaml(skillName: string, description: string): string {
+	let shortDesc = description.replace(/\n/g, " ").trim();
+	if (shortDesc.length > 120) shortDesc = `${shortDesc.slice(0, 117)}...`;
+	const escaped = shortDesc.replace(/"/g, '\\"');
+	return [
+		"interface:",
+		`  display_name: "${skillName}"`,
+		`  short_description: "${escaped}"`,
+		`  default_prompt: "Use ${skillName} for this task."`,
+		"policy:",
+		"  allow_implicit_invocation: true",
+		"",
+	].join("\n");
+}
+
+// ─── Generation Loop ───────────────────────────────────────
+
 let hasChanges = false;
 
 for (const tmplPath of findTemplates()) {
-	const { outputPath, content } = processTemplate(tmplPath);
-	const relOutput = path.relative(ROOT, outputPath);
+	const { outputPath: claudeOutputPath, content: claudeContent } =
+		processTemplate(tmplPath);
 
-	if (DRY_RUN) {
-		const existing = fs.existsSync(outputPath)
-			? fs.readFileSync(outputPath, "utf-8")
-			: "";
-		if (existing !== content) {
-			console.log(`STALE: ${relOutput}`);
-			hasChanges = true;
+	if (HOST === "claude") {
+		const relOutput = path.relative(ROOT, claudeOutputPath);
+		if (DRY_RUN) {
+			const existing = fs.existsSync(claudeOutputPath)
+				? fs.readFileSync(claudeOutputPath, "utf-8")
+				: "";
+			if (existing !== claudeContent) {
+				console.log(`STALE: ${relOutput}`);
+				hasChanges = true;
+			} else {
+				console.log(`FRESH: ${relOutput}`);
+			}
 		} else {
-			console.log(`FRESH: ${relOutput}`);
+			fs.writeFileSync(claudeOutputPath, claudeContent);
+			console.log(`GENERATED: ${relOutput}`);
 		}
 	} else {
-		fs.writeFileSync(outputPath, content);
-		console.log(`GENERATED: ${relOutput}`);
+		const content = replaceClaudePaths(stripCodexFrontmatter(claudeContent));
+		const skillName = path.basename(path.dirname(tmplPath));
+		const skillDir = path.join(CODEX_OUTPUT_ROOT, skillName);
+		const outputPath = path.join(skillDir, "SKILL.md");
+		const yamlPath = path.join(skillDir, "agents", "openai.yaml");
+		const relOutput = path.relative(CODEX_OUTPUT_ROOT, outputPath);
+
+		const description = extractFrontmatterField(claudeContent, "description");
+		const yamlContent = generateOpenAIYaml(skillName, description);
+
+		if (DRY_RUN) {
+			const existingMd = fs.existsSync(outputPath)
+				? fs.readFileSync(outputPath, "utf-8")
+				: "";
+			const existingYaml = fs.existsSync(yamlPath)
+				? fs.readFileSync(yamlPath, "utf-8")
+				: "";
+			if (existingMd !== content || existingYaml !== yamlContent) {
+				console.log(`STALE: ${relOutput}`);
+				hasChanges = true;
+			} else {
+				console.log(`FRESH: ${relOutput}`);
+			}
+		} else {
+			fs.mkdirSync(path.join(skillDir, "agents"), { recursive: true });
+			fs.writeFileSync(outputPath, content);
+			fs.writeFileSync(yamlPath, yamlContent);
+			console.log(`GENERATED: ${relOutput}`);
+		}
 	}
 }
 

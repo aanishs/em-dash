@@ -1,96 +1,263 @@
 #!/usr/bin/env bash
-# em-dash setup — register skills with Claude Code
-set -e
+# em-dash setup — register skills with Claude Code / Codex
+set -euo pipefail
 
-EMDASH_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_DIR="$(dirname "$EMDASH_DIR")"
+INSTALL_EMDASH_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE_EMDASH_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+INSTALL_SKILLS_DIR="$(dirname "$INSTALL_EMDASH_DIR")"
+CODEX_SKILLS="$HOME/.codex/skills"
+CODEX_EMDASH="$CODEX_SKILLS/em-dash"
+HOST="claude"
+CODEX_GENERATED_SKILLS_DIR="${EMDASH_CODEX_OUTPUT_ROOT:-$SOURCE_EMDASH_DIR/.agents/skills}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host)
+      [ $# -lt 2 ] && echo "Missing value for --host (expected claude or codex)" >&2 && exit 1
+      HOST="$2"
+      shift 2
+      ;;
+    --host=*)
+      HOST="${1#--host=}"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+case "$HOST" in
+  claude|codex) ;;
+  *)
+    echo "Unknown --host value: $HOST (expected claude or codex)" >&2
+    exit 1
+    ;;
+esac
 
 echo "em-dash setup"
 echo "============="
 
-# 1. Migrate data directory if upgrading from hipaa-audit
 if [ -d "$HOME/.hipaa-audit" ] && [ ! -d "$HOME/.em-dash" ]; then
   echo "  migrating ~/.hipaa-audit/ → ~/.em-dash/ ..."
   cp -R "$HOME/.hipaa-audit" "$HOME/.em-dash"
   echo "  migration complete (old directory preserved at ~/.hipaa-audit/)"
 fi
 
-# 2. Check for bun (needed for gen-skill-docs)
+BUN_AVAILABLE=0
 if command -v bun >/dev/null 2>&1; then
+  BUN_AVAILABLE=1
   echo "  bun: $(bun --version)"
 else
-  echo "  bun: not installed (optional — needed for template regeneration)"
-  echo "  Install: curl -fsSL https://bun.sh/install | bash"
+  if [ "$HOST" = "codex" ]; then
+    echo "Error: bun is required for Codex skill generation." >&2
+    echo "Install it: curl -fsSL https://bun.sh/install | bash" >&2
+    exit 1
+  fi
+  echo "  bun: not installed (optional for Claude-only linking)"
 fi
 
-# 3. Install dependencies (needed for canonicalize, Ed25519 signing)
-if command -v bun >/dev/null 2>&1; then
-  (cd "$EMDASH_DIR" && bun install --frozen-lockfile 2>/dev/null || bun install) >/dev/null 2>&1
+if [ "$BUN_AVAILABLE" -eq 1 ]; then
+  (cd "$SOURCE_EMDASH_DIR" && bun install --frozen-lockfile 2>/dev/null || bun install) >/dev/null 2>&1
   echo "  dependencies: installed"
 fi
 
-# 4. Make bin scripts executable
-chmod +x "$EMDASH_DIR"/bin/* 2>/dev/null || true
+chmod +x "$SOURCE_EMDASH_DIR"/bin/* 2>/dev/null || true
 echo "  bin scripts: executable"
 
-# 4. Create global state directory
-mkdir -p "$HOME/.em-dash/projects"
+mkdir -p "$HOME/.em-dash/projects" "$HOME/.em-dash/repos"
 echo "  state dir: ~/.em-dash/"
 
-# 5. Link skill directories into Claude Code skills
-SKILLS_BASENAME="$(basename "$SKILLS_DIR")"
-if [ "$SKILLS_BASENAME" = "skills" ]; then
-  LINKED=()
-  for skill_dir in "$EMDASH_DIR"/skills/*/; do
-    if [ -f "$skill_dir/SKILL.md" ] || [ -f "$skill_dir/SKILL.md.tmpl" ]; then
+migrate_direct_codex_install() {
+  local source_dir="$1"
+  local codex_dir="$2"
+  local migrated_dir="$HOME/.em-dash/repos/em-dash"
+
+  [ "$source_dir" = "$codex_dir" ] || return 0
+  [ -L "$source_dir" ] && return 0
+
+  mkdir -p "$(dirname "$migrated_dir")"
+  if [ -e "$migrated_dir" ] && [ "$migrated_dir" != "$source_dir" ]; then
+    echo "em-dash setup failed: direct Codex install detected at $source_dir" >&2
+    echo "A migrated repo already exists at $migrated_dir; move one of them aside and rerun setup." >&2
+    exit 1
+  fi
+
+  echo "  migrating direct Codex install to $migrated_dir ..."
+  mv "$source_dir" "$migrated_dir"
+  SOURCE_EMDASH_DIR="$migrated_dir"
+  INSTALL_EMDASH_DIR="$migrated_dir"
+  INSTALL_SKILLS_DIR="$(dirname "$INSTALL_EMDASH_DIR")"
+}
+
+generate_claude_skill_docs() {
+  [ "$BUN_AVAILABLE" -eq 1 ] || return 0
+  echo ""
+  echo "Generating Claude SKILL.md files..."
+  (cd "$SOURCE_EMDASH_DIR" && bun run gen:skill-docs)
+}
+
+generate_codex_skill_docs() {
+  [ "$BUN_AVAILABLE" -eq 1 ] || return 1
+  echo ""
+  echo "Generating Codex skill docs..."
+  (cd "$SOURCE_EMDASH_DIR" && bun run gen:skill-docs -- --host codex)
+}
+
+link_claude_skill_dirs() {
+  local emdash_dir="$1"
+  local skills_dir="$2"
+  local linked=()
+
+  mkdir -p "$skills_dir"
+  for skill_dir in "$emdash_dir"/skills/*/; do
+    [ -d "$skill_dir" ] || continue
+    if [ -f "$skill_dir/SKILL.md" ]; then
+      local skill_name
       skill_name="$(basename "$skill_dir")"
-      target="$SKILLS_DIR/$skill_name"
+      local target="$skills_dir/$skill_name"
       if [ -L "$target" ] || [ ! -e "$target" ]; then
         ln -snf "em-dash/skills/$skill_name" "$target"
-        LINKED+=("$skill_name")
+        linked+=("$skill_name")
       fi
     fi
   done
 
-  # Also link the root (em-dash itself) so /comply works
-  target="$SKILLS_DIR/em-dash"
-  if [ -L "$target" ] || [ ! -e "$target" ]; then
-    ln -snf "em-dash" "$SKILLS_DIR/em-dash" 2>/dev/null || true
+  if [ ${#linked[@]} -gt 0 ]; then
+    echo "  linked skills: ${linked[*]}"
+  fi
+}
+
+link_codex_skill_dirs() {
+  local skills_dir="$1"
+  local agents_dir="$CODEX_GENERATED_SKILLS_DIR"
+  local linked=()
+
+  [ -d "$agents_dir" ] || generate_codex_skill_docs
+
+  if [ ! -d "$agents_dir" ]; then
+    echo "em-dash setup failed: missing generated Codex skills in $agents_dir" >&2
+    exit 1
   fi
 
-  if [ ${#LINKED[@]} -gt 0 ]; then
-    echo "  linked skills: ${LINKED[*]}"
+  mkdir -p "$skills_dir"
+  for skill_dir in "$agents_dir"/*/; do
+    [ -d "$skill_dir" ] || continue
+    if [ -f "$skill_dir/SKILL.md" ]; then
+      local skill_name
+      skill_name="$(basename "$skill_dir")"
+      [ "$skill_name" = "em-dash" ] && continue
+      local target="$skills_dir/$skill_name"
+      if [ -L "$target" ] || [ ! -e "$target" ]; then
+        ln -snf "$skill_dir" "$target"
+        linked+=("$skill_name")
+      fi
+    fi
+  done
+
+  if [ ${#linked[@]} -gt 0 ]; then
+    echo "  linked skills: ${linked[*]}"
   fi
-  echo ""
-  echo "em-dash ready."
-else
-  echo ""
-  echo "em-dash ready."
-  echo "  (skipped skill symlinks — not inside .claude/skills/)"
-  echo "  To install: clone this repo into ~/.claude/skills/ and re-run setup"
+}
+
+create_codex_runtime_root() {
+  local emdash_dir="$1"
+  local codex_root="$2"
+
+  if [ -L "$codex_root" ]; then
+    rm -f "$codex_root"
+  elif [ -d "$codex_root" ] && [ "$codex_root" != "$emdash_dir" ]; then
+    rm -rf "$codex_root"
+  fi
+
+  mkdir -p "$codex_root" "$codex_root/skills/hipaa-audit"
+
+  for asset in bin dashboard frameworks nist policies scripts templates node_modules; do
+    local src="$emdash_dir/$asset"
+    local dst="$codex_root/$asset"
+    if [ -d "$src" ]; then
+      ln -snf "$src" "$dst"
+    fi
+  done
+
+  for file in package.json bun.lock; do
+    local src="$emdash_dir/$file"
+    local dst="$codex_root/$file"
+    if [ -f "$src" ]; then
+      ln -snf "$src" "$dst"
+    fi
+  done
+
+  if [ -f "$emdash_dir/skills/hipaa-audit/questionnaire-library.json" ]; then
+    ln -snf "$emdash_dir/skills/hipaa-audit/questionnaire-library.json" \
+      "$codex_root/skills/hipaa-audit/questionnaire-library.json"
+  fi
+}
+
+SKILLS_BASENAME="$(basename "$INSTALL_SKILLS_DIR")"
+SKILLS_PARENT_BASENAME="$(basename "$(dirname "$INSTALL_SKILLS_DIR")")"
+CODEX_REPO_LOCAL=0
+if [ "$SKILLS_BASENAME" = "skills" ] && [ "$SKILLS_PARENT_BASENAME" = ".agents" ]; then
+  CODEX_REPO_LOCAL=1
 fi
 
-# 6. Generate SKILL.md files if bun is available
-if command -v bun >/dev/null 2>&1; then
+if [ "$HOST" = "claude" ]; then
+  generate_claude_skill_docs
+
+  if [ "$SKILLS_BASENAME" = "skills" ] && [ "$SKILLS_PARENT_BASENAME" = ".claude" ]; then
+    link_claude_skill_dirs "$SOURCE_EMDASH_DIR" "$INSTALL_SKILLS_DIR"
+    echo ""
+    echo "em-dash ready (claude)."
+  else
+    echo ""
+    echo "em-dash ready (claude)."
+    echo "  (skipped skill symlinks — not inside .claude/skills/)"
+    echo "  To install globally: clone this repo into ~/.claude/skills/em-dash and rerun setup"
+  fi
+fi
+
+if [ "$HOST" = "codex" ]; then
+  migrate_direct_codex_install "$SOURCE_EMDASH_DIR" "$CODEX_EMDASH"
+  # Recompute after migration may have moved SOURCE_EMDASH_DIR
+  if [ -z "${EMDASH_CODEX_OUTPUT_ROOT:-}" ]; then
+    CODEX_GENERATED_SKILLS_DIR="$SOURCE_EMDASH_DIR/.agents/skills"
+  fi
+  generate_codex_skill_docs
+
+  if [ "$CODEX_REPO_LOCAL" -eq 1 ]; then
+    CODEX_SKILLS="$INSTALL_SKILLS_DIR"
+    CODEX_EMDASH="$INSTALL_EMDASH_DIR"
+  fi
+
+  mkdir -p "$CODEX_SKILLS"
+  if [ "$CODEX_REPO_LOCAL" -eq 0 ]; then
+    create_codex_runtime_root "$SOURCE_EMDASH_DIR" "$CODEX_EMDASH"
+  fi
+  link_codex_skill_dirs "$CODEX_SKILLS"
+
   echo ""
-  echo "Generating SKILL.md files..."
-  (cd "$EMDASH_DIR" && bun run gen:skill-docs)
+  echo "em-dash ready (codex)."
+  if [ "$CODEX_REPO_LOCAL" -eq 1 ]; then
+    echo "  install: repo-local"
+  else
+    echo "  install: global"
+  fi
+  echo "  codex skills: $CODEX_SKILLS"
 fi
 
 echo ""
-echo "Skills (7):"
-echo "  /comply          — compliance status + router"
-echo "  /comply-auto     — autopilot: scan → fix → assess → next control"
-echo "  /comply-assess   — focused interview, one NIST control at a time"
-echo "  /comply-scan     — focused scan, one NIST control at a time"
-echo "  /comply-fix      — remediate failed controls"
-echo "  /comply-report   — compliance report + signed audit packet"
-echo "  /comply-breach   — incident response workflow"
-echo ""
-echo "Utilities (6):"
-echo "  bin/comply-db           — SQLite compliance database (init, status, query)"
-echo "  bin/comply-attest       — Ed25519 attestation signing"
-echo "  bin/comply-verify       — attestation verification"
-echo "  bin/comply-audit-packet — signed audit packet generation"
-echo "  bin/comply-evidence-hash — SHA-256 evidence hashing"
-echo "  bin/comply-slug         — project slug generation"
+echo "Skills (14):"
+echo "  comply          — compliance status + router"
+echo "  comply-auto     — autopilot: scan → fix → assess → next control"
+echo "  comply-assess   — focused interview, one control at a time"
+echo "  comply-explain  — explain any standard in plain English"
+echo "  comply-scan     — focused scan, one control at a time"
+echo "  comply-fix      — remediate failed controls"
+echo "  comply-report   — compliance report + signed audit packet"
+echo "  comply-breach   — incident response workflow"
+echo "  hipaa           — HIPAA onramp + assessment flow"
+echo "  hipaa-audit     — mock OCR audit"
+echo "  gdpr            — GDPR framework"
+echo "  soc2            — SOC 2 framework"
+echo "  pci-dss         — PCI DSS framework"
+echo "  em-dashboard    — visual compliance dashboard"
