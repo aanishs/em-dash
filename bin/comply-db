@@ -62,12 +62,16 @@ function getSlug(): string {
 }
 
 function getDbPath(): string {
-  const dir = path.join(process.env.HOME ?? '', '.em-dash', 'projects', getSlug());
+  return path.join(process.env.HOME ?? '', '.em-dash', 'projects', getSlug(), 'compliance.db');
+}
+
+function ensureDbDir(): void {
+  const dir = path.dirname(getDbPath());
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, 'compliance.db');
 }
 
 function openDb(): InstanceType<typeof Database> {
+  ensureDbDir();
   return new Database(getDbPath());
 }
 
@@ -83,27 +87,28 @@ function loadFilter(): any {
   return JSON.parse(fs.readFileSync(p, 'utf-8'));
 }
 
-/** Extract control prose from NIST catalog */
-function extractControlProse(catalog: any, controlId: string): { prose: string; assess: string; title: string; family: string } {
+/** Find a control object in the NIST catalog by ID. Returns the control and its family group. */
+function findControlInCatalog(catalog: any, controlId: string): { control: any; family: string } | null {
   const id = controlId.toLowerCase();
   for (const group of catalog.catalog.groups) {
     for (const ctrl of group.controls || []) {
-      if (ctrl.id === id) {
-        const prose = extractParts(ctrl.parts?.filter((p: any) => p.name === 'statement') || []);
-        const assess = extractParts(ctrl.parts?.filter((p: any) => p.name === 'assessment') || []);
-        return { prose, assess, title: ctrl.title, family: group.title };
-      }
-      // Check enhancements
+      if (ctrl.id === id) return { control: ctrl, family: group.title };
       for (const enh of ctrl.controls || []) {
-        if (enh.id === id) {
-          const prose = extractParts(enh.parts?.filter((p: any) => p.name === 'statement') || []);
-          const assess = extractParts(enh.parts?.filter((p: any) => p.name === 'assessment') || []);
-          return { prose, assess, title: enh.title || ctrl.title, family: group.title };
-        }
+        if (enh.id === id) return { control: enh, family: group.title };
       }
     }
   }
-  return { prose: '', assess: '', title: controlId, family: 'Unknown' };
+  return null;
+}
+
+/** Extract control prose from NIST catalog */
+function extractControlProse(catalog: any, controlId: string): { prose: string; assess: string; title: string; family: string } {
+  const found = findControlInCatalog(catalog, controlId);
+  if (!found) return { prose: '', assess: '', title: controlId, family: 'Unknown' };
+  const { control, family } = found;
+  const prose = extractParts(control.parts?.filter((p: any) => p.name === 'statement') || []);
+  const assess = extractParts(control.parts?.filter((p: any) => p.name === 'assessment') || []);
+  return { prose, assess, title: control.title, family };
 }
 
 function extractParts(parts: any[]): string {
@@ -133,22 +138,10 @@ function loadPlainEnglish(controlId: string): { plain_english: string; why_it_ma
 }
 
 function extractGuidance(catalog: any, controlId: string): string {
-  const id = controlId.toLowerCase();
-  for (const group of catalog.catalog.groups) {
-    for (const ctrl of group.controls || []) {
-      if (ctrl.id === id) {
-        const guidancePart = ctrl.parts?.find((p: any) => p.name === 'guidance');
-        return guidancePart?.prose || '';
-      }
-      for (const enh of ctrl.controls || []) {
-        if (enh.id === id) {
-          const guidancePart = enh.parts?.find((p: any) => p.name === 'guidance');
-          return guidancePart?.prose || '';
-        }
-      }
-    }
-  }
-  return '';
+  const found = findControlInCatalog(catalog, controlId);
+  if (!found) return '';
+  const guidancePart = found.control.parts?.find((p: any) => p.name === 'guidance');
+  return guidancePart?.prose || '';
 }
 
 /** Build an index of controlId → title from the full NIST catalog */
@@ -166,30 +159,14 @@ function buildCatalogIndex(catalog: any): Record<string, string> {
 }
 
 function extractRelatedControls(catalog: any, controlId: string, catalogIndex: Record<string, string>): { id: string; title: string }[] {
-  const id = controlId.toLowerCase();
-  for (const group of catalog.catalog.groups) {
-    for (const ctrl of group.controls || []) {
-      if (ctrl.id === id) {
-        return (ctrl.links || [])
-          .filter((l: any) => l.rel === 'related')
-          .map((l: any) => {
-            const refId = l.href.replace('#', '').toUpperCase();
-            return { id: refId, title: catalogIndex[refId] || refId };
-          });
-      }
-      for (const enh of ctrl.controls || []) {
-        if (enh.id === id) {
-          return (enh.links || [])
-            .filter((l: any) => l.rel === 'related')
-            .map((l: any) => {
-              const refId = l.href.replace('#', '').toUpperCase();
-              return { id: refId, title: catalogIndex[refId] || refId };
-            });
-        }
-      }
-    }
-  }
-  return [];
+  const found = findControlInCatalog(catalog, controlId);
+  if (!found) return [];
+  return (found.control.links || [])
+    .filter((l: any) => l.rel === 'related')
+    .map((l: any) => {
+      const refId = l.href.replace('#', '').toUpperCase();
+      return { id: refId, title: catalogIndex[refId] || refId };
+    });
 }
 
 function resolveFromCFR(cfrSection: string): string[] {
@@ -244,22 +221,6 @@ function getHipaaName(cfrSections: string[]): string | null {
     }
     return null;
   } catch { return null; }
-}
-
-function getDetectedStack(dbPath: string): string[] {
-  try {
-    if (!fs.existsSync(dbPath)) return [];
-    const db = new Database(dbPath, { readonly: true });
-    // vendor_registry is created by comply-start apply, not by comply-db init
-    try {
-      const vendors = db.prepare('SELECT vendor FROM vendor_registry').all() as any[];
-      db.close();
-      return vendors.map((v: any) => v.vendor).filter(Boolean);
-    } catch {
-      db.close();
-      return [];
-    }
-  } catch { return []; }
 }
 
 /** Check if input looks like a HIPAA CFR section (e.g., 164.312(a)(2)(iv)) */
@@ -594,6 +555,9 @@ function controlDetail() {
 
 /** Build enriched data object for a single control */
 function buildControlData(oscalId: string, resolvedFrom: string | null, simpleMode: boolean): any {
+  // Normalize to uppercase for consistent lookups across data files
+  oscalId = oscalId.toUpperCase();
+
   const dbPath = getDbPath();
   const sources: Record<string, string> = {};
 
@@ -601,6 +565,12 @@ function buildControlData(oscalId: string, resolvedFrom: string | null, simpleMo
   const catalog = loadNistCatalog();
   sources.nist_catalog = 'found';
   const catalogIndex = buildCatalogIndex(catalog);
+
+  // Validate control exists in catalog
+  if (!findControlInCatalog(catalog, oscalId)) {
+    console.error(`Control ${oscalId} not found in NIST catalog.`);
+    process.exit(1);
+  }
 
   // Extract from catalog
   const { prose, assess, title, family } = extractControlProse(catalog, oscalId);
@@ -617,9 +587,8 @@ function buildControlData(oscalId: string, resolvedFrom: string | null, simpleMo
     const filterPath = path.join(NIST_DIR, 'hipaa-filter.json');
     if (fs.existsSync(filterPath)) {
       const filter = JSON.parse(fs.readFileSync(filterPath, 'utf-8'));
-      const upperControlId = oscalId.toUpperCase();
       for (const [spec, controls] of Object.entries(filter.mapping)) {
-        if ((controls as string[]).some(c => c.toUpperCase() === upperControlId)) {
+        if ((controls as string[]).some(c => c.toUpperCase() === oscalId)) {
           hipaaSections.push(spec);
         }
       }
@@ -636,7 +605,7 @@ function buildControlData(oscalId: string, resolvedFrom: string | null, simpleMo
   const verification = normalizeVerification(oscalId);
   sources.tool_bindings = verification !== null ? 'found' : 'not_found';
 
-  // SQLite-dependent fields
+  // SQLite-dependent fields (single DB connection)
   let status = 'unknown';
   let evidenceCount = 0;
   let detectedStack: string[] = [];
@@ -647,14 +616,17 @@ function buildControlData(oscalId: string, resolvedFrom: string | null, simpleMo
       if (ctrl) status = ctrl.status;
       const evCount = db.prepare('SELECT COUNT(*) as cnt FROM evidence WHERE control_id = ?').get(oscalId) as any;
       if (evCount) evidenceCount = evCount.cnt;
+      // Read vendor_registry in the same connection
+      try {
+        const vendors = db.prepare('SELECT vendor FROM vendor_registry').all() as any[];
+        detectedStack = vendors.map((v: any) => v.vendor).filter(Boolean);
+      } catch { /* vendor_registry may not exist yet */ }
       db.close();
       sources.sqlite_db = 'found';
     } else {
       sources.sqlite_db = 'not_found';
     }
   } catch { sources.sqlite_db = 'error'; }
-
-  detectedStack = getDetectedStack(dbPath);
 
   return {
     control_id: oscalId,
@@ -1384,6 +1356,7 @@ function journey() {
   if (sub === 'init') {
     const existing = db.prepare('SELECT COUNT(*) as n FROM journey_milestones').get() as any;
     if (existing.n > 0) {
+      db.close();
       console.log(JSON.stringify({ action: 'already_initialized', milestones: existing.n }));
       return;
     }
@@ -1394,16 +1367,19 @@ function journey() {
       }
     });
     tx();
+    db.close();
     console.log(JSON.stringify({ action: 'initialized', milestones: JOURNEY_MILESTONES.length }));
+    return;
   }
 
   if (sub === 'status') {
     const milestones = db.prepare('SELECT * FROM journey_milestones ORDER BY milestone_id').all();
     if (milestones.length === 0) {
+      db.close();
       console.log(JSON.stringify({ initialized: false, milestones: [] }));
       return;
     }
-    const current = (milestones as any[]).find(m => m.status !== 'COMPLETE') || null;
+    const current = (milestones as any[]).find(m => m.status !== 'COMPLETE' && m.status !== 'SKIPPED') || null;
     console.log(JSON.stringify({
       initialized: true,
       current_milestone: current ? { id: current.milestone_id, name: current.name, status: current.status } : null,
@@ -1413,8 +1389,10 @@ function journey() {
         status: m.status,
         needs_revalidation: !!m.needs_revalidation,
       })),
-      complete: (milestones as any[]).every(m => m.status === 'COMPLETE'),
+      complete: (milestones as any[]).every(m => m.status === 'COMPLETE' || m.status === 'SKIPPED'),
     }));
+    db.close();
+    return;
   }
 
   if (sub === 'skip' || sub === 'complete') {
@@ -1423,7 +1401,7 @@ function journey() {
       console.error(`Usage: comply-db journey ${sub} --milestone <1-${JOURNEY_MILESTONES.length}>`);
       process.exit(1);
     }
-    const label = sub === 'skip' ? 'COMPLETE' : 'COMPLETE';
+    const label = sub === 'skip' ? 'SKIPPED' : 'COMPLETE';
     const now = new Date().toISOString();
     db.prepare('UPDATE journey_milestones SET status = ?, completed_at = ? WHERE milestone_id = ?')
       .run(label, now, milestoneId);
@@ -1437,6 +1415,7 @@ function journey() {
       }
     }
 
+    db.close();
     console.log(JSON.stringify({
       action: sub,
       milestone_id: milestoneId,
@@ -1495,7 +1474,11 @@ function config() {
       explain: ['always', 'on-demand', 'off'],
       auto_sign: ['true', 'false'],
     };
-    if (validKeys[key] && !validKeys[key].includes(value)) {
+    if (!Object.keys(validKeys).includes(key)) {
+      console.error(`Unknown config key: ${key}. Known keys: ${Object.keys(validKeys).join(', ')}`);
+      process.exit(1);
+    }
+    if (!validKeys[key].includes(value)) {
       console.error(`Invalid value for ${key}. Must be one of: ${validKeys[key].join(', ')}`);
       process.exit(1);
     }

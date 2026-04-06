@@ -258,6 +258,185 @@ describe("Bin smoke: comply-db control --json", () => {
 	});
 });
 
+describe("Bin smoke: comply-db control --json invalid ID", () => {
+	let tmpDir: string;
+
+	beforeAll(async () => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "emdash-invalid-"));
+		await run("comply-db", ["init", "--framework", "hipaa"], { cwd: tmpDir });
+	});
+
+	afterAll(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	test("--json mode errors on invalid control ID", async () => {
+		const { stderr, exitCode } = await run(
+			"comply-db",
+			["control", "FAKE-99", "--json", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain("not found");
+	});
+
+	test("lowercase IDs still resolve correctly", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["control", "sc-28", "--json", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.control_id).toBe("SC-28");
+		expect(data.plain_english).toBeDefined();
+		expect(data.why_it_matters).toBeDefined();
+	});
+});
+
+describe("Bin smoke: comply-db journey", () => {
+	let tmpDir: string;
+
+	beforeAll(async () => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "emdash-journey-"));
+		await run("comply-db", ["init", "--framework", "hipaa"], { cwd: tmpDir });
+	});
+
+	afterAll(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	test("journey init seeds milestones", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["journey", "init", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.action).toBe("initialized");
+		expect(data.milestones).toBe(6);
+	});
+
+	test("journey init is idempotent", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["journey", "init", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.action).toBe("already_initialized");
+	});
+
+	test("journey status shows current milestone", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["journey", "status", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.initialized).toBe(true);
+		expect(data.current_milestone.id).toBe(1);
+		expect(data.current_milestone.status).toBe("AVAILABLE");
+		expect(data.complete).toBe(false);
+	});
+
+	test("journey complete unlocks next milestone", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["journey", "complete", "--milestone", "1", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.action).toBe("complete");
+		expect(data.status).toBe("COMPLETE");
+		expect(data.next_unlocked).toBe(2);
+	});
+
+	test("journey skip sets SKIPPED status", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["journey", "skip", "--milestone", "2", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.action).toBe("skip");
+		expect(data.status).toBe("SKIPPED");
+	});
+
+	test("journey status skips over SKIPPED milestones", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["journey", "status", "--framework", "hipaa"],
+			{ cwd: tmpDir },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.current_milestone.id).toBe(3);
+	});
+});
+
+describe("Bin smoke: comply-db config", () => {
+	let tmpDir: string;
+	let configPath: string;
+
+	beforeAll(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "emdash-config-"));
+		configPath = path.join(tmpDir, "config.json");
+	});
+
+	afterAll(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	test("config set saves valid key", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["config", "set", "persona", "founder"],
+			{ cwd: tmpDir, env: { ...process.env, HOME: tmpDir } },
+		);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.action).toBe("set");
+		expect(data.key).toBe("persona");
+		expect(data.value).toBe("founder");
+	});
+
+	test("config get retrieves saved value", async () => {
+		const { stdout, exitCode } = await run(
+			"comply-db",
+			["config", "get", "persona"],
+			{ cwd: tmpDir, env: { ...process.env, HOME: tmpDir } },
+		);
+		expect(exitCode).toBe(0);
+		expect(stdout.trim()).toBe("founder");
+	});
+
+	test("config set rejects unknown key", async () => {
+		const { stderr, exitCode } = await run(
+			"comply-db",
+			["config", "set", "typo_key", "value"],
+			{ cwd: tmpDir, env: { ...process.env, HOME: tmpDir } },
+		);
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain("Unknown config key");
+	});
+
+	test("config set rejects invalid value for known key", async () => {
+		const { stderr, exitCode } = await run(
+			"comply-db",
+			["config", "set", "persona", "invalid"],
+			{ cwd: tmpDir, env: { ...process.env, HOME: tmpDir } },
+		);
+		expect(exitCode).toBe(1);
+		expect(stderr).toContain("Invalid value");
+	});
+});
+
 describe("Bin smoke: hipaa-evidence-hash", () => {
 	let tmpDir: string;
 
