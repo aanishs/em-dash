@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "description": "Curated list of services that may require Business Associate Agreements for HIPAA compliance",
+  "vendors": [
+    {"name": "segment", "packages": ["analytics-node", "@segment/analytics-next", "@segment/analytics-node"], "baa_required": true},
+    {"name": "twilio", "packages": ["twilio"], "baa_required": true},
+    {"name": "sendgrid", "packages": ["@sendgrid/mail", "@sendgrid/client"], "baa_required": true},
+    {"name": "stripe", "packages": ["stripe", "@stripe/stripe-js"], "baa_required": false, "note": "BAA available on request for healthcare use cases"},
+    {"name": "mixpanel", "packages": ["mixpanel", "mixpanel-browser"], "baa_required": true},
+    {"name": "intercom", "packages": ["intercom-client"], "baa_required": true},
+    {"name": "zendesk", "packages": ["zendesk-node-sdk", "node-zendesk"], "baa_required": true},
+    {"name": "hubspot", "packages": ["@hubspot/api-client"], "baa_required": true},
+    {"name": "mailchimp", "packages": ["@mailchimp/mailchimp_marketing", "@mailchimp/mailchimp_transactional"], "baa_required": true},
+    {"name": "datadog", "packages": ["dd-trace", "datadog-metrics"], "baa_required": true},
+    {"name": "sentry", "packages": ["@sentry/node", "@sentry/browser", "@sentry/react"], "baa_required": true},
+    {"name": "fullstory", "packages": ["@fullstory/browser"], "baa_required": true},
+    {"name": "amplitude", "packages": ["@amplitude/analytics-node", "@amplitude/analytics-browser"], "baa_required": true}
+  ]
+}

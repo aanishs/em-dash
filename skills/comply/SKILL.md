@@ -1,13 +1,17 @@
 ---
 
 name: comply
-version: 2.0.0
+version: 3.0.0
 description: |
-  Compliance status dashboard. Shows progress across all active frameworks.
-  To start a specific framework, use /hipaa, /soc2, /gdpr, or /pci-dss.
+  Compliance journey engine. The single entry point for all compliance work.
+  Guides founders through 6 milestones, offers autopilot for engineers,
+  shows persona-aware status for compliance officers.
 allowed-tools:
   - Bash
   - Read
+  - Glob
+  - Grep
+  - Write
   - AskUserQuestion
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
@@ -18,11 +22,9 @@ allowed-tools:
 > **IMPORTANT:** This tool provides technical guidance for implementing compliance controls. It is NOT legal advice and does not constitute certification. Consult qualified legal counsel for formal compliance verification.
 
 
-# /comply — Compliance Status
+# /comply — Compliance Journey Engine
 
-Show compliance status across all active frameworks.
-
-## Step 1: Check if any framework is initialized
+## Step 1: Setup and state detection
 
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
@@ -31,37 +33,136 @@ _DB_PATH=~/.em-dash/projects/$_SLUG/compliance.db
 [ -f "$_DB_PATH" ] && echo "DB_EXISTS" || echo "NO_DB"
 ```
 
-## Step 2: If NO_DB — no framework initialized yet
+## Step 2: Persona detection
 
-Tell the user:
+```bash
+"$_EMDASH_BIN"/comply-db config get persona 2>/dev/null || echo ""
+```
 
-"No compliance framework initialized yet. Start with one of these:
+If persona is empty (not set), ask via AskUserQuestion:
 
-- `/hipaa` — healthcare, patient data (PHI)
-- `/soc2` — SaaS trust service criteria
-- `/gdpr` — EU data protection
-- `/pci-dss` — payment card security
+> "Welcome to em-dash. How would you describe your role? This helps me adapt my recommendations."
+>
+> - A) **Founder** — I'm building a product and need to understand compliance
+> - B) **Engineer** — I'm implementing compliance controls in code
+> - C) **Compliance Officer** — I manage audits, policies, and formal assessments
 
-You can add multiple frameworks — controls are shared automatically."
+Store the answer:
+- A: `"$_EMDASH_BIN"/comply-db config set persona founder && "$_EMDASH_BIN"/comply-db config set explain always`
+- B: `"$_EMDASH_BIN"/comply-db config set persona engineer && "$_EMDASH_BIN"/comply-db config set explain on-demand`
+- C: `"$_EMDASH_BIN"/comply-db config set persona audit && "$_EMDASH_BIN"/comply-db config set explain off`
 
-## Step 3: If DB_EXISTS — show status
+## Step 3: If NO_DB — Framework Advisor (Milestone 1)
 
+This is the first-time user experience. Run the Framework Advisor inline.
+
+Ask these 3 questions via AskUserQuestion, one at a time:
+
+### Q1: What data do you handle?
+
+> "What kind of data does your product handle?"
+>
+> - A) Patient or health data (names, diagnoses, prescriptions, medical records) → HIPAA
+> - B) Payment card data (credit card numbers, CVVs) → PCI-DSS
+> - C) Personal data of EU residents (names, emails, addresses of EU users) → GDPR
+> - D) General customer data (names, emails, usage data) → SOC 2
+
+### Q2: Who are your customers?
+
+> "Who are you selling to?"
+>
+> - A) Healthcare organizations → also add SOC 2 (enterprise health deals need both)
+> - B) Enterprise / B2B → also add SOC 2 if not already selected
+> - C) Consumers → no change
+> - D) Government → note NIST 800-53 direct mapping
+
+### Q3: Timeline pressure?
+
+> "What's driving your compliance timeline?"
+>
+> - A) A prospect or customer asked for it → prioritize that framework
+> - B) Proactive → start with the data-type framework
+> - C) An investor asked → SOC 2 first
+> - D) No specific pressure → start with the data-type framework
+
+### Output recommendation
+
+Based on answers, tell the user which frameworks they need NOW, LATER, and can SKIP.
+
+If multiple frameworks: "Good news: many controls overlap between frameworks. Do [primary] first and you'll have a head start on [secondary]."
+
+Initialize the recommended frameworks:
+```bash
+"$_EMDASH_BIN"/comply-db init --framework <primary>
+"$_EMDASH_BIN"/comply-db journey init --framework <primary>
+"$_EMDASH_BIN"/comply-db journey complete --milestone 1 --framework <primary>
+```
+
+Tell the user: **"Your next step is `/hipaa` (or whichever framework was recommended). It will walk you through an assessment of your stack."**
+
+## Step 4: If DB_EXISTS — Journey state routing
+
+```bash
+"$_EMDASH_BIN"/comply-db journey status 2>/dev/null || echo '{"initialized":false}'
+```
+
+### If journey not initialized (legacy user):
+
+Initialize and mark M1 complete (they already picked their framework):
+```bash
+"$_EMDASH_BIN"/comply-db journey init
+"$_EMDASH_BIN"/comply-db journey complete --milestone 1
+```
+
+### If journey in progress — route to current milestone:
+
+Read `current_milestone` from the JSON. Route based on milestone:
+
+- **M2 (Assessment & Scan):** "Run `/hipaa` (or your framework) to start the assessment interview and scan."
+- **M3 (Policy Generator):** "Run `/comply-policy` to generate personalized compliance policy documents."
+- **M4 (PR Gate Setup):** "Protect your compliance as you build. Run `bin/comply-check --diff HEAD~1` locally to check your code. To set up automated checking, add the em-dash GitHub Action."
+- **M5 (Trust Page):** "Generate a shareable compliance page for prospects. Run `/comply-report` with the trust page option."
+- **M6 (Deal Rescue):** "Got a security questionnaire from a prospect? Run `/comply-deal` to answer it."
+
+### If journey complete:
+
+Show summary and congratulate:
+```bash
+"$_EMDASH_BIN"/comply-db summary
+```
+
+"All milestones complete. Your compliance journey is done. Run `/comply-report` to generate your audit packet, or `/em-dashboard` for the visual view."
+
+## Step 5: Persona-aware status and recommendations
+
+Show current status:
 ```bash
 "$_EMDASH_BIN"/comply-db summary
 "$_EMDASH_BIN"/comply-db status
 ```
 
-Show which frameworks are active:
-```bash
-"$_EMDASH_BIN"/comply-db query "SELECT key, value FROM metadata WHERE key = 'framework'"
-```
+Read the persona and tailor recommendations:
 
-## Step 4: Recommend next step
+**Founder persona:**
+- Plain English descriptions. "You need to encrypt stored patient data" not "SC-28: Protection of Information at Rest"
+- Focus on journey milestones. "Your next milestone is generating policies."
+- Offer autopilot: "Want me to handle everything? I can scan your code, fix issues, and ask you questions one at a time."
 
-- **0% complete:** "Run `/comply-auto` to start."
-- **Some scans done:** "Run `/comply-assess` for interviews or `/comply-scan` for checks."
-- **Failures found:** "Run `/comply-fix` to remediate."
-- **Complete:** "Run `/comply-report` to generate your audit packet."
+**Engineer persona:**
+- Technical details. Control IDs, check results, specific file paths.
+- Action-oriented: "3 controls failing. Run `/comply-fix` to remediate." or "Run `/comply-scan` for a fresh check."
+- PR gate: "Run `bin/comply-check --diff HEAD~1` before pushing."
 
-Want to add another framework? Run `/soc2`, `/gdpr`, or `/pci-dss`.
-Want the visual dashboard? Run `/em-dashboard`.
+**Audit persona:**
+- Formal workflow focus. "Run `/comply-assess` for structured compliance interviews."
+- Reports: "Run `/comply-report` to generate your signed audit packet."
+- Simulation: "Run `/hipaa-audit` for a 7-phase mock HHS OCR audit."
+- Questionnaires: "Run `/comply-deal` to answer prospect security questionnaires."
+- Policies: "Run `/comply-policy` to generate or update compliance policy documents."
+
+## Always mention
+
+- Add frameworks: `/hipaa`, `/soc2`, `/gdpr`, `/pci-dss`
+- Visual dashboard: `/em-dashboard`
+- Breach response: `/comply-breach`
+- Check your code: `bin/comply-check --diff HEAD~1`

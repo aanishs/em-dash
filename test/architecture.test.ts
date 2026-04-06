@@ -546,14 +546,14 @@ describe("Signing & Verification", () => {
 
 // ═══ Skills ═════════════════════════════════════════════════
 
-describe("Skills (14 total)", () => {
-	test("exactly 14 skill directories", () => {
+describe("Skills (16 total)", () => {
+	test("exactly 16 skill directories", () => {
 		const skills = fs
 			.readdirSync(path.join(ROOT, "skills"))
 			.filter((d: string) =>
 				fs.statSync(path.join(ROOT, "skills", d)).isDirectory(),
 			);
-		expect(skills.length).toBe(14);
+		expect(skills.length).toBe(16);
 	});
 
 	test("expected skills present", () => {
@@ -562,8 +562,10 @@ describe("Skills (14 total)", () => {
 			"comply-assess",
 			"comply-auto",
 			"comply-breach",
+			"comply-deal",
 			"comply-explain",
 			"comply-fix",
+			"comply-policy",
 			"comply-report",
 			"comply-scan",
 			"em-dashboard",

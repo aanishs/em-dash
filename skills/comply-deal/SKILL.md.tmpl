@@ -1,0 +1,85 @@
+---
+name: comply-deal
+version: 1.0.0
+description: |
+  Answer prospect security questionnaires using your compliance data.
+  Parses questionnaire text, maps questions to NIST 800-53 controls,
+  checks current compliance posture, and generates an answer pack.
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - AskUserQuestion
+---
+
+## DISCLAIMER
+
+> **IMPORTANT:** This tool provides technical guidance for implementing compliance controls. It is NOT legal advice and does not constitute certification. Consult qualified legal counsel for formal compliance verification.
+
+
+# /comply-deal — Security Questionnaire Response
+
+Answer prospect security questionnaires using your existing compliance evidence.
+
+## Step 1: Check compliance data exists
+
+```bash
+_EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
+_SLUG=$("$_EMDASH_BIN"/comply-slug 2>/dev/null | grep SLUG= | cut -d= -f2)
+_DB_PATH=~/.em-dash/projects/$_SLUG/compliance.db
+[ -f "$_DB_PATH" ] && echo "DB_EXISTS" || echo "NO_DB"
+```
+
+If NO_DB: "No compliance data found. Run `/hipaa` or another framework command first to build your compliance posture, then come back to answer questionnaires."
+
+## Step 2: Load current compliance posture
+
+```bash
+"$_EMDASH_BIN"/comply-db summary 2>/dev/null
+"$_EMDASH_BIN"/comply-db status 2>/dev/null
+```
+
+## Step 3: Get the questionnaire
+
+Ask via AskUserQuestion:
+
+> "Paste the security questionnaire text below, or provide the path to a file (CSV or plain text). I'll map each question to your compliance controls and generate answers."
+>
+> - A) I'll paste the questionnaire text in my next message
+> - B) I have a file — let me provide the path
+
+If A: Ask them to paste the questionnaire.
+If B: Ask for the file path, then read it with the Read tool.
+
+## Step 4: Parse and map questions
+
+For each question in the questionnaire:
+
+1. **Understand the question** — what compliance area does it address? (encryption, access control, logging, incident response, backup, training, etc.)
+2. **Map to NIST 800-53 controls** — identify which control(s) the question relates to (e.g., "Do you encrypt data at rest?" → SC-28)
+3. **Check posture** — look up the control's status in the SQLite database
+
+Classify each question:
+
+- **GREEN**: The mapped control(s) have status PASS with evidence. Generate a confident answer citing the evidence.
+- **YELLOW**: The mapped control(s) are in progress or have partial evidence. Generate a qualified answer noting what's done and what's pending.
+- **RED**: The mapped control(s) FAIL or have no evidence. Flag as a gap and suggest remediation.
+
+## Step 5: Generate the answer pack
+
+Output a structured response:
+
+1. **Summary**: "X of Y questions answered confidently, Z need work."
+2. **GREEN answers**: For each, provide the draft answer with evidence citations.
+3. **YELLOW answers**: For each, provide what can be said today and what's missing.
+4. **RED gaps**: For each, explain what control is needed and suggest `/comply-fix`.
+
+## Step 6: Next steps
+
+- "Want to fix the gaps? Run `/comply-fix` to remediate failing controls."
+- "Want a shareable trust page? Run `/comply-report` with the trust page option."
+
+Update journey:
+```bash
+"$_EMDASH_BIN"/comply-db journey complete --milestone 6 2>/dev/null || true
+```
