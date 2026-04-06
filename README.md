@@ -17,7 +17,7 @@ What we found was an industry that treats compliance like a procurement accessor
 
 So we built em-dash. Originally for CoralEHR, now open source — because "pay $10k/year" and "guess" should not be the two main options.
 
-em-dash is Claude Code plus compliance. You pick your frameworks. The AI reads the actual law, scans your infrastructure, finds gaps, drafts fixes, and produces signed evidence. You stay in control. Nothing disappears into a black box.
+em-dash is Claude Code and Codex plus compliance. You pick your frameworks. The AI reads the actual law, scans your infrastructure, finds gaps, drafts fixes, and produces signed evidence. You stay in control. Nothing disappears into a black box.
 
 (Why "em-dash"? The em dash and "delve" are both classic AI tells. LLMs can't stop using them. The Delve scandal pushed us to ship this publicly, so the name just... worked.)
 
@@ -25,7 +25,9 @@ em-dash is Claude Code plus compliance. You pick your frameworks. The AI reads t
 
 ## Install
 
-**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Git](https://git-scm.com/), [Bun](https://bun.sh/) v1.0+
+**Requirements:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or Codex, [Git](https://git-scm.com/), [Bun](https://bun.sh/) v1.0+
+
+### Claude Code
 
 ```bash
 cd ~/.claude/skills
@@ -40,6 +42,27 @@ cp -Rf ~/.claude/skills/em-dash .claude/skills/em-dash
 rm -rf .claude/skills/em-dash/.git
 cd .claude/skills/em-dash && ./setup
 ```
+
+### Codex
+
+Global install:
+
+```bash
+git clone https://github.com/aanishs/em-dash.git ~/src/em-dash
+cd ~/src/em-dash && ./setup --host codex
+```
+
+This generates Codex wrappers in `.agents/skills/` inside the repo, links the top-level skills into `~/.codex/skills/`, and creates a minimal `~/.codex/skills/em-dash` runtime root with only the assets the skills need.
+
+Repo-local install:
+
+```bash
+mkdir -p .agents/skills
+git clone https://github.com/aanishs/em-dash.git .agents/skills/em-dash
+cd .agents/skills/em-dash && ./setup --host codex
+```
+
+That keeps the runtime root inside the project at `.agents/skills/em-dash` and links the generated Codex skills next to it.
 
 ---
 
