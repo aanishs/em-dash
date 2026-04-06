@@ -1,0 +1,770 @@
+#!/usr/bin/env bun
+/**
+ * comply-start — Project onboarding: detect tech stack, apply founder answers, generate report.
+ *
+ * Scans project files to detect vendors/technologies, writes founder interview
+ * answers to SQLite (phi_data_flows, vendor_registry, action_items), and
+ * generates a startup compliance report.
+ *
+ * All SQLite operations go through comply-db (via Bun.spawn) for table init,
+ * then direct DB access for transactional writes.
+ *
+ * Subcommands:
+ *   scan                   Detect technologies from project files
+ *   apply --answers <json> Write founder answers to DB
+ *   report                 Generate compliance report from DB
+ */
+
+import { Database } from 'bun:sqlite';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const args = process.argv.slice(2);
+const subcommand = args[0];
+const BIN_DIR = import.meta.dir;
+const NIST_DIR = path.join(BIN_DIR, '..', 'nist');
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function getFlag(name: string): string {
+  const idx = args.indexOf(`--${name}`);
+  if (idx === -1 || idx + 1 >= args.length) return '';
+  return args[idx + 1];
+}
+
+function hasFlag(name: string): boolean {
+  return args.includes(`--${name}`);
+}
+
+function getSlug(): string {
+  try {
+    const proc = Bun.spawnSync([path.join(BIN_DIR, 'comply-slug')], { stdout: 'pipe', stderr: 'pipe' });
+    const match = new TextDecoder().decode(proc.stdout).match(/SLUG=(\S+)/);
+    if (match) return match[1];
+  } catch {}
+  return path.basename(process.cwd());
+}
+
+function getDbPath(): string {
+  const dir = path.join(process.env.HOME ?? '', '.em-dash', 'projects', getSlug());
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'compliance.db');
+}
+
+function openDb(): InstanceType<typeof Database> {
+  return new Database(getDbPath());
+}
+
+function runDb(...dbArgs: string[]): string {
+  const proc = Bun.spawnSync([path.join(BIN_DIR, 'comply-db'), ...dbArgs], {
+    stdout: 'pipe', stderr: 'pipe',
+  });
+  if (proc.exitCode !== 0) {
+    const err = new TextDecoder().decode(proc.stderr);
+    throw new Error(`comply-db ${dbArgs[0]} failed: ${err}`);
+  }
+  return new TextDecoder().decode(proc.stdout).trim();
+}
+
+// ─── Vendor Patterns ────────────────────────────────────────
+
+interface VendorPattern {
+  vendor: string;
+  /** npm/pip/go/gem package names or prefixes */
+  packages: string[];
+  /** Terraform provider names */
+  tfProviders: string[];
+  /** Environment variable keys */
+  envKeys: string[];
+  /** Docker image name patterns */
+  dockerImages: string[];
+}
+
+const VENDOR_PATTERNS: VendorPattern[] = [
+  {
+    vendor: 'aws',
+    packages: ['@aws-sdk/', 'aws-sdk', 'boto3', 'botocore', 'aws-cdk', 'github.com/aws/'],
+    tfProviders: ['aws'],
+    envKeys: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION', 'AWS_DEFAULT_REGION', 'AWS_SESSION_TOKEN', 'AWS_PROFILE'],
+    dockerImages: ['amazonlinux', 'amazon/'],
+  },
+  {
+    vendor: 'gcp',
+    packages: ['@google-cloud/', 'google-cloud-', 'googleapis', 'gcloud', 'github.com/googleapis/', 'cloud.google.com/go'],
+    tfProviders: ['google', 'google-beta'],
+    envKeys: ['GOOGLE_APPLICATION_CREDENTIALS', 'GOOGLE_CLOUD_PROJECT', 'GCP_PROJECT', 'GCLOUD_PROJECT'],
+    dockerImages: ['gcr.io/', 'google/'],
+  },
+  {
+    vendor: 'azure',
+    packages: ['@azure/', 'azure-', 'github.com/Azure/'],
+    tfProviders: ['azurerm', 'azuread'],
+    envKeys: ['AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID', 'AZURE_CLIENT_SECRET'],
+    dockerImages: ['mcr.microsoft.com/'],
+  },
+  {
+    vendor: 'auth0',
+    packages: ['auth0', 'auth0-js', '@auth0/', 'nextjs-auth0'],
+    tfProviders: ['auth0'],
+    envKeys: ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET', 'AUTH0_AUDIENCE'],
+    dockerImages: [],
+  },
+  {
+    vendor: 'stripe',
+    packages: ['stripe', '@stripe/'],
+    tfProviders: [],
+    envKeys: ['STRIPE_SECRET_KEY', 'STRIPE_PUBLISHABLE_KEY', 'STRIPE_WEBHOOK_SECRET'],
+    dockerImages: [],
+  },
+  {
+    vendor: 'vercel',
+    packages: ['vercel', '@vercel/'],
+    tfProviders: ['vercel'],
+    envKeys: ['VERCEL_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_ORG_ID'],
+    dockerImages: [],
+  },
+  {
+    vendor: 'firebase',
+    packages: ['firebase', 'firebase-admin', '@firebase/', 'firebase-functions'],
+    tfProviders: [],
+    envKeys: ['FIREBASE_TOKEN', 'FIREBASE_PROJECT_ID', 'FIREBASE_API_KEY'],
+    dockerImages: [],
+  },
+  {
+    vendor: 'supabase',
+    packages: ['@supabase/supabase-js', '@supabase/'],
+    tfProviders: [],
+    envKeys: ['SUPABASE_URL', 'SUPABASE_KEY', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'],
+    dockerImages: ['supabase/'],
+  },
+  {
+    vendor: 'postgresql',
+    packages: ['pg', 'pgx', 'psycopg2', 'asyncpg', 'sequelize', 'typeorm', 'prisma', 'github.com/lib/pq', 'github.com/jackc/pgx'],
+    tfProviders: [],
+    envKeys: ['DATABASE_URL', 'POSTGRES_HOST', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'PGHOST', 'PGUSER'],
+    dockerImages: ['postgres'],
+  },
+  {
+    vendor: 'mongodb',
+    packages: ['mongodb', 'mongoose', 'pymongo', 'motor', 'go.mongodb.org/mongo-driver'],
+    tfProviders: ['mongodbatlas'],
+    envKeys: ['MONGODB_URI', 'MONGO_URL', 'MONGODB_URL'],
+    dockerImages: ['mongo'],
+  },
+  {
+    vendor: 'redis',
+    packages: ['redis', 'ioredis', 'aioredis', 'github.com/go-redis/redis'],
+    tfProviders: [],
+    envKeys: ['REDIS_URL', 'REDIS_HOST', 'REDIS_PASSWORD'],
+    dockerImages: ['redis'],
+  },
+  {
+    vendor: 'sendgrid',
+    packages: ['@sendgrid/mail', '@sendgrid/', 'sendgrid'],
+    tfProviders: [],
+    envKeys: ['SENDGRID_API_KEY'],
+    dockerImages: [],
+  },
+  {
+    vendor: 'twilio',
+    packages: ['twilio', '@twilio/'],
+    tfProviders: [],
+    envKeys: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'],
+    dockerImages: [],
+  },
+];
+
+// ─── scan ───────────────────────────────────────────────────
+
+interface Detection {
+  vendor: string;
+  detected_from: string;
+  evidence: string;
+}
+
+function scanDir(targetDir: string, deep: boolean): Detection[] {
+  const detected: Detection[] = [];
+  const seen = new Set<string>(); // dedup: vendor|source
+
+  function addDetection(vendor: string, source: string, evidence: string) {
+    const key = `${vendor}|${source}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      detected.push({ vendor, detected_from: source, evidence });
+    }
+  }
+
+  // Helper: list files at a directory level (non-recursive)
+  function listFiles(dir: string): string[] {
+    try {
+      return fs.readdirSync(dir).map(f => path.join(dir, f));
+    } catch { return []; }
+  }
+
+  // Helper: recursively collect files matching a test
+  function walkFiles(dir: string, test: (name: string) => boolean): string[] {
+    const results: string[] = [];
+    function walk(d: string) {
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) {
+          // Skip node_modules, .git, vendor, etc.
+          if (['node_modules', '.git', 'vendor', '.terraform', '__pycache__', '.venv', 'venv'].includes(entry.name)) continue;
+          walk(full);
+        } else if (test(entry.name)) {
+          results.push(full);
+        }
+      }
+    }
+    walk(dir);
+    return results;
+  }
+
+  // Determine which files to scan
+  const filesToCheck = deep
+    ? walkFiles(targetDir, () => true)
+    : listFiles(targetDir);
+
+  // 1. package.json
+  const packageJsonFiles = deep
+    ? filesToCheck.filter(f => path.basename(f) === 'package.json')
+    : [path.join(targetDir, 'package.json')].filter(f => fs.existsSync(f));
+
+  for (const pkgFile of packageJsonFiles) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf-8'));
+      const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+      const relPath = path.relative(targetDir, pkgFile) || 'package.json';
+      for (const depName of Object.keys(allDeps)) {
+        for (const vp of VENDOR_PATTERNS) {
+          for (const pattern of vp.packages) {
+            if (depName === pattern || depName.startsWith(pattern)) {
+              addDetection(vp.vendor, relPath, depName);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`WARNING: Could not parse ${pkgFile}: ${(e as Error).message}`);
+    }
+  }
+
+  // 2. *.tf files — grep for provider declarations
+  const tfFiles = deep
+    ? walkFiles(targetDir, n => n.endsWith('.tf'))
+    : filesToCheck.filter(f => f.endsWith('.tf') && fs.statSync(f).isFile());
+
+  for (const tfFile of tfFiles) {
+    try {
+      const content = fs.readFileSync(tfFile, 'utf-8');
+      const relPath = path.relative(targetDir, tfFile) || path.basename(tfFile);
+      const providerRe = /provider\s+"([^"]+)"/g;
+      let m;
+      while ((m = providerRe.exec(content)) !== null) {
+        const providerName = m[1];
+        for (const vp of VENDOR_PATTERNS) {
+          if (vp.tfProviders.includes(providerName)) {
+            addDetection(vp.vendor, relPath, `provider "${providerName}"`);
+          }
+        }
+      }
+    } catch { /* skip unreadable */ }
+  }
+
+  // 3. .env* files
+  const envFiles = deep
+    ? walkFiles(targetDir, n => n.startsWith('.env'))
+    : filesToCheck.filter(f => path.basename(f).startsWith('.env') && fs.existsSync(f) && fs.statSync(f).isFile());
+
+  for (const envFile of envFiles) {
+    try {
+      const content = fs.readFileSync(envFile, 'utf-8');
+      const relPath = path.relative(targetDir, envFile) || path.basename(envFile);
+      for (const line of content.split('\n')) {
+        const keyMatch = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=/);
+        if (!keyMatch) continue;
+        const key = keyMatch[1];
+        for (const vp of VENDOR_PATTERNS) {
+          if (vp.envKeys.includes(key)) {
+            addDetection(vp.vendor, relPath, key);
+          }
+        }
+      }
+    } catch { /* skip unreadable */ }
+  }
+
+  // 4. Dockerfile — parse FROM images
+  const dockerfiles = deep
+    ? walkFiles(targetDir, n => n === 'Dockerfile' || n.startsWith('Dockerfile.'))
+    : [path.join(targetDir, 'Dockerfile')].filter(f => fs.existsSync(f));
+
+  for (const df of dockerfiles) {
+    try {
+      const content = fs.readFileSync(df, 'utf-8');
+      const relPath = path.relative(targetDir, df) || 'Dockerfile';
+      const fromRe = /^\s*FROM\s+([^\s]+)/gmi;
+      let m;
+      while ((m = fromRe.exec(content)) !== null) {
+        const image = m[1].split(':')[0]; // strip tag
+        for (const vp of VENDOR_PATTERNS) {
+          for (const pattern of vp.dockerImages) {
+            if (image === pattern || image.startsWith(pattern)) {
+              addDetection(vp.vendor, relPath, image);
+            }
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  // 5. docker-compose.yml — parse service images
+  const composeFiles = deep
+    ? walkFiles(targetDir, n => n === 'docker-compose.yml' || n === 'docker-compose.yaml' || n === 'compose.yml' || n === 'compose.yaml')
+    : ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+        .map(n => path.join(targetDir, n))
+        .filter(f => fs.existsSync(f));
+
+  for (const cf of composeFiles) {
+    try {
+      const content = fs.readFileSync(cf, 'utf-8');
+      const relPath = path.relative(targetDir, cf) || path.basename(cf);
+      // Simple regex for image: lines in YAML
+      const imageRe = /^\s*image:\s*['"]?([^\s'"]+)/gm;
+      let m;
+      while ((m = imageRe.exec(content)) !== null) {
+        const image = m[1].split(':')[0];
+        for (const vp of VENDOR_PATTERNS) {
+          for (const pattern of vp.dockerImages) {
+            if (image === pattern || image.startsWith(pattern)) {
+              addDetection(vp.vendor, relPath, image);
+            }
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  // 6. requirements.txt
+  const reqFiles = deep
+    ? walkFiles(targetDir, n => n === 'requirements.txt')
+    : [path.join(targetDir, 'requirements.txt')].filter(f => fs.existsSync(f));
+
+  for (const rf of reqFiles) {
+    try {
+      const content = fs.readFileSync(rf, 'utf-8');
+      const relPath = path.relative(targetDir, rf) || 'requirements.txt';
+      for (const line of content.split('\n')) {
+        const pkgMatch = line.match(/^\s*([a-zA-Z0-9_-]+)/);
+        if (!pkgMatch) continue;
+        const pkg = pkgMatch[1].toLowerCase();
+        for (const vp of VENDOR_PATTERNS) {
+          for (const pattern of vp.packages) {
+            if (pkg === pattern.toLowerCase() || pkg.startsWith(pattern.toLowerCase().replace('/', '-'))) {
+              addDetection(vp.vendor, relPath, pkg);
+            }
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  // 7. go.mod
+  const goModFiles = deep
+    ? walkFiles(targetDir, n => n === 'go.mod')
+    : [path.join(targetDir, 'go.mod')].filter(f => fs.existsSync(f));
+
+  for (const gm of goModFiles) {
+    try {
+      const content = fs.readFileSync(gm, 'utf-8');
+      const relPath = path.relative(targetDir, gm) || 'go.mod';
+      for (const line of content.split('\n')) {
+        const modMatch = line.match(/^\s*([^\s]+)\s+v/);
+        if (!modMatch) continue;
+        const mod = modMatch[1];
+        for (const vp of VENDOR_PATTERNS) {
+          for (const pattern of vp.packages) {
+            if (mod === pattern || mod.startsWith(pattern)) {
+              addDetection(vp.vendor, relPath, mod);
+            }
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  // 8. Gemfile
+  const gemfiles = deep
+    ? walkFiles(targetDir, n => n === 'Gemfile')
+    : [path.join(targetDir, 'Gemfile')].filter(f => fs.existsSync(f));
+
+  for (const gf of gemfiles) {
+    try {
+      const content = fs.readFileSync(gf, 'utf-8');
+      const relPath = path.relative(targetDir, gf) || 'Gemfile';
+      const gemRe = /^\s*gem\s+['"]([^'"]+)['"]/gm;
+      let m;
+      while ((m = gemRe.exec(content)) !== null) {
+        const gem = m[1];
+        for (const vp of VENDOR_PATTERNS) {
+          for (const pattern of vp.packages) {
+            if (gem === pattern || gem.startsWith(pattern)) {
+              addDetection(vp.vendor, relPath, gem);
+            }
+          }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  return detected;
+}
+
+function scan() {
+  if (hasFlag('no-detect')) {
+    console.log(JSON.stringify({ detected: [] }));
+    return;
+  }
+
+  const targetDir = getFlag('dir') || process.cwd();
+  const deep = hasFlag('deep');
+
+  if (!fs.existsSync(targetDir)) {
+    console.error(`Directory not found: ${targetDir}`);
+    process.exit(1);
+  }
+
+  const detected = scanDir(targetDir, deep);
+
+  if (detected.length === 0) {
+    console.log(JSON.stringify({ detected: [], note: 'No project files found' }));
+  } else {
+    console.log(JSON.stringify({ detected }));
+  }
+}
+
+// ─── apply ──────────────────────────────────────────────────
+
+function apply() {
+  const answersArg = getFlag('answers');
+  if (!answersArg) {
+    console.error('Usage: comply-start apply --answers <json-file-or-string>');
+    process.exit(1);
+  }
+
+  // Parse answers: file path or inline JSON
+  let answers: any;
+  try {
+    if (fs.existsSync(answersArg)) {
+      answers = JSON.parse(fs.readFileSync(answersArg, 'utf-8'));
+    } else {
+      answers = JSON.parse(answersArg);
+    }
+  } catch (e) {
+    console.error(`Failed to parse answers: ${(e as Error).message}`);
+    process.exit(1);
+  }
+
+  // 1. Initialize DB if needed (call comply-db init --framework hipaa)
+  try {
+    runDb('init', '--framework', 'hipaa');
+  } catch (e) {
+    // DB may already be initialized — that's fine
+    console.error(`NOTE: DB init: ${(e as Error).message}`);
+  }
+
+  // 2. Open DB for transactional writes
+  const db = openDb();
+
+  // Create onramp-specific tables if not yet present
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS phi_data_flows (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      source           TEXT NOT NULL,
+      destination      TEXT NOT NULL,
+      data_type        TEXT NOT NULL,
+      encryption_status TEXT DEFAULT 'unknown',
+      notes            TEXT
+    );
+    CREATE TABLE IF NOT EXISTS vendor_registry (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      vendor           TEXT NOT NULL,
+      services_used    TEXT,
+      baa_status       TEXT DEFAULT 'unknown',
+      phi_scope        TEXT DEFAULT 'unknown',
+      detected_from    TEXT,
+      confirmed_by_user INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS action_items (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      priority         INTEGER,
+      control_id       TEXT,
+      description      TEXT,
+      effort           TEXT,
+      phase            TEXT,
+      status           TEXT DEFAULT 'pending'
+    );
+  `);
+
+  try {
+    const tx = db.transaction(() => {
+      // Clear previous onramp data to ensure idempotency
+      db.exec('DELETE FROM phi_data_flows');
+      db.exec('DELETE FROM vendor_registry');
+      db.exec('DELETE FROM action_items');
+
+      // Write phi_data_flows
+      if (Array.isArray(answers.phi_flows)) {
+        const insertFlow = db.prepare(
+          'INSERT INTO phi_data_flows (source, destination, data_type, encryption_status) VALUES (?, ?, ?, ?)'
+        );
+        for (const flow of answers.phi_flows) {
+          insertFlow.run(
+            flow.source || '',
+            flow.destination || '',
+            flow.data_type || '',
+            flow.encryption_status || 'unknown',
+          );
+        }
+      }
+
+      // Write vendor_registry
+      if (Array.isArray(answers.vendors)) {
+        const insertVendor = db.prepare(
+          'INSERT INTO vendor_registry (vendor, services_used, baa_status, phi_scope, detected_from, confirmed_by_user) VALUES (?, ?, ?, ?, ?, ?)'
+        );
+        for (const v of answers.vendors) {
+          insertVendor.run(
+            v.vendor || '',
+            Array.isArray(v.services_used) ? v.services_used.join(', ') : (v.services_used || ''),
+            v.baa_status || 'unknown',
+            v.phi_scope || 'unknown',
+            v.detected_from || '',
+            v.confirmed ? 1 : 0,
+          );
+        }
+      }
+
+      // Generate action_items based on findings
+      const insertAction = db.prepare(
+        'INSERT INTO action_items (priority, control_id, description, effort, phase) VALUES (?, ?, ?, ?, ?)'
+      );
+      let priority = 0;
+
+      // Missing BAAs for vendors with phi_scope != "none"
+      if (Array.isArray(answers.vendors)) {
+        for (const v of answers.vendors) {
+          if (v.phi_scope && v.phi_scope !== 'none' && v.baa_status !== 'signed') {
+            priority++;
+            insertAction.run(
+              priority,
+              'pm-10', // Business associate agreements
+              `Get BAA signed with ${v.vendor} (phi_scope: ${v.phi_scope}, current status: ${v.baa_status || 'unknown'})`,
+              'low',
+              'immediate',
+            );
+          }
+        }
+      }
+
+      // Unencrypted PHI flows
+      if (Array.isArray(answers.phi_flows)) {
+        for (const flow of answers.phi_flows) {
+          if (flow.encryption_status && flow.encryption_status !== 'encrypted' && flow.encryption_status !== 'tls') {
+            priority++;
+            insertAction.run(
+              priority,
+              'sc-28', // Protection of information at rest / in transit
+              `Encrypt PHI flow: ${flow.source} -> ${flow.destination} (${flow.data_type}, currently: ${flow.encryption_status})`,
+              'medium',
+              'immediate',
+            );
+          }
+        }
+      }
+
+      // No auth system configured
+      if (!answers.auth_system || answers.auth_system === 'none' || answers.auth_system === '') {
+        priority++;
+        insertAction.run(
+          priority,
+          'ia-2', // Identification and authentication
+          'Configure an authentication system for PHI access controls',
+          'high',
+          'immediate',
+        );
+      }
+
+      // No cloud provider (PHI must be on compliant infrastructure)
+      if (!answers.cloud_provider || answers.cloud_provider === 'none' || answers.cloud_provider === '') {
+        priority++;
+        insertAction.run(
+          priority,
+          'sc-7', // Boundary protection
+          'Select a HIPAA-eligible cloud provider (AWS, GCP, or Azure) for PHI storage and processing',
+          'high',
+          'immediate',
+        );
+      }
+
+      // B2B2C-specific: BAA with each covered entity
+      if (answers.is_b2b2c) {
+        priority++;
+        insertAction.run(
+          priority,
+          'pm-10',
+          'Get BAA signed with each covered entity (B2B2C model requires BAAs with healthcare org customers)',
+          'medium',
+          '30_day',
+        );
+      }
+
+      // Cap at top 5 blockers (by priority)
+      // Items are already inserted in priority order, so just note the count
+    });
+
+    tx();
+    db.close();
+
+    // Output summary
+    const flowCount = Array.isArray(answers.phi_flows) ? answers.phi_flows.length : 0;
+    const vendorCount = Array.isArray(answers.vendors) ? answers.vendors.length : 0;
+
+    console.log(JSON.stringify({
+      success: true,
+      phi_flows_written: flowCount,
+      vendors_written: vendorCount,
+      db_path: getDbPath(),
+    }));
+  } catch (e) {
+    db.close();
+    console.error(`Transaction failed: ${(e as Error).message}`);
+    process.exit(1);
+  }
+}
+
+// ─── report ─────────────────────────────────────────────────
+
+function report() {
+  const db = openDb();
+
+  // Load plain-english.json for control translations (optional)
+  let plainEnglish: Record<string, string> = {};
+  const plainEnglishPath = path.join(NIST_DIR, 'plain-english.json');
+  if (fs.existsSync(plainEnglishPath)) {
+    try {
+      plainEnglish = JSON.parse(fs.readFileSync(plainEnglishPath, 'utf-8'));
+    } catch { /* fall back to control IDs */ }
+  }
+
+  function translateControl(controlId: string): string {
+    return plainEnglish[controlId] || controlId;
+  }
+
+  // PHI Flow Map
+  let phiFlows: any[] = [];
+  try {
+    phiFlows = db.prepare('SELECT * FROM phi_data_flows ORDER BY id').all() as any[];
+  } catch {
+    // Table may not exist yet
+  }
+
+  // Vendor Inventory
+  let vendors: any[] = [];
+  try {
+    vendors = db.prepare('SELECT * FROM vendor_registry ORDER BY id').all() as any[];
+  } catch {
+    // Table may not exist yet
+  }
+
+  // Action Items
+  let actionItems: any[] = [];
+  try {
+    actionItems = db.prepare('SELECT * FROM action_items ORDER BY priority').all() as any[];
+  } catch {
+    // Table may not exist yet
+  }
+
+  db.close();
+
+  // Build PHI Flow Map section
+  const phiFlowMap = phiFlows.map(f => ({
+    source: f.source,
+    destination: f.destination,
+    data_type: f.data_type,
+    encryption_status: f.encryption_status || 'unknown',
+    notes: f.notes || '',
+  }));
+
+  // Build Vendor Inventory section
+  const vendorInventory = vendors.map(v => ({
+    vendor: v.vendor,
+    services_used: v.services_used || '',
+    baa_status: v.baa_status || 'unknown',
+    phi_scope: v.phi_scope || 'unknown',
+    detected_from: v.detected_from || '',
+    confirmed: v.confirmed_by_user === 1,
+  }));
+
+  // Build Top 5 Blockers
+  const top5Blockers = actionItems
+    .filter(a => !a.status || a.status === 'pending')
+    .slice(0, 5)
+    .map(a => ({
+      priority: a.priority,
+      control_id: a.control_id,
+      control_name: translateControl(a.control_id),
+      description: a.description,
+      effort: a.effort || 'unknown',
+      phase: a.phase || 'unscheduled',
+    }));
+
+  // Build 30-Day Action Plan (group by phase)
+  const phases: Record<string, any[]> = { immediate: [], '30_day': [], '90_day': [], unscheduled: [] };
+  for (const item of actionItems) {
+    const phase = item.phase || 'unscheduled';
+    if (!phases[phase]) phases[phase] = [];
+    phases[phase].push({
+      priority: item.priority,
+      control_id: item.control_id,
+      control_name: translateControl(item.control_id),
+      description: item.description,
+      effort: item.effort || 'unknown',
+      status: item.status,
+    });
+  }
+
+  const result = {
+    phi_flow_map: {
+      total: phiFlowMap.length,
+      flows: phiFlowMap,
+    },
+    vendor_inventory: {
+      total: vendorInventory.length,
+      vendors: vendorInventory,
+      missing_baas: vendorInventory.filter(v => v.baa_status !== 'signed' && v.phi_scope !== 'none').length,
+    },
+    top_5_blockers: top5Blockers,
+    action_plan: {
+      immediate: phases.immediate || [],
+      '30_day': phases['30_day'] || [],
+      '90_day': phases['90_day'] || [],
+      unscheduled: phases.unscheduled || [],
+    },
+  };
+
+  console.log(JSON.stringify(result));
+}
+
+// ─── Router ─────────────────────────────────────────────────
+
+switch (subcommand) {
+  case 'scan': scan(); break;
+  case 'apply': apply(); break;
+  case 'report': report(); break;
+  default:
+    console.error('Usage: comply-start <scan|apply|report>');
+    if (subcommand) console.error(`Unknown: ${subcommand}`);
+    process.exit(1);
+}
