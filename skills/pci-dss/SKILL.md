@@ -73,7 +73,7 @@ Store answers in metadata for context in assessments and reports.
 ## Step 3: Recommend next step
 
 Based on progress:
-- **0% complete:** "Run `/comply` to start your compliance journey, or `/comply-auto` to scan everything."
+- **0% complete:** "Run `/comply` to start your compliance journey — Autopilot mode scans everything."
 - **Partial:** "Run `/comply-assess` for interviews or `/comply-scan` for automated checks."
 - **Failures found:** "Run `/comply-fix` to remediate."
 - **Complete:** "Run `/comply-report` to generate your compliance report."
