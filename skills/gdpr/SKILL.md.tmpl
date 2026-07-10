@@ -1,10 +1,10 @@
 ---
 
 name: gdpr
-version: 2.0.0
+version: 3.0.0
 description: |
-  GDPR compliance. Initializes the framework, shows status,
-  and routes to comply-auto/scan/assess/fix/report skills.
+  GDPR compliance. Initializes the framework, asks domain-specific questions
+  about data processing role, lawful basis, and DPO status, then routes to comply skills.
 allowed-tools:
   - Bash
   - Read
@@ -18,32 +18,76 @@ allowed-tools:
 
 # /gdpr — GDPR Compliance
 
-Initialize GDPR compliance and show your status.
+Initialize GDPR compliance with domain-specific context.
 
-## Step 1: Initialize
+## Step 1: Initialize framework
 
 ```bash
 _EMDASH_BIN=$([ -d ~/.claude/skills/em-dash/bin ] && echo ~/.claude/skills/em-dash/bin || echo .claude/skills/em-dash/bin)
 "$_EMDASH_BIN"/comply-db init --framework gdpr 2>/dev/null || true
+"$_EMDASH_BIN"/comply-db journey init 2>/dev/null || true
 "$_EMDASH_BIN"/comply-db summary
-"$_EMDASH_BIN"/comply-db status
 ```
 
 Tell the user: "GDPR compliance initialized. [N] NIST 800-53 controls imported."
 
-## Step 2: Recommend next step
+## Step 2: GDPR-specific questions
 
-- **0% complete:** "Run `/comply-auto` to start — it scans your infrastructure, fixes what it can, and asks you questions."
+Ask these via AskUserQuestion, one at a time:
+
+### Q1: Data processing role
+
+> "Under GDPR, are you a Controller or a Processor?"
+>
+> - A) Controller — we decide what data to collect and why (most SaaS companies)
+> - B) Processor — we process data on behalf of another company (B2B data services)
+> - C) Both — we have our own users AND process data for other companies
+> - D) Not sure
+
+### Q2: Data subject locations
+
+> "Where are your users/data subjects located?"
+>
+> - A) EU only
+> - B) EU + UK (need both GDPR and UK GDPR)
+> - C) Global (including EU residents)
+> - D) Not sure — we haven't tracked this yet
+
+### Q3: Lawful basis for processing
+
+> "What's your primary lawful basis for processing personal data?"
+>
+> - A) Consent — users explicitly agree (opt-in forms, cookie banners)
+> - B) Contract — processing is necessary to provide your service
+> - C) Legitimate Interest — you have a business reason and it doesn't override user rights
+> - D) Not sure — I need to figure this out
+
+### Q4: Data Protection Officer
+
+> "Do you have a Data Protection Officer (DPO)?"
+>
+> - A) Yes, we have a designated DPO
+> - B) No, but we plan to appoint one
+> - C) No — do I need one?
+
+If C: explain that a DPO is required if you process data on a large scale, handle special categories of data (health, biometric), or are a public authority.
+
+Store answers in metadata for context in assessments and reports.
+
+## Step 3: Recommend next step
+
+Based on progress:
+- **0% complete:** "Run `/comply` to start your compliance journey, or `/comply-auto` to scan everything."
 - **Partial:** "Run `/comply-assess` for interviews or `/comply-scan` for automated checks."
 - **Failures found:** "Run `/comply-fix` to remediate."
-- **Complete:** "Run `/comply-report` to generate your signed audit packet."
+- **Complete:** "Run `/comply-report` to generate your compliance report."
 
-## Step 3: Multiple frameworks
+## Step 4: Multiple frameworks
 
-If user wants to add another framework: "Run `/soc2`, `/gdpr`, or `/pci-dss` to add more. Controls are shared automatically."
+"Want to add another framework? Run `/hipaa`, `/soc2`, or `/pci-dss`. Controls are shared automatically."
 
 ## Important
 
 - All `/comply-*` skills work with whichever frameworks you've initialized.
 - Evidence lives in SQLite: `~/.em-dash/projects/{slug}/compliance.db`
-- EU data protection — privacy rights, data processing, breach notification
+- GDPR covers: data subject rights, lawful processing, breach notification (72 hours), DPO requirements

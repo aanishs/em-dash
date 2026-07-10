@@ -1,0 +1,345 @@
+#!/usr/bin/env bun
+/**
+ * comply-check — PR-level compliance gate.
+ *
+ * Checks a git diff for compliance issues: PHI patterns, sensitive data exposure,
+ * removed security controls, new dependencies requiring BAAs.
+ *
+ * Usage:
+ *   comply-check --diff HEAD~1 [--severity warn] [--json]
+ *   comply-check --diff main   [--severity block]
+ *
+ * Exit codes:
+ *   0 — clean (no findings at or above severity threshold)
+ *   1 — findings detected at or above severity threshold
+ *   2 — error (bad args, git failure, etc.)
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const args = process.argv.slice(2);
+
+function getFlag(name: string): string {
+  const idx = args.indexOf(`--${name}`);
+  if (idx === -1 || idx + 1 >= args.length) return '';
+  return args[idx + 1];
+}
+
+const diffRef = getFlag('diff');
+const severity = getFlag('severity') || 'warn';
+const jsonOutput = args.includes('--json');
+
+if (!diffRef) {
+  console.error('Usage: comply-check --diff <ref> [--severity info|warn|block] [--json]');
+  console.error('  e.g.: comply-check --diff HEAD~1');
+  console.error('  e.g.: comply-check --diff main --severity block');
+  process.exit(2);
+}
+
+// ─── Severity levels ───────────────────────────────────────
+
+const SEVERITY_ORDER: Record<string, number> = {
+  'INFO': 0, 'LOW': 1, 'MEDIUM': 2, 'HIGH': 3, 'CRITICAL': 4
+};
+const THRESHOLD: Record<string, string> = {
+  'info': 'INFO', 'warn': 'HIGH', 'block': 'CRITICAL'
+};
+const thresholdSeverity = THRESHOLD[severity] || 'HIGH';
+
+// ─── Load checks registry (code_grep checks only) ─────────
+
+interface CodeCheck {
+  id: string;
+  description: string;
+  pattern: string;
+  severity: string;
+  category: string;
+}
+
+function loadCodeChecks(): CodeCheck[] {
+  const registryPath = path.join(import.meta.dir, '..', 'frameworks', 'checks-registry.ts');
+  const content = fs.readFileSync(registryPath, 'utf-8');
+
+  // Extract code_grep checks by parsing the array literals
+  const checks: CodeCheck[] = [];
+  const checkRegex = /\{\s*id:\s*"([^"]+)"[\s\S]*?category:\s*"([^"]+)"[\s\S]*?description:\s*"([^"]+)"[\s\S]*?type:\s*"code_grep"[\s\S]*?pattern:\s*"([^"]+)"[\s\S]*?severity_default:\s*"([^"]+)"/g;
+
+  let match;
+  while ((match = checkRegex.exec(content)) !== null) {
+    checks.push({
+      id: match[1],
+      category: match[2],
+      description: match[3],
+      pattern: match[4],
+      severity: match[5],
+    });
+  }
+  return checks;
+}
+
+// ─── Load BAA vendor list ──────────────────────────────────
+
+interface BAAVendor {
+  name: string;
+  packages: string[];
+  baa_required: boolean;
+  note?: string;
+}
+
+function loadBAAVendors(): BAAVendor[] {
+  const vendorPath = path.join(import.meta.dir, '..', 'nist', 'baa-vendors.json');
+  if (!fs.existsSync(vendorPath)) return [];
+  try {
+    const data = JSON.parse(fs.readFileSync(vendorPath, 'utf-8'));
+    return data.vendors || [];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Load plain-english descriptions ───────────────────────
+
+function loadPlainEnglish(): Record<string, { plain_english: string }> {
+  const p = path.join(import.meta.dir, '..', 'nist', 'plain-english.json');
+  if (!fs.existsSync(p)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+// ─── Load tool bindings (check → control mapping) ──────────
+
+function loadToolBindings(): Record<string, { checks?: string[] }> {
+  const p = path.join(import.meta.dir, '..', 'nist', 'tool-bindings.json');
+  if (!fs.existsSync(p)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function checkIdToControlId(checkId: string, bindings: Record<string, any>): string | null {
+  for (const [controlId, binding] of Object.entries(bindings)) {
+    if (binding.checks && Array.isArray(binding.checks)) {
+      for (const check of binding.checks) {
+        const id = typeof check === 'string' ? check : check.id;
+        if (id === checkId) return controlId;
+      }
+    }
+  }
+  return null;
+}
+
+// ─── Get diff ──────────────────────────────────────────────
+
+interface DiffFile {
+  path: string;
+  content: string;
+  addedLines: { num: number; text: string }[];
+}
+
+async function getDiffFiles(): Promise<DiffFile[]> {
+  // Get list of changed files
+  const nameProc = Bun.spawnSync(['git', 'diff', diffRef, '--name-only', '--diff-filter=ACMR'], {
+    stdout: 'pipe', stderr: 'pipe'
+  });
+  const names = new TextDecoder().decode(nameProc.stdout).trim().split('\n').filter(Boolean);
+
+  const files: DiffFile[] = [];
+  for (const name of names) {
+    // Skip binary files and non-code files
+    if (/\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|pdf|zip|tar|gz)$/i.test(name)) continue;
+
+    // Get added lines from the diff
+    const diffProc = Bun.spawnSync(['git', 'diff', diffRef, '--', name], {
+      stdout: 'pipe', stderr: 'pipe'
+    });
+    const diffOutput = new TextDecoder().decode(diffProc.stdout);
+
+    // Parse added lines (lines starting with +, excluding +++ header)
+    const addedLines: { num: number; text: string }[] = [];
+    let lineNum = 0;
+    for (const line of diffOutput.split('\n')) {
+      const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)/);
+      if (hunkMatch) {
+        lineNum = parseInt(hunkMatch[1]) - 1;
+        continue;
+      }
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        lineNum++;
+        addedLines.push({ num: lineNum, text: line.slice(1) });
+      } else if (!line.startsWith('-')) {
+        lineNum++;
+      }
+    }
+
+    // Read full file content for context
+    let content = '';
+    try {
+      content = fs.readFileSync(name, 'utf-8');
+    } catch {
+      // File might not exist (deleted)
+    }
+
+    if (addedLines.length > 0) {
+      files.push({ path: name, content, addedLines });
+    }
+  }
+  return files;
+}
+
+// ─── Check for new BAA-requiring dependencies ──────────────
+
+function checkNewDependencies(files: DiffFile[], vendors: BAAVendor[]): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const file of files) {
+    if (!file.path.endsWith('package.json')) continue;
+
+    for (const vendor of vendors) {
+      for (const pkg of vendor.packages) {
+        for (const line of file.addedLines) {
+          if (line.text.includes(`"${pkg}"`)) {
+            findings.push({
+              file: file.path,
+              line: line.num,
+              check_id: 'baa-vendor-dependency',
+              control_id: null,
+              severity: vendor.baa_required ? 'HIGH' : 'MEDIUM',
+              description: `New dependency "${pkg}" (${vendor.name}) ${vendor.baa_required ? 'requires a BAA' : 'may need a BAA'}. ${vendor.note || ''}`.trim(),
+              category: 'vendor_baa',
+            });
+          }
+        }
+      }
+    }
+  }
+  return findings;
+}
+
+// ─── Run checks ────────────────────────────────────────────
+
+interface Finding {
+  file: string;
+  line: number;
+  check_id: string;
+  control_id: string | null;
+  severity: string;
+  description: string;
+  category: string;
+}
+
+function runCodeChecks(files: DiffFile[], checks: CodeCheck[], bindings: Record<string, any>): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const file of files) {
+    for (const check of checks) {
+      try {
+        const regex = new RegExp(check.pattern, 'gi');
+        for (const line of file.addedLines) {
+          if (regex.test(line.text)) {
+            const controlId = checkIdToControlId(check.id, bindings);
+            findings.push({
+              file: file.path,
+              line: line.num,
+              check_id: check.id,
+              control_id: controlId,
+              severity: check.severity,
+              description: check.description,
+              category: check.category,
+            });
+            regex.lastIndex = 0; // Reset for next line
+          }
+        }
+      } catch {
+        // Invalid regex pattern, skip this check
+      }
+    }
+  }
+  return findings;
+}
+
+// ─── Main ──────────────────────────────────────────────────
+
+async function main() {
+  const checks = loadCodeChecks();
+  const vendors = loadBAAVendors();
+  const bindings = loadToolBindings();
+  const plainEnglish = loadPlainEnglish();
+
+  if (checks.length === 0) {
+    console.error('WARNING: No code_grep checks loaded from checks-registry.ts');
+  }
+
+  let files: DiffFile[];
+  try {
+    files = await getDiffFiles();
+  } catch (e: any) {
+    console.error(`Error reading diff: ${e.message}`);
+    process.exit(2);
+  }
+
+  if (files.length === 0) {
+    if (jsonOutput) {
+      console.log(JSON.stringify({ findings: [], summary: { total: 0, files_checked: 0 } }));
+    } else {
+      console.log('No changed files to check.');
+    }
+    process.exit(0);
+  }
+
+  // Run checks
+  const codeFindings = runCodeChecks(files, checks, bindings);
+  const depFindings = checkNewDependencies(files, vendors);
+  const allFindings = [...codeFindings, ...depFindings];
+
+  // Enrich with plain-english descriptions
+  for (const f of allFindings) {
+    if (f.control_id && plainEnglish[f.control_id]) {
+      (f as any).plain_english = plainEnglish[f.control_id].plain_english;
+    }
+  }
+
+  // Filter by severity threshold
+  const thresholdNum = SEVERITY_ORDER[thresholdSeverity] ?? 3;
+  const gatedFindings = allFindings.filter(f => (SEVERITY_ORDER[f.severity] ?? 0) >= thresholdNum);
+
+  // Output
+  if (jsonOutput) {
+    console.log(JSON.stringify({
+      findings: allFindings,
+      summary: {
+        total: allFindings.length,
+        above_threshold: gatedFindings.length,
+        threshold: thresholdSeverity,
+        files_checked: files.length,
+        checks_run: checks.length,
+      }
+    }, null, 2));
+  } else {
+    if (allFindings.length === 0) {
+      console.log(`✓ No compliance findings in ${files.length} changed files (${checks.length} checks run)`);
+    } else {
+      console.log(`Found ${allFindings.length} compliance finding(s) in ${files.length} changed files:\n`);
+      for (const f of allFindings) {
+        const marker = (SEVERITY_ORDER[f.severity] ?? 0) >= thresholdNum ? '✗' : '⚠';
+        console.log(`  ${marker} [${f.severity}] ${f.file}:${f.line}`);
+        console.log(`    ${f.description}`);
+        if (f.control_id) {
+          const pe = plainEnglish[f.control_id];
+          console.log(`    NIST: ${f.control_id}${pe ? ` — ${pe.plain_english}` : ''}`);
+        }
+        console.log('');
+      }
+      console.log(`${gatedFindings.length} finding(s) at or above ${thresholdSeverity} threshold.`);
+    }
+  }
+
+  process.exit(gatedFindings.length > 0 ? 1 : 0);
+}
+
+main();
