@@ -16,12 +16,19 @@ jobs:
           bun-version: latest
       - run: bun install
       - run: bun run gen:skill-docs -- --dry-run
-      - run: bun test
+      - run: bun run skill:check
+      - run: bunx biome check .
+      - run: bunx knip
+      - run: bun run test
 
   compliance:
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -56,9 +63,14 @@ jobs:
               summary = 'Compliance summary unavailable.';
             }
             const body = `## em-dash Compliance Check\n\n\`\`\`\n${summary}\n\`\`\`\n\n> This is an informational check — it does not block merging.\n> Run \`/hipaa\` locally for a full interactive compliance audit.`;
-            github.rest.issues.createComment({
+            // Warn-only: fork PRs get a read-only token — never fail the job over a comment.
+            try {
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: body,
             });
+            } catch (e) {
+              core.warning(`Could not post compliance comment: ${e.message}`);
+            }
