@@ -1,8 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["frameworks/index.ts", "nist/cross-framework.ts", "scripts/*.ts"],
+  "entry": ["frameworks/index.ts", "frameworks/checks-registry.ts", "nist/cross-framework.ts", "scripts/*.ts"],
   "project": ["frameworks/**/*.ts", "nist/**/*.ts", "scripts/**/*.ts"],
-  "ignore": ["demo/**", "test/**", "bin/**"],
-  "ignoreDependencies": ["bun-types"],
+  "ignore": ["frameworks/schema.ts"],
+  "ignoreBinaries": ["lsof", "pip"],
+  "ignoreDependencies": ["canonicalize"],
   "bun": false
 }

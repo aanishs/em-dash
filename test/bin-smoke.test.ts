@@ -382,11 +382,9 @@ describe("Bin smoke: comply-db journey", () => {
 
 describe("Bin smoke: comply-db config", () => {
 	let tmpDir: string;
-	let configPath: string;
 
 	beforeAll(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "emdash-config-"));
-		configPath = path.join(tmpDir, "config.json");
 	});
 
 	afterAll(() => {

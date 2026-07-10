@@ -151,11 +151,13 @@ for (const policy of EXPECTED_REGO) {
 	const content = fs.readFileSync(policyPath, "utf-8");
 	const issues: string[] = [];
 
-	if (!/^package hipaa\.\w+/m.test(content))
-		issues.push("missing package hipaa.* declaration");
+	if (!/^package (compliance|hipaa)\.\w+/m.test(content))
+		issues.push("missing package compliance.* declaration");
 	if (!content.includes("deny[msg]")) issues.push("missing deny[msg] rule");
-	if (!content.includes("hipaa_ref"))
-		issues.push("missing hipaa_ref in deny messages");
+	if (!content.includes("check_id"))
+		issues.push("missing check_id in deny messages");
+	if (!content.includes("severity"))
+		issues.push("missing severity in deny messages");
 
 	if (issues.length > 0) {
 		hasErrors = true;

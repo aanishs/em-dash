@@ -18,7 +18,7 @@ allowed-tools:
 
 ## DISCLAIMER
 
-> **IMPORTANT:** This is a mock audit for educational purposes. It does NOT constitute certification, legal advice, or official compliance verification. A clean report does NOT mean you are HIPAA compliant. Consult qualified legal counsel for formal HIPAA compliance verification.
+> **IMPORTANT:** This is a mock audit for educational purposes. It is NOT legal advice and does NOT constitute certification or official compliance verification. A clean report does NOT mean you are HIPAA compliant. Consult qualified legal counsel for formal HIPAA compliance verification.
 
 # /hipaa-audit — Interactive HIPAA Audit Simulation
 

@@ -77,10 +77,7 @@ describe("Plain-English control translations", () => {
 // ═══ NIST catalog data availability for explain enrichment ═══
 
 const nistCatalog = JSON.parse(
-	fs.readFileSync(
-		path.join(NIST, "NIST_SP-800-53_rev5_catalog.json"),
-		"utf-8",
-	),
+	fs.readFileSync(path.join(NIST, "NIST_SP-800-53_rev5_catalog.json"), "utf-8"),
 );
 
 const toolBindings = JSON.parse(
@@ -90,7 +87,11 @@ const toolBindings = JSON.parse(
 describe("NIST catalog data for explain enrichment", () => {
 	const TOOL_KEYS = ["emdash", "prowler", "checkov", "trivy", "lynis"];
 
-	function findControl(catalog: any, controlId: string) {
+	type CatalogControl = { id: string; controls?: CatalogControl[] };
+	function findControl(
+		catalog: { catalog: { groups: Array<{ controls?: CatalogControl[] }> } },
+		controlId: string,
+	) {
 		const id = controlId.toLowerCase();
 		for (const group of catalog.catalog.groups) {
 			for (const ctrl of group.controls || []) {
@@ -129,10 +130,8 @@ describe("NIST catalog data for explain enrichment", () => {
 	});
 
 	test("tool bindings use expected key types", () => {
-		for (const [_controlId, binding] of Object.entries(
-			toolBindings.bindings,
-		)) {
-			const b = binding as any;
+		for (const [_controlId, binding] of Object.entries(toolBindings.bindings)) {
+			const b = binding as Record<string, unknown>;
 			for (const key of TOOL_KEYS) {
 				if (b[key] !== undefined) {
 					expect(Array.isArray(b[key])).toBe(true);

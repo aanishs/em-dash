@@ -1782,7 +1782,7 @@ function stripCodexFrontmatter(content: string): string {
 	const after = content.slice(fmEnd);
 
 	let cleaned = fm.replace(/^version:.*\n/m, "");
-	cleaned = cleaned.replace(/^allowed-tools:\n(  - .*\n)*/m, "");
+	cleaned = cleaned.replace(/^allowed-tools:\n( {2}- .*\n)*/m, "");
 
 	return before + cleaned + after;
 }
@@ -1800,8 +1800,8 @@ function extractFrontmatterField(content: string, field: string): string {
 	const fm = content.slice(fmStart + 4, fmEnd);
 
 	if (field === "description") {
-		const multiLine = fm.match(/^description:\s*\|?\s*\n((?:  .*\n)*)/m);
-		if (multiLine) return multiLine[1].replace(/^  /gm, "").trim();
+		const multiLine = fm.match(/^description:\s*\|?\s*\n((?: {2}.*\n)*)/m);
+		if (multiLine) return multiLine[1].replace(/^ {2}/gm, "").trim();
 		const inlineMatch = fm.match(/^description:\s*(.+)$/m);
 		return inlineMatch ? inlineMatch[1].trim() : "";
 	}

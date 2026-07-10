@@ -19,7 +19,7 @@ jobs:
       - run: bun run skill:check
       - run: bunx biome check .
       - run: bunx knip
-      - run: bun test
+      - run: bun run test
 
   compliance:
     runs-on: ubuntu-latest
