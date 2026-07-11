@@ -38,6 +38,25 @@ resource "aws_db_instance" "patients" {
 }
 
 # VIOLATION: IAM policy with wildcard — §164.308(a)(4)
+resource "aws_iam_role" "app_role" {
+  name = "hipaa-demo-app-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "app_wildcard" {
+  role       = aws_iam_role.app_role.name
+  policy_arn = aws_iam_policy.app_policy.arn
+}
+
 resource "aws_iam_policy" "app_policy" {
   name = "hipaa-demo-app-policy"
   policy = jsonencode({
@@ -95,7 +114,7 @@ resource "aws_lambda_function" "processor" {
   function_name = "hipaa-demo-processor"
   runtime       = "nodejs20.x"
   handler       = "index.handler"
-  role          = aws_iam_policy.app_policy.arn
+  role          = aws_iam_role.app_role.arn
   filename      = "lambda.zip"
 
   environment {

@@ -60,8 +60,9 @@ describe("Demo app integrity: planted violations stay planted", () => {
 
 	test(".env.example contains hardcoded secrets (§164.312(a)(1))", () => {
 		const env = read(".env.example");
-		expect(env).toMatch(/AWS_SECRET_ACCESS_KEY=\S+/);
-		expect(env).toMatch(/API_KEY=\S+/);
+		expect(env).toMatch(/^AWS_SECRET_ACCESS_KEY=\S+/m);
+		expect(env).toMatch(/^ANTHROPIC_API_KEY=\S+/m);
+		expect(env).toMatch(/^STRIPE_SECRET_KEY=\S+/m);
 	});
 
 	test("main.tf S3 bucket lacks encryption, versioning, and public access block", () => {
