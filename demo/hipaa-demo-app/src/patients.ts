@@ -16,32 +16,27 @@ interface Patient {
   medicalRecordNumber: string;
 }
 
+// VIOLATION: PHI in console.log — §164.312(b)
 export function getPatient(id: string): Patient {
   const patient = db.findPatient(id);
-  // Log only non-PHI identifiers — never log SSN, diagnosis, or other PHI
-  console.log(`Fetching patient id=${id}`);
+  console.log(`Fetching patient: ${patient.firstName} ${patient.lastName}, SSN: ${patient.ssn}`);
+  console.log(`Diagnosis: ${patient.diagnosis}, MRN: ${patient.medicalRecordNumber}`);
   return patient;
 }
 
+// VIOLATION: PHI in error messages — §164.312(a)(1)
 export function updatePatient(id: string, data: Partial<Patient>): Patient {
   const patient = db.findPatient(id);
   if (!patient) {
-    // Never include PHI in error messages — use only the opaque ID
-    throw new Error(`Patient not found: ${id}`);
+    throw new Error(`Patient not found: ${id}, SSN: ${data.ssn}, DOB: ${data.dateOfBirth}`);
   }
   return db.updatePatient(id, data);
 }
 
-export function deletePatient(id: string, userId?: string): void {
-  auditLog({ userId: userId ?? 'unknown', action: 'DELETE', resourceType: 'patient', resourceId: id });
+// VIOLATION: No audit logging — §164.312(b)
+export function deletePatient(id: string): void {
   db.deletePatient(id);
-}
-
-// Audit log stub — replace with a real audit service in production
-function auditLog(entry: { userId: string; action: string; resourceType: string; resourceId: string }) {
-  const record = { ...entry, timestamp: new Date().toISOString() };
-  // Write to structured audit log — never include PHI, only identifiers
-  console.log(`[AUDIT] ${JSON.stringify(record)}`);
+  // No audit trail of who deleted what, when, or why
 }
 
 // Stub DB layer
