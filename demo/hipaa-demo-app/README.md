@@ -5,25 +5,18 @@ A deliberately insecure health-tech backend for demonstrating em-dash.
 **This app has intentional HIPAA violations.** It exists so you can run em-dash against it
 and see what a real compliance scan looks like — without touching production infrastructure.
 
-## What's broken (on purpose)
+## Where's the list of violations?
 
-| Violation | File | HIPAA Ref |
-|-----------|------|-----------|
-| PHI in console.log | `src/patients.ts` | 164.312(b) |
-| No audit logging on PHI endpoints | `src/api.ts` | 164.312(b) |
-| PHI stored in localStorage | `src/dashboard.ts` | 164.312(a)(1) |
-| Weak password hashing (MD5) | `src/auth.ts` | 164.312(d) |
-| No session timeout | `src/auth.ts` | 164.312(a)(2)(iii) |
-| No RBAC on patient endpoints | `src/api.ts` | 164.312(a)(1) |
-| Real SSN patterns in tests | `src/patients.test.ts` | 164.502 |
-| PHI in error responses | `src/api.ts` | 164.312(a)(1) |
-| Secrets in config | `.env.example` | 164.312(a)(1) |
-| No encryption at rest config | `infra/main.tf` | 164.312(a)(2)(iv) |
-| Open S3 bucket | `infra/main.tf` | 164.312(a)(1) |
-| No VPC flow logs | `infra/main.tf` | 164.312(b) |
-| IAM wildcard permissions | `infra/main.tf` | 164.308(a)(4) |
-| No CloudTrail | `infra/main.tf` | 164.312(b) |
-| DB without TLS | `infra/main.tf` | 164.312(e)(1) |
+Not here, on purpose. The violation inventory (the "answer key") lives outside this
+directory so that benchmark runs of em-dash against this app aren't graded against a
+cheat sheet sitting in the scanned tree:
+
+- The **planted set** is guarded by `test/demo-integrity.test.ts` at the repo root —
+  if anyone "fixes" a planted violation, CI fails. (That test enumerates the violations,
+  which is fine: this set is public by design and derivable from git history anyway.)
+- Benchmark scoring against a **held-out set** (novel violations planted just before a
+  scored run, pre-registered via a timestamped public gist) is what measures blind
+  detection. See the Trust Sprint notes in the repo for the protocol.
 
 ## Try it
 
@@ -40,4 +33,5 @@ em-dash will find 15+ violations across code, infrastructure, and missing polici
 ## Contributing
 
 Want to add a new vulnerability for em-dash to detect? Add a file to `src/` or `infra/`
-with an intentional HIPAA gap. Update this README's violation table. Open a PR.
+with an intentional HIPAA gap, and add a matching guard assertion to
+`test/demo-integrity.test.ts` so the violation can't be silently "fixed" later. Open a PR.
