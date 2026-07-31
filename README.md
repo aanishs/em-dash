@@ -82,7 +82,7 @@ Dashboard, CLI, cross-framework matrix, and scan results are all scoped to your 
 ```mermaid
 flowchart TD
     A["You type /hipaa"] --> B["em-dash imports 59 HIPAA controls\nfrom the NIST 800-53 catalog"]
-    B --> C["You type /comply-auto"]
+    B --> C["You type /comply → Autopilot"]
     C --> D{For each control}
     D -->|has automated checks| E["Scans your code + cloud infra"]
     D -->|interview only| F["Asks you a plain-English question"]
@@ -199,7 +199,7 @@ bin/comply-db frameworks --remove cis # remove a framework
 | Command | What it does |
 |---------|-------------|
 | `/comply` | Status dashboard — compliance score, next step recommendation |
-| `/comply-auto` | **Autopilot.** Scans, fixes, interviews — one control at a time |
+| `/comply` → Autopilot | **Autopilot.** Scans, fixes, interviews — one control at a time (`/comply-auto` is deprecated) |
 | `/comply-scan` | Run all available scanning tools in parallel |
 | `/comply-fix` | Remediate failures, generate policy docs, re-scan to verify |
 | `/comply-assess` | Focused interview — one NIST control at a time |
